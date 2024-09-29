@@ -96,6 +96,46 @@ impl Operator for CairoMul {
     }
 }
 
+#[derive(Clone)]
+pub struct CairoMod {
+    sierra_file: PathBuf,
+    runner_config: Arc<CairoRunnerConfig>,
+}
+crate::debug_type!(CairoMod);
+
+impl CairoMod {
+    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
+        if !sierra_file.exists() {
+            panic!("Sierra file does not exist: {:?}", sierra_file);
+        }
+        Self {
+            sierra_file,
+            runner_config,
+        }
+    }
+}
+
+impl Operator for CairoMod {
+    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        if tensors.len() != 2 {
+            panic!("CairoMod operator requires exactly two input tensors.");
+        }
+
+        let (lhs, rhs) = precompile_binary_op(tensors);
+        let inputs = serialize_inputs_binary_op(lhs, rhs);
+
+        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
+        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+            Ok(result) => {
+                vec![result]
+            }
+            Err(e) => {
+                panic!("Error executing Cairo: {:?}", e);
+            }
+        }
+    }
+}
+
 /// Convert all primitive ops to cairo primitive ops.
 #[derive(Debug, Default)]
 pub struct PrimitiveCompiler {
@@ -159,12 +199,19 @@ impl Compiler for PrimitiveCompiler {
                     .unwrap()
                     .join("mul.sierra.json");
 
-                *op_ref = Box::new(CairoAdd::new(
+                *op_ref = Box::new(CairoMul::new(
                     sierra_file,
                     self.runner_config.clone().into(),
                 ));
             } else if is::<Mod>(op) {
-                unimplemented!()
+                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
+                    .unwrap()
+                    .join("rem.sierra.json");
+
+                *op_ref = Box::new(CairoMod::new(
+                    sierra_file,
+                    self.runner_config.clone().into(),
+                ));
             } else if is::<LessThan>(op) {
                 unimplemented!()
             } else if is::<Contiguous>(op) {

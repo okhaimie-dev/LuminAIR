@@ -9,3 +9,9 @@ luminal::test_imports!();
 
 binary_test!(|a, b| a + b, |a, b| a + b, test_add, f32);
 binary_test!(|a, b| a * b, |a, b| a * b, test_mul, f32);
+binary_test!(
+    |a, b| a % b,
+    |a, b| a.clone() - ((a / b.clone()).to_dtype::<i32>().to_dtype::<f32>() * b),
+    test_mod,
+    f32
+);
