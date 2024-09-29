@@ -56,6 +56,46 @@ impl Operator for CairoAdd {
     }
 }
 
+#[derive(Clone)]
+pub struct CairoMul {
+    sierra_file: PathBuf,
+    runner_config: Arc<CairoRunnerConfig>,
+}
+crate::debug_type!(CairoMul);
+
+impl CairoMul {
+    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
+        if !sierra_file.exists() {
+            panic!("Sierra file does not exist: {:?}", sierra_file);
+        }
+        Self {
+            sierra_file,
+            runner_config,
+        }
+    }
+}
+
+impl Operator for CairoMul {
+    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        if tensors.len() != 2 {
+            panic!("CairoMul operator requires exactly two input tensors.");
+        }
+
+        let (lhs, rhs) = precompile_binary_op(tensors);
+        let inputs = serialize_inputs_binary_op(lhs, rhs);
+
+        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
+        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+            Ok(result) => {
+                vec![result]
+            }
+            Err(e) => {
+                panic!("Error executing Cairo: {:?}", e);
+            }
+        }
+    }
+}
+
 /// Convert all primitive ops to cairo primitive ops.
 #[derive(Debug, Default)]
 pub struct PrimitiveCompiler {
@@ -115,7 +155,14 @@ impl Compiler for PrimitiveCompiler {
                     self.runner_config.clone().into(),
                 ));
             } else if is::<Mul>(op) {
-                unimplemented!()
+                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
+                    .unwrap()
+                    .join("mul.sierra.json");
+
+                *op_ref = Box::new(CairoAdd::new(
+                    sierra_file,
+                    self.runner_config.clone().into(),
+                ));
             } else if is::<Mod>(op) {
                 unimplemented!()
             } else if is::<LessThan>(op) {

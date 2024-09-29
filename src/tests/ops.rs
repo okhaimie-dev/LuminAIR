@@ -8,3 +8,4 @@ luminal::test_imports!();
 // =============== BINARY ===============
 
 binary_test!(|a, b| a + b, |a, b| a + b, test_add, f32);
+binary_test!(|a, b| a * b, |a, b| a * b, test_mul, f32);
