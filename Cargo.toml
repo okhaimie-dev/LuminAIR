@@ -1,0 +1,15 @@
+[package]
+name = "luminair"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+luminal = { git = "https://github.com/jafioti/luminal.git", commit = "caa7e55" }
+cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm.git", rev = "v1.0.1", features = [
+    "std",
+    "cairo-1-hints",
+] }
+cairo1-run = { git = "https://github.com/lambdaclass/cairo-vm", rev = "v1.0.1" }
+cairo-lang-sierra = { version = "2.7.0", default-features = false }
+thiserror = "1.0.63"
+itertools = "0.12.1"
