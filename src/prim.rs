@@ -1,14 +1,17 @@
 use std::{
     any::{Any, TypeId},
     path::PathBuf,
+    str::FromStr,
     sync::Arc,
 };
 
 use luminal::prelude::*;
 
 use crate::{
-    cairo_runner::CairoRunnerConfig,
+    cairo_runner::{CairoRunner, CairoRunnerConfig},
+    constants::COMPILED_CAIRO_PATH,
     precomputing::{compute_strides, determine_broadcast_shape, expand_data},
+    serialization::serialize_inputs_binary_op,
     CairoCompilerError,
 };
 use itertools::Itertools;
@@ -64,14 +67,32 @@ impl Operator for CairoAdd {
 
         let cairo_runner = CairoRunner::new((*self.runner_config).clone());
 
+        let inputs = serialize_inputs_binary_op(expanded_a, expanded_b);
 
-        todo!()
+        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+            Ok(result) => {
+                vec![result]
+            }
+            Err(e) => {
+                panic!("Error executing Cairo: {:?}", e);
+            }
+        }
     }
 }
 
 /// Convert all primitive ops to cairo primitive ops.
 #[derive(Debug, Default)]
-pub struct PrimitiveCompiler();
+pub struct PrimitiveCompiler {
+    runner_config: CairoRunnerConfig,
+}
+
+impl PrimitiveCompiler {
+    pub fn new(config: CairoRunnerConfig) -> Self {
+        Self {
+            runner_config: config,
+        }
+    }
+}
 
 impl Compiler for PrimitiveCompiler {
     type Output = Result<(), CairoCompilerError>;
@@ -109,7 +130,14 @@ impl Compiler for PrimitiveCompiler {
             } else if is::<Sqrt>(op) {
                 unimplemented!()
             } else if is::<Add>(op) {
-                unimplemented!()
+                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
+                    .unwrap()
+                    .join("add.sierra.json");
+
+                *op_ref = Box::new(CairoAdd::new(
+                    sierra_file,
+                    self.runner_config.clone().into(),
+                ))
             } else if is::<Mul>(op) {
                 unimplemented!()
             } else if is::<Mod>(op) {

@@ -2,11 +2,14 @@ use cairo_vm::air_public_input::PublicInputError;
 use luminal::prelude::*;
 
 mod cairo_runner;
+mod constants;
+mod fixed_point;
 mod precomputing;
 mod prim;
+mod serialization;
 
 /// Compile graphs to run on CairoVM
-pub type CairoCompiler = (prim::PrimitiveCompiler,);
+pub type CairoCompiler<'a> = (prim::PrimitiveCompiler,);
 
 /// Compiler to replace primops with specialized variants
 pub type SpecialOpsCompiler = ();
