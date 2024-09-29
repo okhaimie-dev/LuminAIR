@@ -1,5 +1,10 @@
+use luminal::op::InputTensor;
+
 /// Helper function to determine broadcasted shape
-pub(crate) fn determine_broadcast_shape(shape_a: &[usize], shape_b: &[usize]) -> Result<Vec<usize>, String> {
+pub(super) fn determine_broadcast_shape(
+    shape_a: &[usize],
+    shape_b: &[usize],
+) -> Result<Vec<usize>, String> {
     let len_a = shape_a.len();
     let len_b = shape_b.len();
     let len = usize::max(len_a, len_b);
@@ -31,7 +36,7 @@ pub(crate) fn determine_broadcast_shape(shape_a: &[usize], shape_b: &[usize]) ->
 }
 
 /// Helper function to compute strides for a given shape
-pub(crate) fn compute_strides(shape: &[usize]) -> Vec<usize> {
+pub(super) fn compute_strides(shape: &[usize]) -> Vec<usize> {
     let mut strides = vec![1; shape.len()];
     for i in (0..shape.len()).rev().skip(1) {
         strides[i - 1] = strides[i] * shape[i];
@@ -40,7 +45,7 @@ pub(crate) fn compute_strides(shape: &[usize]) -> Vec<usize> {
 }
 
 /// Helper function to expand data according to the broadcasted shape
-pub(crate) fn expand_data(
+pub(super) fn expand_data(
     data: &[f32],
     original_shape: &[usize],
     broadcast_shape: &[usize],
@@ -75,4 +80,12 @@ pub(crate) fn expand_data(
     }
 
     expanded_data
+}
+
+/// Helper function to extract Vec<f32> from InputTensor
+pub(super) fn get_vec<'a>(tensor: &'a InputTensor<'a>) -> &'a Vec<f32> {
+    tensor
+        .borrowed()
+        .downcast_ref::<Vec<f32>>()
+        .expect("Tensor data is not Vec<f32>")
 }

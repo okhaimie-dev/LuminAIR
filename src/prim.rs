@@ -10,7 +10,7 @@ use luminal::prelude::*;
 use crate::{
     cairo_runner::{CairoRunner, CairoRunnerConfig},
     constants::COMPILED_CAIRO_PATH,
-    precomputing::{compute_strides, determine_broadcast_shape, expand_data},
+    precomputing::binary::precompile_binary_op,
     serialization::serialize_inputs_binary_op,
     CairoCompilerError,
 };
@@ -37,41 +37,14 @@ impl CairoAdd {
 
 impl Operator for CairoAdd {
     fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        // Ensure exactly two input tensors
         if tensors.len() != 2 {
             panic!("CairoAdd operator requires exactly two input tensors.");
         }
 
-        // Extract input tensors and their ShapeTrackers
-        let (tensor_a, shape_a_tracker) = &tensors[0];
-        let (tensor_b, shape_b_tracker) = &tensors[1];
-
-        // Downcast to Vec<f32>
-        let data_a = get_vec(tensor_a);
-        let data_b = get_vec(tensor_b);
-
-        // Get original shapes
-        let shape_a = shape_a_tracker.shape_usize();
-        let shape_b = shape_b_tracker.shape_usize();
-
-        // Determine broadcasted shape
-        let broadcast_shape = match determine_broadcast_shape(&shape_a, &shape_b) {
-            Ok(shape) => shape,
-            Err(e) => panic!("Broadcasting error: {}", e),
-        };
-
-        // Compute strides for original tensors
-        let strides_a = compute_strides(&shape_a);
-        let strides_b = compute_strides(&shape_b);
-
-        // Expand data according to broadcasted shape
-        let expanded_a = expand_data(&data_a, &shape_a, &broadcast_shape, &strides_a);
-        let expanded_b = expand_data(&data_b, &shape_b, &broadcast_shape, &strides_b);
+        let (lhs, rhs) = precompile_binary_op(tensors);
+        let inputs = serialize_inputs_binary_op(lhs, rhs);
 
         let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-
-        let inputs = serialize_inputs_binary_op(expanded_a, expanded_b);
-
         match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
             Ok(result) => {
                 vec![result]
@@ -157,12 +130,4 @@ impl Compiler for PrimitiveCompiler {
         }
         Ok(())
     }
-}
-
-/// Helper function to extract Vec<f32> from InputTensor
-fn get_vec<'a>(tensor: &'a InputTensor<'a>) -> &'a Vec<f32> {
-    tensor
-        .borrowed()
-        .downcast_ref::<Vec<f32>>()
-        .expect("Tensor data is not Vec<f32>")
 }
