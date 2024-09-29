@@ -21,3 +21,10 @@ num-bigint = "0.4"
 num-traits = "0.2.19"
 serde_json = "1.0.120"
 lazy_static = "1.5.0"
+
+[dev-dependencies]
+paste = "1.0.15"
+rand = "0.8.5"
+dfdx = { version = "0.13" }
+candle-core = "0.5.0"
+ctor = "0.2.8"

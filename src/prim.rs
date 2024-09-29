@@ -25,6 +25,9 @@ crate::debug_type!(CairoAdd);
 
 impl CairoAdd {
     pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
+        if !sierra_file.exists() {
+            panic!("Sierra file does not exist: {:?}", sierra_file);
+        }
         Self {
             sierra_file,
             runner_config,
@@ -137,7 +140,7 @@ impl Compiler for PrimitiveCompiler {
                 *op_ref = Box::new(CairoAdd::new(
                     sierra_file,
                     self.runner_config.clone().into(),
-                ))
+                ));
             } else if is::<Mul>(op) {
                 unimplemented!()
             } else if is::<Mod>(op) {
@@ -152,8 +155,7 @@ impl Compiler for PrimitiveCompiler {
                 unimplemented!()
             }
         }
-
-        todo!()
+        Ok(())
     }
 }
 

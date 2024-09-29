@@ -8,6 +8,9 @@ mod precomputing;
 mod prim;
 mod serialization;
 
+#[cfg(test)]
+mod tests;
+
 /// Compile graphs to run on CairoVM
 pub type CairoCompiler<'a> = (prim::PrimitiveCompiler,);
 
