@@ -1,19 +1,18 @@
-use luminair_cairo_lib::Tensor;
 
-pub(crate) fn tensor_add<T, +Add<T>, +Copy<T>, +Drop<T>>(
-    mut lhs: Tensor<T>, mut rhs: Tensor<T>
-) -> Tensor<T> {
-    let mut result_data: Array<T> = ArrayTrait::new();
+pub(crate) fn add<T, +Add<T>, +Copy<T>, +Drop<T>>(
+    mut lhs: Span<T>, mut rhs: Span<T>
+) -> Span<T> {
+    let mut result: Array<T> = ArrayTrait::new();
 
     loop {
-        match lhs.data.pop_front() {
+        match lhs.pop_front() {
             Option::Some(lhs_ele) => {
-                let rhs_ele = rhs.data.pop_front().unwrap();
-                result_data.append(*lhs_ele + *rhs_ele);
+                let rhs_ele = rhs.pop_front().unwrap();
+                result.append(*lhs_ele + *rhs_ele);
             },
             Option::None => { break; }
         }
     };
 
-    Tensor { data: result_data.span() }
+    result.span()
 }

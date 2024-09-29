@@ -62,15 +62,10 @@ impl Operator for CairoAdd {
         let expanded_a = expand_data(&data_a, &shape_a, &broadcast_shape, &strides_a);
         let expanded_b = expand_data(&data_b, &shape_b, &broadcast_shape, &strides_b);
 
-        // Perform element-wise addition
-        let result_data: Vec<f32> = expanded_a
-            .iter()
-            .zip(expanded_b.iter())
-            .map(|(a, b)| a + b)
-            .collect();
+        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
 
-        // Return the result tensor
-        vec![Tensor::new(result_data)]
+
+        todo!()
     }
 }
 

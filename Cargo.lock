@@ -1795,6 +1795,7 @@ dependencies = [
 name = "luminair"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "cairo-lang-sierra",
  "cairo-vm",
  "cairo1-run",
