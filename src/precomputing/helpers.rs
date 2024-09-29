@@ -1,4 +1,4 @@
-use luminal::op::InputTensor;
+use luminal::{op::InputTensor, shape::ShapeTracker};
 
 /// Helper function to determine broadcasted shape
 pub(super) fn determine_broadcast_shape(
@@ -88,4 +88,14 @@ pub(super) fn get_vec<'a>(tensor: &'a InputTensor<'a>) -> &'a Vec<f32> {
         .borrowed()
         .downcast_ref::<Vec<f32>>()
         .expect("Tensor data is not Vec<f32>")
+}
+
+/// Helper function to compute the effective shape by treating fake dimensions as size 1
+pub(super) fn get_effective_shape(shape_tracker: &ShapeTracker) -> Vec<usize> {
+    shape_tracker
+        .shape_usize()
+        .iter()
+        .zip(shape_tracker.fake.iter())
+        .map(|(dim, &is_fake)| if is_fake { 1 } else { *dim })
+        .collect()
 }

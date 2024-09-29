@@ -5,6 +5,8 @@ use std::{
     sync::Arc,
 };
 
+use rustc_hash::FxHashMap;
+
 use luminal::prelude::*;
 
 use crate::{
@@ -15,6 +17,39 @@ use crate::{
     CairoCompilerError,
 };
 use itertools::Itertools;
+
+#[derive(Clone)]
+pub struct CairoConstant {
+    pub value: ConstantValue,
+    dyn_map: *const FxHashMap<char, usize>,
+}
+impl core::fmt::Debug for CairoConstant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CairoConstant({:?})", self.value)
+    }
+}
+
+impl CairoConstant {
+    pub fn new(value: ConstantValue, dyn_map: *const FxHashMap<char, usize>) -> Self {
+        Self { value, dyn_map }
+    }
+}
+
+impl Operator for CairoConstant {
+    fn process(&mut self, _: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        let value = match &self.value {
+            ConstantValue::Expression(e) => {
+                vec![e.exec(unsafe { self.dyn_map.as_ref().unwrap() }).unwrap() as f32]
+            }
+            ConstantValue::Float(f) => vec![*f],
+        };
+        let res = vec![Tensor::new(value)];
+
+        println!("Constant {:?}", res);
+
+        res
+    }
+}
 
 #[derive(Clone)]
 pub struct CairoAdd {
@@ -136,6 +171,46 @@ impl Operator for CairoMod {
     }
 }
 
+#[derive(Clone)]
+pub struct CairoLessThan {
+    sierra_file: PathBuf,
+    runner_config: Arc<CairoRunnerConfig>,
+}
+crate::debug_type!(CairoLessThan);
+
+impl CairoLessThan {
+    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
+        if !sierra_file.exists() {
+            panic!("Sierra file does not exist: {:?}", sierra_file);
+        }
+        Self {
+            sierra_file,
+            runner_config,
+        }
+    }
+}
+
+impl Operator for CairoLessThan {
+    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        if tensors.len() != 2 {
+            panic!("CairoLessThan operator requires exactly two input tensors.");
+        }
+
+        let (lhs, rhs) = precompile_binary_op(tensors);
+        let inputs = serialize_inputs_binary_op(lhs, rhs);
+
+        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
+        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+            Ok(result) => {
+                vec![result]
+            }
+            Err(e) => {
+                panic!("Error executing Cairo: {:?}", e);
+            }
+        }
+    }
+}
+
 /// Convert all primitive ops to cairo primitive ops.
 #[derive(Debug, Default)]
 pub struct PrimitiveCompiler {
@@ -161,15 +236,8 @@ impl Compiler for PrimitiveCompiler {
         fn is<T: Any>(type_id: TypeId) -> bool {
             type_id == TypeId::of::<T>()
         }
-
         // Swap primitive ops
         for id in graph.node_indices().collect::<Vec<_>>() {
-            let shapes = graph
-                .edges_directed(id, petgraph::Direction::Incoming)
-                .filter_map(|i| i.weight().as_data())
-                .sorted_by_key(|e| e.0)
-                .map(|e| e.2)
-                .collect::<Vec<_>>();
             let op = graph.node_weight(id).unwrap().as_any().type_id();
             let op_ref = graph.graph.node_weight_mut(id).unwrap();
 
@@ -180,7 +248,7 @@ impl Compiler for PrimitiveCompiler {
             } else if is::<Sin>(op) {
                 unimplemented!()
             } else if let Some(c) = op_ref.as_any().downcast_ref::<Constant>() {
-                unimplemented!()
+                *op_ref = Box::new(CairoConstant::new(c.0.clone(), &graph.dyn_map));
             } else if is::<Recip>(op) {
                 unimplemented!()
             } else if is::<Sqrt>(op) {
@@ -213,7 +281,14 @@ impl Compiler for PrimitiveCompiler {
                     self.runner_config.clone().into(),
                 ));
             } else if is::<LessThan>(op) {
-                unimplemented!()
+                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
+                    .unwrap()
+                    .join("lt.sierra.json");
+
+                *op_ref = Box::new(CairoLessThan::new(
+                    sierra_file,
+                    self.runner_config.clone().into(),
+                ));
             } else if is::<Contiguous>(op) {
                 unimplemented!()
             } else if let Some(SumReduce(dim)) = op_ref.as_any().downcast_ref() {

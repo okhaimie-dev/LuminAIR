@@ -8,6 +8,8 @@ luminal::test_imports!();
 // =============== BINARY ===============
 
 binary_test!(|a, b| a + b, |a, b| a + b, test_add, f32);
+binary_test!(|a, b| a - b, |a, b| a - b, test_sub, f32);
+
 binary_test!(|a, b| a * b, |a, b| a * b, test_mul, f32);
 binary_test!(
     |a, b| a % b,
@@ -15,3 +17,4 @@ binary_test!(
     test_mod,
     f32
 );
+binary_test!(|a, b| a.min(b), |a, b| a.minimum(b), test_min, f32);

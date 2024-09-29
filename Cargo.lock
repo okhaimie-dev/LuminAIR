@@ -2203,6 +2203,7 @@ dependencies = [
  "num-traits 0.2.19",
  "paste",
  "rand",
+ "rustc-hash",
  "serde_json",
  "thiserror",
  "tracing",
