@@ -7,6 +7,7 @@ luminal::test_imports!();
 
 // =============== UNARY ===============
 unary_test!(|a| a.log2(), |a| a.ln() / 2_f32.ln(), test_log2, f32);
+unary_test!(|a| a.exp2(), |a| (a * 2_f32.ln()).exp(), test_exp2, f32);
 
 // =============== BINARY ===============
 
