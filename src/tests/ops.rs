@@ -1,9 +1,12 @@
 use luminal::prelude::*;
 use rand::{rngs::StdRng, SeedableRng};
 
-use crate::{binary_test, CairoCompiler};
+use crate::{binary_test, unary_test, CairoCompiler};
 
 luminal::test_imports!();
+
+// =============== UNARY ===============
+unary_test!(|a| a.log2(), |a| a.ln() / 2_f32.ln(), test_log2, f32);
 
 // =============== BINARY ===============
 

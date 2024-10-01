@@ -13,10 +13,9 @@ use crate::{
     cairo_runner::{CairoRunner, CairoRunnerConfig},
     constants::COMPILED_CAIRO_PATH,
     precomputing::{binary::precompile_binary_op, helpers::get_vec},
-    serialization::{serialize_inputs_binary_op, serialize_reduce_op},
+    serialization::{serialize_inputs_binary_op, serialize_reduce_op, serialize_unary_op},
     CairoCompilerError,
 };
-use itertools::Itertools;
 
 #[derive(Clone)]
 pub struct CairoConstant {
@@ -48,6 +47,46 @@ impl Operator for CairoConstant {
         println!("Constant {:?}", res);
 
         res
+    }
+}
+
+#[derive(Clone)]
+pub struct CairoLog2 {
+    sierra_file: PathBuf,
+    runner_config: Arc<CairoRunnerConfig>,
+}
+crate::debug_type!(CairoLog2);
+
+impl CairoLog2 {
+    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
+        if !sierra_file.exists() {
+            panic!("Sierra file does not exist: {:?}", sierra_file);
+        }
+        Self {
+            sierra_file,
+            runner_config,
+        }
+    }
+}
+
+impl Operator for CairoLog2 {
+    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        // Ensure exactly one input tensor is provided
+        if tensors.len() != 1 {
+            panic!("CairoLog2 operator requires exactly one input tensor.");
+        }
+
+        let inputs = serialize_unary_op(get_vec(&tensors[0].0));
+
+        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
+        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+            Ok(result) => {
+                vec![result]
+            }
+            Err(e) => {
+                panic!("Error executing Cairo: {:?}", e);
+            }
+        }
     }
 }
 
@@ -333,7 +372,7 @@ impl Compiler for PrimitiveCompiler {
     fn compile<T: luminal::prelude::ToIdsMut>(
         &self,
         graph: &mut luminal::prelude::Graph,
-        ids: T,
+        _: T,
     ) -> Self::Output {
         fn is<T: Any>(type_id: TypeId) -> bool {
             type_id == TypeId::of::<T>()
@@ -344,7 +383,14 @@ impl Compiler for PrimitiveCompiler {
             let op_ref = graph.graph.node_weight_mut(id).unwrap();
 
             if is::<Log2>(op) {
-                unimplemented!()
+                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
+                    .unwrap()
+                    .join("log2.sierra.json");
+
+                *op_ref = Box::new(CairoLog2::new(
+                    sierra_file,
+                    self.runner_config.clone().into(),
+                ));
             } else if is::<Exp2>(op) {
                 unimplemented!()
             } else if is::<Sin>(op) {

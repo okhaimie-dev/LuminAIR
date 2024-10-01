@@ -11,6 +11,43 @@ mod ops;
 // }
 
 #[macro_export]
+macro_rules! single_unary_test {
+    ($luminal_func: expr , $dfdx_func: expr , $name: ident, $type: ty, $size: expr) => {
+        paste::paste! {
+            #[test]
+            fn [<$name _ $size>]() {
+                let mut rng = StdRng::seed_from_u64(1);
+                let data = random_vec_rng($size, &mut rng);
+                let mut cx = Graph::new();
+                let a = cx.tensor($size).set(data.clone());
+                let f: fn(GraphTensor) -> GraphTensor = $luminal_func;
+                let mut b = f(a).retrieve();
+                let _ = cx.compile(CairoCompiler::default(), &mut b);
+                cx.execute_debug();
+
+                let d_dev = Cpu::default();
+                let d_a = d_dev
+                    .tensor_from_vec(data, (dfdx::prelude::Const::<$size>,))
+                    .to_dtype::<$type>();
+                let f: fn(
+                    dfdx::prelude::Tensor<Rank1<$size>, $type, Cpu, NoneTape>,
+                ) -> dfdx::prelude::Tensor<Rank1<$size>, $type, Cpu, NoneTape> = $dfdx_func;
+                let d_b = f(d_a);
+
+                assert_close(&b.data(), &d_b.to_dtype::<f32>().as_vec());
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! unary_test {
+    ($luminal_func: expr , $dfdx_func: expr , $name: ident, $type: ty) => {
+        $crate::single_unary_test!($luminal_func, $dfdx_func, $name, $type, 3);
+    };
+}
+
+#[macro_export]
 macro_rules! single_binary_test {
     ($luminal_func: expr , $dfdx_func: expr , $name: ident, $type: ty, $size: expr) => {
         paste::paste! {
