@@ -211,6 +211,46 @@ impl Operator for CairoSin {
 }
 
 #[derive(Clone)]
+pub struct CairoRecip {
+    sierra_file: PathBuf,
+    runner_config: Arc<CairoRunnerConfig>,
+}
+crate::debug_type!(CairoRecip);
+
+impl CairoRecip {
+    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
+        if !sierra_file.exists() {
+            panic!("Sierra file does not exist: {:?}", sierra_file);
+        }
+        Self {
+            sierra_file,
+            runner_config,
+        }
+    }
+}
+
+impl Operator for CairoRecip {
+    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        // Ensure exactly one input tensor is provided
+        if tensors.len() != 1 {
+            panic!("CairoRecip operator requires exactly one input tensor.");
+        }
+
+        let inputs = serialize_unary_op(get_vec(&tensors[0].0));
+
+        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
+        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+            Ok(result) => {
+                vec![result]
+            }
+            Err(e) => {
+                panic!("Error executing Cairo: {:?}", e);
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct CairoAdd {
     sierra_file: PathBuf,
     runner_config: Arc<CairoRunnerConfig>,
@@ -532,7 +572,14 @@ impl Compiler for PrimitiveCompiler {
             } else if let Some(c) = op_ref.as_any().downcast_ref::<Constant>() {
                 *op_ref = Box::new(CairoConstant::new(c.0.clone(), &graph.dyn_map));
             } else if is::<Recip>(op) {
-                unimplemented!()
+                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
+                    .unwrap()
+                    .join("recip.sierra.json");
+
+                *op_ref = Box::new(CairoRecip::new(
+                    sierra_file,
+                    self.runner_config.clone().into(),
+                ));
             } else if is::<Sqrt>(op) {
                 let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
                     .unwrap()

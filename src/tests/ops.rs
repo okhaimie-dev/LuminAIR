@@ -10,7 +10,7 @@ unary_test!(|a| a.log2(), |a| a.ln() / 2_f32.ln(), test_log2, f32);
 unary_test!(|a| a.exp2(), |a| (a * 2_f32.ln()).exp(), test_exp2, f32);
 unary_test!(|a| a.sqrt(), |a| a.sqrt(), test_sqrt, f32);
 unary_test!(|a| a.sin(), |a| a.sin(), test_sin, f32);
-
+unary_test!(|a| a.recip(), |a| a.recip(), test_recip, f32);
 
 // =============== BINARY ===============
 
