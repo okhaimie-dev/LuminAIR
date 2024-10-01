@@ -131,6 +131,46 @@ impl Operator for CairoExp2 {
 }
 
 #[derive(Clone)]
+pub struct CairoSqrt {
+    sierra_file: PathBuf,
+    runner_config: Arc<CairoRunnerConfig>,
+}
+crate::debug_type!(CairoSqrt);
+
+impl CairoSqrt {
+    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
+        if !sierra_file.exists() {
+            panic!("Sierra file does not exist: {:?}", sierra_file);
+        }
+        Self {
+            sierra_file,
+            runner_config,
+        }
+    }
+}
+
+impl Operator for CairoSqrt {
+    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        // Ensure exactly one input tensor is provided
+        if tensors.len() != 1 {
+            panic!("CairoSqrt operator requires exactly one input tensor.");
+        }
+
+        let inputs = serialize_unary_op(get_vec(&tensors[0].0));
+
+        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
+        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+            Ok(result) => {
+                vec![result]
+            }
+            Err(e) => {
+                panic!("Error executing Cairo: {:?}", e);
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct CairoAdd {
     sierra_file: PathBuf,
     runner_config: Arc<CairoRunnerConfig>,
@@ -447,7 +487,14 @@ impl Compiler for PrimitiveCompiler {
             } else if is::<Recip>(op) {
                 unimplemented!()
             } else if is::<Sqrt>(op) {
-                unimplemented!()
+                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
+                    .unwrap()
+                    .join("sqrt.sierra.json");
+
+                *op_ref = Box::new(CairoSqrt::new(
+                    sierra_file,
+                    self.runner_config.clone().into(),
+                ));
             } else if is::<Add>(op) {
                 let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
                     .unwrap()
