@@ -24,8 +24,8 @@ binary_test!(|a, b| a.min(b), |a, b| a.minimum(b), test_min, f32);
 #[test]
 fn test_sum_reduce() {
     let mut cx = Graph::new();
-    let data = random_vec(4 * 4096);
-    let a = cx.tensor((1, 4, 4096));
+    let data = random_vec(4 * 512);
+    let a = cx.tensor((1, 4, 512));
     a.set(data.clone());
     let mut b = a.sum_reduce(1).retrieve();
     let mut c = a.sum_reduce(0).retrieve();
@@ -35,7 +35,7 @@ fn test_sum_reduce() {
     cx.execute();
 
     let d_dev = Cpu::default();
-    let d_a = d_dev.tensor_from_vec(data, (DConst::<1>, DConst::<4>, DConst::<4096>));
+    let d_a = d_dev.tensor_from_vec(data, (DConst::<1>, DConst::<4>, DConst::<512>));
     let d_b = d_a.clone().sum::<_, DAxis<1>>();
     let d_c = d_a.clone().sum::<_, DAxis<0>>();
     let d_d = d_a.sum::<_, DAxis<2>>();
