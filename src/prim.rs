@@ -12,7 +12,7 @@ use luminal::prelude::*;
 use crate::{
     cairo_runner::{CairoRunner, CairoRunnerConfig},
     constants::COMPILED_CAIRO_PATH,
-    precomputing::{binary::precompile_binary_op, helpers::get_vec},
+    precomputing::{binary::precompile_binary_op, helpers::{get_index, get_vec}},
     serialization::{serialize_inputs_binary_op, serialize_reduce_op, serialize_unary_op},
     CairoCompilerError,
 };
@@ -47,6 +47,23 @@ impl Operator for CairoConstant {
         println!("Constant {:?}", res);
 
         res
+    }
+}
+
+/// Ensure a tensor is contiguously layed out in memory. May involve copying
+#[derive(Debug, Clone, PartialEq)]
+pub struct Contiguous;
+impl Operator for Contiguous {
+    fn process(&mut self, inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        // Copy data over to new tensor
+        let inp_data = get_vec(&inp[0].0);
+        let mut out_data = vec![0.; inp[0].1.n_elements().to_usize().unwrap()];
+        let expr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
+        let mut stack = vec![];
+        for (i, out) in out_data.iter_mut().enumerate() {
+            *out = get_index(inp_data, &expr, &mut stack, i);
+        }
+        vec![Tensor::new(out_data)]
     }
 }
 
@@ -626,7 +643,7 @@ impl Compiler for PrimitiveCompiler {
                     self.runner_config.clone().into(),
                 ));
             } else if is::<Contiguous>(op) {
-                unimplemented!()
+                *op_ref = Box::new(Contiguous)
             } else if let Some(SumReduce(dim)) = op_ref.as_any().downcast_ref() {
                 let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
                     .unwrap()

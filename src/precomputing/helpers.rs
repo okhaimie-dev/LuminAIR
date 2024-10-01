@@ -1,4 +1,4 @@
-use luminal::{op::InputTensor, shape::ShapeTracker};
+use luminal::{op::InputTensor, shape::{Expression, ShapeTracker}};
 
 /// Helper function to determine broadcasted shape
 pub(super) fn determine_broadcast_shape(
@@ -98,4 +98,17 @@ pub(super) fn get_effective_shape(shape_tracker: &ShapeTracker) -> Vec<usize> {
         .zip(shape_tracker.fake.iter())
         .map(|(dim, &is_fake)| if is_fake { 1 } else { *dim })
         .collect()
+}
+
+pub(crate) fn get_index(
+    data: &[f32],
+    (ind, val): &(Expression, Expression),
+    stack: &mut Vec<i64>,
+    index: usize,
+) -> f32 {
+    if val.exec_single_var_stack(index, stack) != 0 {
+        data[ind.exec_single_var_stack(index, stack)]
+    } else {
+        0.0
+    }
 }
