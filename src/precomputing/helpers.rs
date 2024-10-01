@@ -83,7 +83,7 @@ pub(super) fn expand_data(
 }
 
 /// Helper function to extract Vec<f32> from InputTensor
-pub(super) fn get_vec<'a>(tensor: &'a InputTensor<'a>) -> &'a Vec<f32> {
+pub(crate) fn get_vec<'a>(tensor: &'a InputTensor<'a>) -> &'a Vec<f32> {
     tensor
         .borrowed()
         .downcast_ref::<Vec<f32>>()
