@@ -262,6 +262,57 @@ impl Operator for CairoSumReduce {
     }
 }
 
+#[derive(Clone)]
+pub struct CairoMaxReduce {
+    sierra_file: PathBuf,
+    runner_config: Arc<CairoRunnerConfig>,
+    dim: usize,
+}
+crate::debug_type!(CairoMaxReduce);
+
+impl CairoMaxReduce {
+    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>, dim: usize) -> Self {
+        if !sierra_file.exists() {
+            panic!("Sierra file does not exist: {:?}", sierra_file);
+        }
+        Self {
+            sierra_file,
+            runner_config,
+            dim,
+        }
+    }
+}
+
+impl Operator for CairoMaxReduce {
+    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        // Ensure exactly one input tensor is provided
+        if tensors.len() != 1 {
+            panic!("CairoMaxReduce operator requires exactly one input tensor.");
+        }
+
+        // Extract the shape of the input tensor
+        let sh = tensors[0].1.shape_usize();
+        // Calculate front_size: product of dimensions before the reduction axis
+        let front_size: usize = sh.iter().take(self.dim).product::<usize>().max(1);
+        // Calculate back_size: product of dimensions after the reduction axis
+        let back_size = sh.iter().skip(self.dim + 1).product::<usize>().max(1);
+        // Size of the dimension to be reduced
+        let dim_size: usize = sh[self.dim];
+
+        let inputs = serialize_reduce_op(get_vec(&tensors[0].0), front_size, back_size, dim_size);
+
+        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
+        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+            Ok(result) => {
+                vec![result]
+            }
+            Err(e) => {
+                panic!("Error executing Cairo: {:?}", e);
+            }
+        }
+    }
+}
+
 /// Convert all primitive ops to cairo primitive ops.
 #[derive(Debug, Default)]
 pub struct PrimitiveCompiler {
@@ -353,7 +404,15 @@ impl Compiler for PrimitiveCompiler {
                     *dim,
                 ));
             } else if let Some(MaxReduce(dim)) = op_ref.as_any().downcast_ref() {
-                unimplemented!()
+                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
+                    .unwrap()
+                    .join("max_reduce.sierra.json");
+
+                *op_ref = Box::new(CairoMaxReduce::new(
+                    sierra_file,
+                    self.runner_config.clone().into(),
+                    *dim,
+                ));
             }
         }
         Ok(())
