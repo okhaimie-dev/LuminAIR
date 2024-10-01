@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-luminal = { git = "https://github.com/jafioti/luminal.git", commit = "caa7e55" }
+# luminal = { git = "https://github.com/jafioti/luminal.git", commit = "caa7e55" }
+luminal = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal" }
 cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm.git", rev = "v1.0.1", features = [
     "std",
     "cairo-1-hints",
@@ -29,3 +30,4 @@ rand = "0.8.5"
 dfdx = { version = "0.13" }
 candle-core = "0.5.0"
 ctor = "0.2.8"
+luminal_cpu = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal/crates/luminal_cpu" }

@@ -20,12 +20,12 @@ unary_test!(|a| a.exp2(), |a| (a * 2_f32.ln()).exp(), test_exp2, f32);
 //     test_softmax,
 //     f32
 // );
-// unary_test!(
-//     |a| a.mean_norm(0).std_norm(0, 1e-5),
-//     |a| a.normalize::<DAxis<0>>(1e-5),
-//     test_norm,
-//     f32
-// );
+unary_test!(
+    |a| a.mean_norm(0).std_norm(0, 1e-5),
+    |a| a.normalize::<DAxis<0>>(1e-5),
+    test_norm,
+    f32
+);
 
 // =============== BINARY ===============
 
@@ -112,7 +112,7 @@ fn test_max_reduce() {
 
 // #[test]
 // fn test_mean_reduce() {
-//     let data = random_vec(5120);
+//     let data = random_vec(512);
 //     let mut cx = Graph::new();
 //     let a = cx.tensor((1, 10, 512)).set(data.clone());
 //     let mut b = a.mean_reduce(2).retrieve();

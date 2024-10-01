@@ -2199,6 +2199,7 @@ dependencies = [
  "itertools 0.12.1",
  "lazy_static",
  "luminal",
+ "luminal_cpu",
  "num-bigint",
  "num-traits 0.2.19",
  "paste",
@@ -2212,7 +2213,6 @@ dependencies = [
 [[package]]
 name = "luminal"
 version = "0.2.0"
-source = "git+https://github.com/jafioti/luminal.git#caa7e55524e1fcb049d53a23a090b0c7b57ae78d"
 dependencies = [
  "as-any",
  "colored",
@@ -2237,11 +2237,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "luminal_cpu"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.12.1",
+ "luminal",
+ "matrixmultiply 0.3.9",
+ "rustc-hash",
+]
+
+[[package]]
 name = "matrixmultiply"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "916806ba0031cd542105d916a97c8572e1fa6dd79c9c51e7eb43a09ec2dd84c1"
 dependencies = [
+ "rawpointer",
+]
+
+[[package]]
+name = "matrixmultiply"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9380b911e3e96d10c1f415da0876389aaf1b56759054eeb0de7df940c456ba1a"
+dependencies = [
+ "autocfg",
  "rawpointer",
 ]
 
@@ -2301,7 +2321,7 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac06db03ec2f46ee0ecdca1a1c34a99c0d188a0d83439b84bf0cb4b386e4ab09"
 dependencies = [
- "matrixmultiply",
+ "matrixmultiply 0.2.4",
  "num-complex 0.2.4",
  "num-integer",
  "num-traits 0.2.19",

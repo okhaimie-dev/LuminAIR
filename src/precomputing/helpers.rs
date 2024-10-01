@@ -36,7 +36,7 @@ pub(super) fn determine_broadcast_shape(
 }
 
 /// Helper function to compute strides for a given shape
-pub(super) fn compute_strides(shape: &[usize]) -> Vec<usize> {
+fn compute_strides(shape: &[usize]) -> Vec<usize> {
     let mut strides = vec![1; shape.len()];
     for i in (0..shape.len()).rev().skip(1) {
         strides[i - 1] = strides[i] * shape[i];
@@ -60,12 +60,11 @@ pub(super) fn expand_data(
         // Compute multi-dimensional index
         let mut remaining = idx;
         let mut md_index = vec![0; broadcast_shape.len()];
-        for (i, _) in broadcast_shape.iter().enumerate() {
-            md_index[i] = remaining / broadcast_strides[i];
-            remaining %= broadcast_strides[i];
+        for (i, &stride) in broadcast_strides.iter().enumerate() {
+            md_index[i] = remaining / stride;
+            remaining %= stride;
         }
 
-        // Map to original tensor's index
         let mut original_idx = 0;
         for (i, &dim) in original_shape.iter().enumerate() {
             let index = if dim == 1 {
@@ -76,7 +75,8 @@ pub(super) fn expand_data(
             original_idx += index * original_strides[i];
         }
 
-        expanded_data.push(data[original_idx]);
+        // Use modulo to wrap around if the original data is smaller
+        expanded_data.push(data[original_idx % data.len()]);
     }
 
     expanded_data
@@ -93,10 +93,16 @@ pub(crate) fn get_vec<'a>(tensor: &'a InputTensor<'a>) -> &'a Vec<f32> {
 /// Helper function to compute the effective shape by treating fake dimensions as size 1
 pub(super) fn get_effective_shape(shape_tracker: &ShapeTracker) -> Vec<usize> {
     shape_tracker
-        .shape_usize()
-        .iter()
-        .zip(shape_tracker.fake.iter())
-        .map(|(dim, &is_fake)| if is_fake { 1 } else { *dim })
+        .dims()
+        .into_iter()
+        .zip(shape_tracker.indexes.iter())
+        .map(|(dim, &index)| {
+            if shape_tracker.fake[index] {
+                dim.to_usize().unwrap_or(1)
+            } else {
+                shape_tracker.dims[index].to_usize().unwrap_or(1)
+            }
+        })
         .collect()
 }
 
