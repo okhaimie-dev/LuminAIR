@@ -1,6 +1,5 @@
+use super::helpers::get_vec;
 use luminal::{op::InputTensor, shape::ShapeTracker};
-
-use super::helpers::{determine_broadcast_shape, expand_data, get_effective_shape, get_vec};
 
 pub(crate) fn precompile_binary_op(
     tensors: Vec<(InputTensor, ShapeTracker)>,
@@ -13,32 +12,39 @@ pub(crate) fn precompile_binary_op(
     let data_a = get_vec(tensor_a);
     let data_b = get_vec(tensor_b);
 
-    // Get effective shapes by treating fake dimensions as size 1
-    let shape_a = get_effective_shape(shape_a_tracker);
-    let shape_b = get_effective_shape(shape_b_tracker);
-
     // Determine broadcasted shape
-    let broadcast_shape = match determine_broadcast_shape(&shape_a, &shape_b) {
-        Ok(shape) => shape,
-        Err(e) => panic!("Broadcasting error: {}", e),
-    };
-
-    // Compute strides for tensors
-    let strides_a_expr = shape_a_tracker.strides();
-    let strides_a = strides_a_expr
-        .iter()
-        .map(|expr| expr.to_usize().unwrap())
-        .collect::<Vec<_>>();
-
-    let strides_b_expr = shape_b_tracker.strides();
-    let strides_b = strides_b_expr
-        .iter()
-        .map(|expr| expr.to_usize().unwrap())
-        .collect::<Vec<_>>();
+    let mut broadcast_tracker = shape_a_tracker.clone();
+    let b_dims = shape_b_tracker.dims();
+    for (i, &dim) in b_dims.iter().enumerate() {
+        if i >= broadcast_tracker.len() {
+            broadcast_tracker.expand(i, dim);
+        } else if broadcast_tracker.dims()[i].to_usize().unwrap() < dim.to_usize().unwrap() {
+            broadcast_tracker.expand(i, dim);
+        }
+    }
 
     // Expand data according to broadcasted shape
-    let expanded_a = expand_data(&data_a, &shape_a, &broadcast_shape, &strides_a);
-    let expanded_b = expand_data(&data_b, &shape_b, &broadcast_shape, &strides_b);
+    let expanded_a = expand_data_to_broadcast(data_a, shape_a_tracker, &broadcast_tracker);
+    let expanded_b = expand_data_to_broadcast(data_b, shape_b_tracker, &broadcast_tracker);
 
     (expanded_a, expanded_b)
+}
+
+fn expand_data_to_broadcast(
+    data: &[f32],
+    original_shape: &ShapeTracker,
+    broadcast_shape: &ShapeTracker,
+) -> Vec<f32> {
+    let mut expanded_data = vec![0.0; broadcast_shape.n_elements().to_usize().unwrap()];
+    let expr = (
+        original_shape.index_expression(),
+        original_shape.valid_expression(),
+    );
+    let mut stack = vec![];
+
+    for i in 0..expanded_data.len() {
+        expanded_data[i] = super::helpers::get_index(data, &expr, &mut stack, i);
+    }
+
+    expanded_data
 }

@@ -12,7 +12,10 @@ use luminal::prelude::*;
 use crate::{
     cairo_runner::{CairoRunner, CairoRunnerConfig},
     constants::COMPILED_CAIRO_PATH,
-    precomputing::{binary::precompile_binary_op, helpers::{get_index, get_vec}},
+    precomputing::{
+        binary::precompile_binary_op,
+        helpers::{get_index, get_vec},
+    },
     serialization::{serialize_inputs_binary_op, serialize_reduce_op, serialize_unary_op},
     CairoCompilerError,
 };

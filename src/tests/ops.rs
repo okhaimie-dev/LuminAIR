@@ -51,7 +51,7 @@ fn test_contiguous() {
     let a = cx.tensor((3, 4)).set(data.clone());
     let mut b = a.permute((1, 0)).reshape((12, 1)).retrieve();
     let _ = cx.compile(CairoCompiler::default(), &mut b);
-    cx.execute();
+    cx.execute_debug();
 
     let d_dev = Cpu::default();
     let d_a = d_dev.tensor_from_vec(data, (DConst::<3>, DConst::<4>));
@@ -73,7 +73,7 @@ fn test_sum_reduce() {
     let mut d = a.sum_reduce(2).retrieve();
 
     let _ = cx.compile(CairoCompiler::default(), (&mut b, &mut c, &mut d));
-    cx.execute();
+    cx.execute_debug();
 
     let d_dev = Cpu::default();
     let d_a = d_dev.tensor_from_vec(data, (DConst::<1>, DConst::<4>, DConst::<512>));
@@ -97,7 +97,7 @@ fn test_max_reduce() {
     let mut d = a.max_reduce(2).retrieve();
 
     let _ = cx.compile(CairoCompiler::default(), (&mut b, &mut c, &mut d));
-    cx.execute();
+    cx.execute_debug();
 
     let d_dev = Cpu::default();
     let d_a = d_dev.tensor_from_vec(data, (DConst::<2>, DConst::<2>, DConst::<3>));
@@ -125,3 +125,25 @@ fn test_max_reduce() {
 //     let d_b = d_a.mean::<_, DAxis<2>>();
 //     assert_close(&b.data(), &d_b.as_vec());
 // }
+
+// =============== MATMUL ===============
+
+#[test]
+fn test_matmul() {
+    let mut cx = Graph::new();
+    let a_data = random_vec(3 * 3);
+    let b_data = random_vec(3 * 3);
+    let a = cx.tensor((3, 3)).set(a_data.clone());
+    let b = cx.tensor((3, 3)).set(b_data.clone());
+    let mut c = a.matmul(b).retrieve();
+
+    let _ = cx.compile(CairoCompiler::default(), &mut c);
+    cx.execute();
+
+    let d_dev = Cpu::default();
+    let d_a = d_dev.tensor_from_vec(a_data, (DConst::<3>, DConst::<3>));
+    let d_b = d_dev.tensor_from_vec(b_data, (DConst::<3>, DConst::<3>));
+    let d_c = d_a.matmul(d_b);
+
+    assert_close(&c.data(), &d_c.as_vec());
+}
