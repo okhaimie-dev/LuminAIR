@@ -20,11 +20,167 @@ use crate::{
     CairoCompilerError,
 };
 
+// ====== UNARY ======
+
+macro_rules! cairo_unary_op {
+    ($name:ident, $file_name:expr) => {
+        #[derive(Clone)]
+        pub struct $name {
+            sierra_file: PathBuf,
+            runner_config: Arc<CairoRunnerConfig>,
+        }
+        crate::debug_type!($name);
+
+        impl $name {
+            pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
+                if !sierra_file.exists() {
+                    panic!("Sierra file does not exist: {:?}", sierra_file);
+                }
+                Self {
+                    sierra_file,
+                    runner_config,
+                }
+            }
+        }
+
+        impl Operator for $name {
+            fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+                if tensors.len() != 1 {
+                    panic!("$name operator requires exactly one input tensor.");
+                }
+
+                let inputs = serialize_unary_op(get_vec(&tensors[0].0));
+
+                let cairo_runner = CairoRunner::new((*self.runner_config).clone());
+                match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+                    Ok(result) => {
+                        vec![result]
+                    }
+                    Err(e) => {
+                        panic!("Error executing Cairo: {:?}", e);
+                    }
+                }
+            }
+        }
+    };
+}
+
+// ====== BINARY ======
+macro_rules! cairo_binary_op {
+    ($name:ident, $file_name:expr) => {
+        #[derive(Clone)]
+        pub struct $name {
+            sierra_file: PathBuf,
+            runner_config: Arc<CairoRunnerConfig>,
+        }
+        crate::debug_type!($name);
+
+        impl $name {
+            pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
+                if !sierra_file.exists() {
+                    panic!("Sierra file does not exist: {:?}", sierra_file);
+                }
+                Self {
+                    sierra_file,
+                    runner_config,
+                }
+            }
+        }
+
+        impl Operator for $name {
+            fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+                if tensors.len() != 2 {
+                    panic!("$name operator requires exactly two input tensors.");
+                }
+
+                let (lhs, rhs) = precompile_binary_op(tensors);
+                let inputs = serialize_inputs_binary_op(lhs, rhs);
+
+                let cairo_runner = CairoRunner::new((*self.runner_config).clone());
+                match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+                    Ok(result) => {
+                        vec![result]
+                    }
+                    Err(e) => {
+                        panic!("Error executing Cairo: {:?}", e);
+                    }
+                }
+            }
+        }
+    };
+}
+
+// ====== REDUCE ======
+macro_rules! cairo_reduce_op {
+    ($name:ident, $file_name:expr) => {
+        #[derive(Clone)]
+        pub struct $name {
+            sierra_file: PathBuf,
+            runner_config: Arc<CairoRunnerConfig>,
+            dim: usize,
+        }
+        crate::debug_type!($name);
+
+        impl $name {
+            pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>, dim: usize) -> Self {
+                if !sierra_file.exists() {
+                    panic!("Sierra file does not exist: {:?}", sierra_file);
+                }
+                Self {
+                    sierra_file,
+                    runner_config,
+                    dim,
+                }
+            }
+        }
+
+        impl Operator for $name {
+            fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+                if tensors.len() != 1 {
+                    panic!("$name operator requires exactly one input tensor.");
+                }
+
+                let sh = tensors[0].1.shape_usize();
+                let front_size: usize = sh.iter().take(self.dim).product::<usize>().max(1);
+                let back_size = sh.iter().skip(self.dim + 1).product::<usize>().max(1);
+                let dim_size: usize = sh[self.dim];
+
+                let inputs = serialize_reduce_op(get_vec(&tensors[0].0), front_size, back_size, dim_size);
+
+                let cairo_runner = CairoRunner::new((*self.runner_config).clone());
+                match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
+                    Ok(result) => {
+                        vec![result]
+                    }
+                    Err(e) => {
+                        panic!("Error executing Cairo: {:?}", e);
+                    }
+                }
+            }
+        }
+    };
+}
+
+cairo_unary_op!(CairoLog2, "log2.sierra.json");
+cairo_unary_op!(CairoExp2, "exp2.sierra.json");
+cairo_unary_op!(CairoSin, "sin.sierra.json");
+cairo_unary_op!(CairoRecip, "recip.sierra.json");
+cairo_unary_op!(CairoSqrt, "sqrt.sierra.json");
+
+cairo_binary_op!(CairoAdd, "add.sierra.json");
+cairo_binary_op!(CairoMul, "mul.sierra.json");
+cairo_binary_op!(CairoMod, "rem.sierra.json");
+cairo_binary_op!(CairoLessThan, "lt.sierra.json");
+
+cairo_reduce_op!(CairoSumReduce, "sum_reduce.sierra.json");
+cairo_reduce_op!(CairoMaxReduce, "max_reduce.sierra.json");
+
 #[derive(Clone)]
 pub struct CairoConstant {
     pub value: ConstantValue,
     dyn_map: *const FxHashMap<char, usize>,
 }
+
 impl core::fmt::Debug for CairoConstant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "CairoConstant({:?})", self.value)
@@ -53,12 +209,11 @@ impl Operator for CairoConstant {
     }
 }
 
-/// Ensure a tensor is contiguously layed out in memory. May involve copying
 #[derive(Debug, Clone, PartialEq)]
 pub struct Contiguous;
+
 impl Operator for Contiguous {
     fn process(&mut self, inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        // Copy data over to new tensor
         let inp_data = get_vec(&inp[0].0);
         let mut out_data = vec![0.; inp[0].1.n_elements().to_usize().unwrap()];
         let expr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
@@ -70,469 +225,6 @@ impl Operator for Contiguous {
     }
 }
 
-#[derive(Clone)]
-pub struct CairoLog2 {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-}
-crate::debug_type!(CairoLog2);
-
-impl CairoLog2 {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-        }
-    }
-}
-
-impl Operator for CairoLog2 {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        // Ensure exactly one input tensor is provided
-        if tensors.len() != 1 {
-            panic!("CairoLog2 operator requires exactly one input tensor.");
-        }
-
-        let inputs = serialize_unary_op(get_vec(&tensors[0].0));
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CairoExp2 {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-}
-crate::debug_type!(CairoExp2);
-
-impl CairoExp2 {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-        }
-    }
-}
-
-impl Operator for CairoExp2 {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        // Ensure exactly one input tensor is provided
-        if tensors.len() != 1 {
-            panic!("CairoExp2 operator requires exactly one input tensor.");
-        }
-
-        let inputs = serialize_unary_op(get_vec(&tensors[0].0));
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CairoSqrt {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-}
-crate::debug_type!(CairoSqrt);
-
-impl CairoSqrt {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-        }
-    }
-}
-
-impl Operator for CairoSqrt {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        // Ensure exactly one input tensor is provided
-        if tensors.len() != 1 {
-            panic!("CairoSqrt operator requires exactly one input tensor.");
-        }
-
-        let inputs = serialize_unary_op(get_vec(&tensors[0].0));
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CairoSin {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-}
-crate::debug_type!(CairoSin);
-
-impl CairoSin {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-        }
-    }
-}
-
-impl Operator for CairoSin {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        // Ensure exactly one input tensor is provided
-        if tensors.len() != 1 {
-            panic!("CairoSin operator requires exactly one input tensor.");
-        }
-
-        let inputs = serialize_unary_op(get_vec(&tensors[0].0));
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CairoRecip {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-}
-crate::debug_type!(CairoRecip);
-
-impl CairoRecip {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-        }
-    }
-}
-
-impl Operator for CairoRecip {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        // Ensure exactly one input tensor is provided
-        if tensors.len() != 1 {
-            panic!("CairoRecip operator requires exactly one input tensor.");
-        }
-
-        let inputs = serialize_unary_op(get_vec(&tensors[0].0));
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CairoAdd {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-}
-crate::debug_type!(CairoAdd);
-
-impl CairoAdd {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-        }
-    }
-}
-
-impl Operator for CairoAdd {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        if tensors.len() != 2 {
-            panic!("CairoAdd operator requires exactly two input tensors.");
-        }
-
-        let (lhs, rhs) = precompile_binary_op(tensors);
-        let inputs = serialize_inputs_binary_op(lhs, rhs);
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CairoMul {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-}
-crate::debug_type!(CairoMul);
-
-impl CairoMul {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-        }
-    }
-}
-
-impl Operator for CairoMul {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        if tensors.len() != 2 {
-            panic!("CairoMul operator requires exactly two input tensors.");
-        }
-
-        let (lhs, rhs) = precompile_binary_op(tensors);
-        let inputs = serialize_inputs_binary_op(lhs, rhs);
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CairoMod {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-}
-crate::debug_type!(CairoMod);
-
-impl CairoMod {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-        }
-    }
-}
-
-impl Operator for CairoMod {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        if tensors.len() != 2 {
-            panic!("CairoMod operator requires exactly two input tensors.");
-        }
-
-        let (lhs, rhs) = precompile_binary_op(tensors);
-        let inputs = serialize_inputs_binary_op(lhs, rhs);
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CairoLessThan {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-}
-crate::debug_type!(CairoLessThan);
-
-impl CairoLessThan {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-        }
-    }
-}
-
-impl Operator for CairoLessThan {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        if tensors.len() != 2 {
-            panic!("CairoLessThan operator requires exactly two input tensors.");
-        }
-
-        let (lhs, rhs) = precompile_binary_op(tensors);
-        let inputs = serialize_inputs_binary_op(lhs, rhs);
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CairoSumReduce {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-    dim: usize,
-}
-crate::debug_type!(CairoSumReduce);
-
-impl CairoSumReduce {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>, dim: usize) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-            dim,
-        }
-    }
-}
-
-impl Operator for CairoSumReduce {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        // Ensure exactly one input tensor is provided
-        if tensors.len() != 1 {
-            panic!("CairoSumReduce operator requires exactly one input tensor.");
-        }
-
-        // Extract the shape of the input tensor
-        let sh = tensors[0].1.shape_usize();
-        // Calculate front_size: product of dimensions before the reduction axis
-        let front_size: usize = sh.iter().take(self.dim).product::<usize>().max(1);
-        // Calculate back_size: product of dimensions after the reduction axis
-        let back_size = sh.iter().skip(self.dim + 1).product::<usize>().max(1);
-        // Size of the dimension to be reduced
-        let dim_size: usize = sh[self.dim];
-
-        let inputs = serialize_reduce_op(get_vec(&tensors[0].0), front_size, back_size, dim_size);
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CairoMaxReduce {
-    sierra_file: PathBuf,
-    runner_config: Arc<CairoRunnerConfig>,
-    dim: usize,
-}
-crate::debug_type!(CairoMaxReduce);
-
-impl CairoMaxReduce {
-    pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>, dim: usize) -> Self {
-        if !sierra_file.exists() {
-            panic!("Sierra file does not exist: {:?}", sierra_file);
-        }
-        Self {
-            sierra_file,
-            runner_config,
-            dim,
-        }
-    }
-}
-
-impl Operator for CairoMaxReduce {
-    fn process(&mut self, tensors: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        // Ensure exactly one input tensor is provided
-        if tensors.len() != 1 {
-            panic!("CairoMaxReduce operator requires exactly one input tensor.");
-        }
-
-        // Extract the shape of the input tensor
-        let sh = tensors[0].1.shape_usize();
-        // Calculate front_size: product of dimensions before the reduction axis
-        let front_size: usize = sh.iter().take(self.dim).product::<usize>().max(1);
-        // Calculate back_size: product of dimensions after the reduction axis
-        let back_size = sh.iter().skip(self.dim + 1).product::<usize>().max(1);
-        // Size of the dimension to be reduced
-        let dim_size: usize = sh[self.dim];
-
-        let inputs = serialize_reduce_op(get_vec(&tensors[0].0), front_size, back_size, dim_size);
-
-        let cairo_runner = CairoRunner::new((*self.runner_config).clone());
-        match cairo_runner.run(self.sierra_file.clone(), inputs, false) {
-            Ok(result) => {
-                vec![result]
-            }
-            Err(e) => {
-                panic!("Error executing Cairo: {:?}", e);
-            }
-        }
-    }
-}
-
-/// Convert all primitive ops to cairo primitive ops.
 #[derive(Debug, Default)]
 pub struct PrimitiveCompiler {
     runner_config: CairoRunnerConfig,
@@ -557,7 +249,7 @@ impl Compiler for PrimitiveCompiler {
         fn is<T: Any>(type_id: TypeId) -> bool {
             type_id == TypeId::of::<T>()
         }
-        // Swap primitive ops
+
         for id in graph.node_indices().collect::<Vec<_>>() {
             let op = graph.node_weight(id).unwrap().as_any().type_id();
             let op_ref = graph.graph.node_weight_mut(id).unwrap();
