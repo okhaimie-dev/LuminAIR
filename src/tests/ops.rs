@@ -147,3 +147,74 @@ fn test_matmul() {
 
     assert_close(&c.data(), &d_c.as_vec());
 }
+
+#[test]
+fn test_batch_matmul() {
+    let mut cx = Graph::new();
+    let a = cx
+        .tensor((2, 2, 3))
+        .set(vec![1., 2., 3., 1., 2., 1., 1., 2., 3., 1., 2., 1.]);
+    let b = cx
+        .tensor((3, 4))
+        .set(vec![1., 2., 3., 1., 1., 2., 1., 2., -1., -2., 1., 2.]);
+    let mut c = a.matmul(b).retrieve();
+
+    let _ = cx.compile(CairoCompiler::default(), &mut c);
+    cx.execute_debug();
+
+    let d_dev = Cpu::default();
+    let d_a = d_dev.tensor([[[1., 2., 3.], [1., 2., 1.]], [[1., 2., 3.], [1., 2., 1.]]]);
+    let d_b = d_dev.tensor([[1., 2., 3., 1.], [1., 2., 1., 2.], [-1., -2., 1., 2.]]);
+    let d_c = d_a.matmul(d_b);
+
+    assert_close(&c.data(), &d_c.as_vec());
+}
+
+#[test]
+fn test_matmul_transpose() {
+    const M: usize = 16;
+    const K: usize = 8;
+    const N: usize = 8;
+    let mut cx = Graph::new();
+    let mut rng = StdRng::seed_from_u64(0);
+
+    let a_data = random_vec_rng(M * K, &mut rng);
+    let a = cx.tensor((M, K)).set(a_data.clone());
+    let b_data = random_vec_rng(K * N, &mut rng);
+    let b = cx.tensor((N, K)).set(b_data.clone());
+    let a_t_data = random_vec_rng(K * M, &mut rng);
+    let a_t = cx.tensor((K, M)).set(a_t_data.clone());
+    let b_t_data = random_vec_rng(K * N, &mut rng);
+    let b_t = cx.tensor((K, N)).set(b_t_data.clone());
+
+    let mut a_b = a.matmul(b.permute((1, 0))).retrieve();
+    let mut a_b_t = a.matmul(b_t).retrieve();
+    let mut a_t_b = a_t.permute((1, 0)).matmul(b.permute((1, 0))).retrieve();
+    let mut a_t_b_t = a_t.permute((1, 0)).matmul(b_t).retrieve();
+
+    let _ = cx.compile(
+        CairoCompiler::default(),
+        (&mut a_b, &mut a_b_t, &mut a_t_b, &mut a_t_b_t),
+    );
+    cx.execute();
+
+    let d_dev = Cpu::default();
+    let d_a = d_dev.tensor_from_vec(a_data, (DConst::<M>, DConst::<K>));
+    let d_b = d_dev.tensor_from_vec(b_data, (DConst::<N>, DConst::<K>));
+    let d_a_t = d_dev.tensor_from_vec(a_t_data, (DConst::<K>, DConst::<M>));
+    let d_b_t = d_dev.tensor_from_vec(b_t_data, (DConst::<K>, DConst::<N>));
+    let d_a_b = d_a.clone().matmul(d_b.clone().permute());
+    let d_a_b_t = d_a.matmul(d_b_t.clone());
+    let d_a_t_b = d_a_t
+        .clone()
+        .permute::<_, dfdx::shapes::Axes2<1, 0>>()
+        .matmul(d_b.permute());
+    let d_a_t_b_t = d_a_t
+        .permute::<_, dfdx::shapes::Axes2<1, 0>>()
+        .matmul(d_b_t);
+
+    assert_close(&a_b.data(), &d_a_b.as_vec());
+    assert_close(&a_b_t.data(), &d_a_b_t.as_vec());
+    assert_close(&a_t_b.data(), &d_a_t_b.as_vec());
+    assert_close(&a_t_b_t.data(), &d_a_t_b_t.as_vec());
+}
