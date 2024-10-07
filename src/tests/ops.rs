@@ -1,4 +1,5 @@
 use luminal::prelude::*;
+use luminal_cpu::CPUCompiler;
 use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{binary_test, unary_test, CairoCompiler};
@@ -110,21 +111,21 @@ fn test_max_reduce() {
     assert_close(&d.data(), &d_d.as_vec());
 }
 
-// #[test]
-// fn test_mean_reduce() {
-//     let data = random_vec(512);
-//     let mut cx = Graph::new();
-//     let a = cx.tensor((1, 10, 512)).set(data.clone());
-//     let mut b = a.mean_reduce(2).retrieve();
+#[test]
+fn test_mean_reduce() {
+    let data = random_vec(1024);
+    let mut cx = Graph::new();
+    let a = cx.tensor((1, 8, 128)).set(data.clone());
+    let mut b = a.mean_reduce(2).retrieve();
 
-//     let _ = cx.compile(CairoCompiler::default(), &mut b);
-//     cx.execute();
+    let _ = cx.compile(CairoCompiler::default(), &mut b);
+    cx.execute_debug();
 
-//     let d_dev = Cpu::default();
-//     let d_a = d_dev.tensor_from_vec(data, (DConst::<1>, DConst::<10>, DConst::<512>));
-//     let d_b = d_a.mean::<_, DAxis<2>>();
-//     assert_close(&b.data(), &d_b.as_vec());
-// }
+    let d_dev = Cpu::default();
+    let d_a = d_dev.tensor_from_vec(data, (DConst::<1>, DConst::<8>, DConst::<128>));
+    let d_b = d_a.mean::<_, DAxis<2>>();
+    assert_close(&b.data(), &d_b.as_vec());
+}
 
 // =============== MATMUL ===============
 
@@ -138,7 +139,7 @@ fn test_matmul() {
     let mut c = a.matmul(b).retrieve();
 
     let _ = cx.compile(CairoCompiler::default(), &mut c);
-    cx.execute();
+    cx.execute_debug();
 
     let d_dev = Cpu::default();
     let d_a = d_dev.tensor_from_vec(a_data, (DConst::<3>, DConst::<3>));
@@ -196,7 +197,7 @@ fn test_matmul_transpose() {
         CairoCompiler::default(),
         (&mut a_b, &mut a_b_t, &mut a_t_b, &mut a_t_b_t),
     );
-    cx.execute();
+    cx.execute_debug();
 
     let d_dev = Cpu::default();
     let d_a = d_dev.tensor_from_vec(a_data, (DConst::<M>, DConst::<K>));
