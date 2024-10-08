@@ -122,7 +122,11 @@ macro_rules! cairo_reduce_op {
         crate::debug_type!($name);
 
         impl $name {
-            pub fn new(sierra_file: PathBuf, runner_config: Arc<CairoRunnerConfig>, dim: usize) -> Self {
+            pub fn new(
+                sierra_file: PathBuf,
+                runner_config: Arc<CairoRunnerConfig>,
+                dim: usize,
+            ) -> Self {
                 if !sierra_file.exists() {
                     panic!("Sierra file does not exist: {:?}", sierra_file);
                 }
@@ -145,7 +149,8 @@ macro_rules! cairo_reduce_op {
                 let back_size = sh.iter().skip(self.dim + 1).product::<usize>().max(1);
                 let dim_size: usize = sh[self.dim];
 
-                let inputs = serialize_reduce_op(get_vec(&tensors[0].0), front_size, back_size, dim_size);
+                let inputs =
+                    serialize_reduce_op(get_vec(&tensors[0].0), front_size, back_size, dim_size);
 
                 let cairo_runner = CairoRunner::new((*self.runner_config).clone());
                 match cairo_runner.run(self.sierra_file.clone(), inputs, false) {

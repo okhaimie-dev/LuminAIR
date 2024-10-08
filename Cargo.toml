@@ -23,6 +23,7 @@ num-traits = "0.2.19"
 serde_json = "1.0.120"
 lazy_static = "1.5.0"
 rustc-hash = "1.1.0"
+luminal_cpu = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal/crates/luminal_cpu" }
 
 [dev-dependencies]
 paste = "1.0.15"

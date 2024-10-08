@@ -7,7 +7,7 @@ edition = "2024_07"
 
 [dependencies]
 luminair_cairo_lib = { path = "../../luminair_cairo_lib" }
-orion_numbers = { git = "https://github.com/gizatechxyz/orion.git", rev = "96bfa1c" }
+orion_numbers = { git = "https://github.com/gizatechxyz/orion.git", rev = "9a2db04" }
 
 [dev-dependencies]
 cairo_test = "2.8.2"

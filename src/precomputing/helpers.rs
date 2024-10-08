@@ -15,7 +15,13 @@ pub(crate) fn get_index(
     index: usize,
 ) -> f32 {
     if val.exec_single_var_stack(index, stack) != 0 {
-        data[ind.exec_single_var_stack(index, stack)]
+        let calculated_index = ind.exec_single_var_stack(index, stack);
+
+        // Handle broadcasting: if the calculated index is out of bounds,
+        // we use modulo to wrap it back into the valid range.
+        let safe_index = calculated_index % data.len();
+
+        data[safe_index]
     } else {
         0.0
     }

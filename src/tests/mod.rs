@@ -1,4 +1,5 @@
 use luminal::{graph::Graph, op::Operator};
+// use luminal_cpu::CPUCompiler;
 
 mod ops;
 
@@ -23,6 +24,7 @@ macro_rules! single_unary_test {
                 let f: fn(GraphTensor) -> GraphTensor = $luminal_func;
                 let mut b = f(a).retrieve();
                 let _ = cx.compile(CairoCompiler::default(), &mut b);
+                // let _ = cx.compile(luminal_cpu::CPUCompiler::default(), &mut b);
                 cx.execute_debug();
 
                 let d_dev = Cpu::default();

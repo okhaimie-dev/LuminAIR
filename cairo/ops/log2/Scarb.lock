@@ -19,4 +19,4 @@ dependencies = [
 [[package]]
 name = "orion_numbers"
 version = "0.1.0"
-source = "git+https://github.com/gizatechxyz/orion.git?rev=96bfa1c#96bfa1cef9a6108a056b479b5ed4c5355ef7c32d"
+source = "git+https://github.com/gizatechxyz/orion.git?rev=9a2db04#9a2db04a8f9b3ca29add278909adf239d78f6ff4"

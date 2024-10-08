@@ -1,5 +1,4 @@
 use luminal::prelude::*;
-use luminal_cpu::CPUCompiler;
 use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{binary_test, unary_test, CairoCompiler};
@@ -15,12 +14,12 @@ unary_test!(|a| a * a, |a| a.clone() * a, test_square, f32);
 unary_test!(|a| a.ln(), |a| a.ln(), test_ln, f32);
 unary_test!(|a| a.log2(), |a| a.ln() / 2_f32.ln(), test_log2, f32);
 unary_test!(|a| a.exp2(), |a| (a * 2_f32.ln()).exp(), test_exp2, f32);
-// unary_test!(
-//     |a| a.softmax(0),
-//     |a| a.softmax::<DAxis<0>>(),
-//     test_softmax,
-//     f32
-// );
+unary_test!(
+    |a| a.softmax(0),
+    |a| a.softmax::<DAxis<0>>(),
+    test_softmax,
+    f32
+);
 unary_test!(
     |a| a.mean_norm(0).std_norm(0, 1e-5),
     |a| a.normalize::<DAxis<0>>(1e-5),
