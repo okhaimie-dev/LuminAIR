@@ -2200,6 +2200,7 @@ dependencies = [
  "lazy_static",
  "luminal",
  "luminal_cpu",
+ "luminal_nn",
  "num-bigint",
  "num-traits 0.2.19",
  "paste",
@@ -2243,6 +2244,16 @@ dependencies = [
  "itertools 0.12.1",
  "luminal",
  "matrixmultiply 0.3.9",
+ "rustc-hash",
+]
+
+[[package]]
+name = "luminal_nn"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.12.1",
+ "luminal",
+ "rand",
  "rustc-hash",
 ]
 
