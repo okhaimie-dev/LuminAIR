@@ -275,3 +275,184 @@ fn test_relu_and_linear() {
 
     assert_close_precision(&unoptimized_b, &out.as_vec(), 1e-2);
 }
+
+// #[test]
+// fn test_transformer_encoder_block() {
+//     let mut cx = Graph::new();
+//     let model = luminal_nn::TransformerEncoderBlock::new(3, 4, 1, &mut cx);
+//     model
+//         .attention
+//         .w_k
+//         .weight
+//         .set(vec![1., 22., 3., 1., 2., 3., 1., 2., 3.]);
+//     model
+//         .attention
+//         .w_q
+//         .weight
+//         .set(vec![3., 2., 3., 1.3, 2., 3., 3., 2., 3.]);
+//     model
+//         .attention
+//         .w_v
+//         .weight
+//         .set(vec![-1., 12., 3., -1., 2., -3., 11., 2., 3.]);
+//     model
+//         .attention
+//         .w_o
+//         .weight
+//         .set(vec![1., 22., 3., 1., 2., 3., 1., 2., 3.]);
+//     model
+//         .ff
+//         .0
+//         .weight
+//         .set(vec![-1., 12., 3., -1., 2., -3., 11., 2., 3., 11., 2., 3.]);
+//     model
+//         .ff
+//         .2
+//         .weight
+//         .set(vec![-1., 12., 3., -1., 2., -3., 11., 2., 3., 3., -1., 2.]);
+
+//     let a = cx
+//         .tensor(('a', 3))
+//         .set_dyn(vec![-1., 2., 3., 3., 3., -1.], (2, 3));
+//     let mut b = model.forward(a).retrieve();
+
+//     let _ = cx.compile(<(GenericCompiler, CairoCompiler)>::default(), &mut b);
+//     cx.execute();
+
+//     let d_dev = Cpu::default();
+//     let mut d_model: dfdx::nn::modules::TransformerEncoderBlock<3, 1, 4, f32, Cpu> =
+//         d_dev.build_module::<dfdx::nn::modules::builders::TransformerEncoderBlock<3, 1, 4>, f32>();
+//     d_model.self_attn.w_k.bias.copy_from(&[0.0, 0.0, 0.0]);
+//     d_model.self_attn.w_v.bias.copy_from(&[0.0, 0.0, 0.0]);
+//     d_model.self_attn.w_q.bias.copy_from(&[0.0, 0.0, 0.0]);
+//     d_model.self_attn.w_o.bias.copy_from(&[0., 0., 0.]);
+//     d_model.self_attn.w_o.weight = d_dev
+//         .tensor_from_vec(
+//             vec![1., 22., 3., 1., 2., 3., 1., 2., 3.],
+//             (DConst::<3>, DConst::<3>),
+//         )
+//         .permute();
+//     d_model.self_attn.w_k.weight = d_dev
+//         .tensor_from_vec(
+//             vec![1., 22., 3., 1., 2., 3., 1., 2., 3.],
+//             (DConst::<3>, DConst::<3>),
+//         )
+//         .permute();
+//     d_model.self_attn.w_q.weight = d_dev
+//         .tensor_from_vec(
+//             vec![3., 2., 3., 1.3, 2., 3., 3., 2., 3.],
+//             (DConst::<3>, DConst::<3>),
+//         )
+//         .permute();
+//     d_model.self_attn.w_v.weight = d_dev
+//         .tensor_from_vec(
+//             vec![-1., 12., 3., -1., 2., -3., 11., 2., 3.],
+//             (DConst::<3>, DConst::<3>),
+//         )
+//         .permute();
+//     d_model.ff.0 .0.weight = d_dev
+//         .tensor_from_vec(
+//             vec![-1., 12., 3., -1., 2., -3., 11., 2., 3., 11., 2., 3.],
+//             (DConst::<3>, DConst::<4>),
+//         )
+//         .permute();
+//     d_model.ff.0 .0.bias = d_dev.tensor_from_vec(vec![0., 0., 0., 0.], (DConst::<4>,));
+//     d_model.ff.0 .2.weight = d_dev
+//         .tensor_from_vec(
+//             vec![-1., 12., 3., -1., 2., -3., 11., 2., 3., 3., -1., 2.],
+//             (DConst::<4>, DConst::<3>),
+//         )
+//         .permute();
+//     d_model.ff.0 .2.bias = d_dev.tensor_from_vec(vec![0., 0., 0.], (DConst::<3>,));
+//     d_model.norm1.gamma = d_dev.tensor_from_vec(vec![1., 1., 1.], (DConst::<3>,));
+//     d_model.norm2.gamma = d_dev.tensor_from_vec(vec![1., 1., 1.], (DConst::<3>,));
+//     d_model.norm1.epsilon = 1e-5;
+//     d_model.norm2.beta = d_dev.tensor_from_vec(vec![0., 0., 0.], (DConst::<3>,));
+//     d_model.norm1.beta = d_dev.tensor_from_vec(vec![0., 0., 0.], (DConst::<3>,));
+//     d_model.norm2.epsilon = 1e-5;
+//     let d_a = d_dev.tensor_from_vec(vec![-1., 2., 3., 3., 3., -1.], (DConst::<2>, DConst::<3>));
+//     let d_b = d_model.forward(d_a);
+
+//     assert_close(&b.data(), &d_b.as_vec());
+// }
+
+#[test]
+fn test_pool_1d_dims() {
+    let mut cx = Graph::new();
+
+    let inp1 = cx.tensor((4, 4)).set(vec![
+        1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., 12., 13., 14., 15., 16.,
+    ]);
+    // Stride 1
+    let mut out1 = inp1.pool_last_dim(3, 1, 1).retrieve();
+
+    let _ = cx.compile(<CairoCompiler>::default(), &mut out1);
+
+    cx.execute();
+
+    assert_exact(
+        &out1.data(),
+        &[
+            1., 2., 3., 2., 3., 4., 5., 6., 7., 6., 7., 8., 9., 10., 11., 10., 11., 12., 13., 14.,
+            15., 14., 15., 16.,
+        ],
+    );
+}
+
+#[test]
+fn test_pool_2d() {
+    let mut cx = Graph::new();
+
+    let inp1 = cx.tensor((4, 4)).set(vec![
+        1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., 12., 13., 14., 15., 16.,
+    ]);
+    // 3x3 kernel
+    let mut out1 = inp1
+        // Pool first dim first by moving it to end
+        .permute((1, 0))
+        .pool_last_dim(3, 1, 1)
+        // Now move other dim to end
+        .permute((1, 2, 0))
+        .pool_last_dim(3, 1, 1)
+        // Now swap middle two dims
+        .permute((0, 2, 1, 3))
+        // Now merge both pooled dimensions
+        .reshape((4, 3, 3))
+        .retrieve();
+
+    let _ = cx.compile(<CairoCompiler>::default(), &mut out1);
+
+    cx.execute();
+
+    assert_exact(
+        &out1.data(),
+        &[
+            1.00, 2.00, 3.00, 5.00, 6.00, 7.00, 9.00, 10.00, 11.00, 2.00, 3.00, 4.00, 6.00, 7.00,
+            8.00, 10.00, 11.00, 12.00, 5.00, 6.00, 7.00, 9.00, 10.00, 11.00, 13.00, 14.00, 15.00,
+            6.00, 7.00, 8.00, 10.00, 11.00, 12.00, 14.00, 15.00, 16.00,
+        ],
+    );
+}
+
+#[test]
+fn test_pool_1d_dilation() {
+    let mut cx = Graph::new();
+
+    let inp1 = cx.tensor(5).set(vec![1., 2., 3., 4., 5.]);
+    // Stride 1
+    let mut out1 = inp1.pool_last_dim(2, 1, 2).retrieve();
+    // Stride 2
+    let mut out2 = inp1.pool_last_dim(2, 2, 2).retrieve();
+    // Stride 3
+    let mut out3 = inp1.pool_last_dim(2, 3, 2).retrieve();
+
+    let _ = cx.compile(<CairoCompiler>::default(), &mut out1);
+    let _ = cx.compile(<CairoCompiler>::default(), &mut out2);
+    let _ = cx.compile(<CairoCompiler>::default(), &mut out3);
+
+    cx.execute();
+
+    assert_exact(&out1.data(), &[1., 3., 2., 4., 3., 5.]);
+    assert_exact(&out2.data(), &[1., 3., 3., 5.]);
+    assert_exact(&out3.data(), &[1., 3.]);
+}
