@@ -241,7 +241,7 @@ fn test_relu_and_linear() {
     model.2.weight.set(w2.clone());
     let mut b = model.forward(a).retrieve();
     let mut batch_out = model.forward(batch).retrieve();
-    cx.execute();
+    cx.execute_debug();
 
     let unoptimized_b = b.data();
     let unoptimized_batch_out = batch_out.data();
@@ -251,7 +251,7 @@ fn test_relu_and_linear() {
         <(GenericCompiler, CairoCompiler)>::default(),
         (&mut b, &mut batch_out),
     );
-    cx.execute();
+    cx.execute_debug();
 
     assert_close_precision(&unoptimized_b, &b.data(), 1e-2);
     assert_close_precision(&unoptimized_batch_out, &batch_out.data(), 1e-2);
@@ -276,105 +276,110 @@ fn test_relu_and_linear() {
     assert_close_precision(&unoptimized_b, &out.as_vec(), 1e-2);
 }
 
-// #[test]
-// fn test_transformer_encoder_block() {
-//     let mut cx = Graph::new();
-//     let model = luminal_nn::TransformerEncoderBlock::new(3, 4, 1, &mut cx);
-//     model
-//         .attention
-//         .w_k
-//         .weight
-//         .set(vec![1., 22., 3., 1., 2., 3., 1., 2., 3.]);
-//     model
-//         .attention
-//         .w_q
-//         .weight
-//         .set(vec![3., 2., 3., 1.3, 2., 3., 3., 2., 3.]);
-//     model
-//         .attention
-//         .w_v
-//         .weight
-//         .set(vec![-1., 12., 3., -1., 2., -3., 11., 2., 3.]);
-//     model
-//         .attention
-//         .w_o
-//         .weight
-//         .set(vec![1., 22., 3., 1., 2., 3., 1., 2., 3.]);
-//     model
-//         .ff
-//         .0
-//         .weight
-//         .set(vec![-1., 12., 3., -1., 2., -3., 11., 2., 3., 11., 2., 3.]);
-//     model
-//         .ff
-//         .2
-//         .weight
-//         .set(vec![-1., 12., 3., -1., 2., -3., 11., 2., 3., 3., -1., 2.]);
+#[test]
+fn test_transformer_encoder_block() {
+    let mut cx = Graph::new();
+    let model = luminal_nn::TransformerEncoderBlock::new(3, 4, 1, &mut cx);
 
-//     let a = cx
-//         .tensor(('a', 3))
-//         .set_dyn(vec![-1., 2., 3., 3., 3., -1.], (2, 3));
-//     let mut b = model.forward(a).retrieve();
+    model
+        .attention
+        .w_k
+        .weight
+        .set(vec![0.1, 0.22, 0.03, 0.1, 0.2, 0.3, 0.1, 0.2, 0.3]);
+    model
+        .attention
+        .w_q
+        .weight
+        .set(vec![0.3, 0.2, 0.3, 0.13, 0.2, 0.3, 0.3, 0.2, 0.3]);
+    model
+        .attention
+        .w_v
+        .weight
+        .set(vec![-0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3]);
+    model
+        .attention
+        .w_o
+        .weight
+        .set(vec![0.1, 0.22, 0.03, 0.1, 0.2, 0.3, 0.1, 0.2, 0.3]);
+    model
+        .ff
+        .0
+        .weight
+        .set(vec![-0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.11, 0.2, 0.3]);
+    model
+        .ff
+        .2
+        .weight
+        .set(vec![-0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.3, -0.1, 0.2]);
 
-//     let _ = cx.compile(<(GenericCompiler, CairoCompiler)>::default(), &mut b);
-//     cx.execute();
+    let a = cx
+        .tensor(('a', 3))
+        .set_dyn(vec![-0.1, 0.2, 0.3, 0.3, 0.3, -0.1], (2, 3));
+    
+    let mut b = model.forward(a).retrieve();
 
-//     let d_dev = Cpu::default();
-//     let mut d_model: dfdx::nn::modules::TransformerEncoderBlock<3, 1, 4, f32, Cpu> =
-//         d_dev.build_module::<dfdx::nn::modules::builders::TransformerEncoderBlock<3, 1, 4>, f32>();
-//     d_model.self_attn.w_k.bias.copy_from(&[0.0, 0.0, 0.0]);
-//     d_model.self_attn.w_v.bias.copy_from(&[0.0, 0.0, 0.0]);
-//     d_model.self_attn.w_q.bias.copy_from(&[0.0, 0.0, 0.0]);
-//     d_model.self_attn.w_o.bias.copy_from(&[0., 0., 0.]);
-//     d_model.self_attn.w_o.weight = d_dev
-//         .tensor_from_vec(
-//             vec![1., 22., 3., 1., 2., 3., 1., 2., 3.],
-//             (DConst::<3>, DConst::<3>),
-//         )
-//         .permute();
-//     d_model.self_attn.w_k.weight = d_dev
-//         .tensor_from_vec(
-//             vec![1., 22., 3., 1., 2., 3., 1., 2., 3.],
-//             (DConst::<3>, DConst::<3>),
-//         )
-//         .permute();
-//     d_model.self_attn.w_q.weight = d_dev
-//         .tensor_from_vec(
-//             vec![3., 2., 3., 1.3, 2., 3., 3., 2., 3.],
-//             (DConst::<3>, DConst::<3>),
-//         )
-//         .permute();
-//     d_model.self_attn.w_v.weight = d_dev
-//         .tensor_from_vec(
-//             vec![-1., 12., 3., -1., 2., -3., 11., 2., 3.],
-//             (DConst::<3>, DConst::<3>),
-//         )
-//         .permute();
-//     d_model.ff.0 .0.weight = d_dev
-//         .tensor_from_vec(
-//             vec![-1., 12., 3., -1., 2., -3., 11., 2., 3., 11., 2., 3.],
-//             (DConst::<3>, DConst::<4>),
-//         )
-//         .permute();
-//     d_model.ff.0 .0.bias = d_dev.tensor_from_vec(vec![0., 0., 0., 0.], (DConst::<4>,));
-//     d_model.ff.0 .2.weight = d_dev
-//         .tensor_from_vec(
-//             vec![-1., 12., 3., -1., 2., -3., 11., 2., 3., 3., -1., 2.],
-//             (DConst::<4>, DConst::<3>),
-//         )
-//         .permute();
-//     d_model.ff.0 .2.bias = d_dev.tensor_from_vec(vec![0., 0., 0.], (DConst::<3>,));
-//     d_model.norm1.gamma = d_dev.tensor_from_vec(vec![1., 1., 1.], (DConst::<3>,));
-//     d_model.norm2.gamma = d_dev.tensor_from_vec(vec![1., 1., 1.], (DConst::<3>,));
-//     d_model.norm1.epsilon = 1e-5;
-//     d_model.norm2.beta = d_dev.tensor_from_vec(vec![0., 0., 0.], (DConst::<3>,));
-//     d_model.norm1.beta = d_dev.tensor_from_vec(vec![0., 0., 0.], (DConst::<3>,));
-//     d_model.norm2.epsilon = 1e-5;
-//     let d_a = d_dev.tensor_from_vec(vec![-1., 2., 3., 3., 3., -1.], (DConst::<2>, DConst::<3>));
-//     let d_b = d_model.forward(d_a);
+    let _ = cx.compile(<(GenericCompiler, CairoCompiler)>::default(), &mut b);
+    cx.execute_debug();
 
-//     assert_close(&b.data(), &d_b.as_vec());
-// }
+    let d_dev = Cpu::default();
+    let mut d_model: dfdx::nn::modules::TransformerEncoderBlock<3, 1, 4, f32, Cpu> =
+        d_dev.build_module::<dfdx::nn::modules::builders::TransformerEncoderBlock<3, 1, 4>, f32>();
+
+    d_model.self_attn.w_k.bias.copy_from(&[0.0, 0.0, 0.0]);
+    d_model.self_attn.w_v.bias.copy_from(&[0.0, 0.0, 0.0]);
+    d_model.self_attn.w_q.bias.copy_from(&[0.0, 0.0, 0.0]);
+    d_model.self_attn.w_o.bias.copy_from(&[0.0, 0.0, 0.0]);
+
+    d_model.self_attn.w_o.weight = d_dev
+        .tensor_from_vec(
+            vec![0.1, 0.22, 0.03, 0.1, 0.2, 0.3, 0.1, 0.2, 0.3],
+            (DConst::<3>, DConst::<3>),
+        )
+        .permute();
+    d_model.self_attn.w_k.weight = d_dev
+        .tensor_from_vec(
+            vec![0.1, 0.22, 0.03, 0.1, 0.2, 0.3, 0.1, 0.2, 0.3],
+            (DConst::<3>, DConst::<3>),
+        )
+        .permute();
+    d_model.self_attn.w_q.weight = d_dev
+        .tensor_from_vec(
+            vec![0.3, 0.2, 0.3, 0.13, 0.2, 0.3, 0.3, 0.2, 0.3],
+            (DConst::<3>, DConst::<3>),
+        )
+        .permute();
+    d_model.self_attn.w_v.weight = d_dev
+        .tensor_from_vec(
+            vec![-0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3],
+            (DConst::<3>, DConst::<3>),
+        )
+        .permute();
+    d_model.ff.0 .0.weight = d_dev
+        .tensor_from_vec(
+            vec![-0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.11, 0.2, 0.3],
+            (DConst::<3>, DConst::<4>),
+        )
+        .permute();
+    d_model.ff.0 .0.bias = d_dev.tensor_from_vec(vec![0.0, 0.0, 0.0, 0.0], (DConst::<4>,));
+    d_model.ff.0 .2.weight = d_dev
+        .tensor_from_vec(
+            vec![-0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.3, -0.1, 0.2],
+            (DConst::<4>, DConst::<3>),
+        )
+        .permute();
+    d_model.ff.0 .2.bias = d_dev.tensor_from_vec(vec![0.0, 0.0, 0.0], (DConst::<3>,));
+    d_model.norm1.gamma = d_dev.tensor_from_vec(vec![1.0, 1.0, 1.0], (DConst::<3>,));
+    d_model.norm2.gamma = d_dev.tensor_from_vec(vec![1.0, 1.0, 1.0], (DConst::<3>,));
+    d_model.norm1.epsilon = 1e-5;
+    d_model.norm2.beta = d_dev.tensor_from_vec(vec![0.0, 0.0, 0.0], (DConst::<3>,));
+    d_model.norm1.beta = d_dev.tensor_from_vec(vec![0.0, 0.0, 0.0], (DConst::<3>,));
+    d_model.norm2.epsilon = 1e-5;
+
+    let d_a = d_dev.tensor_from_vec(vec![-0.1, 0.2, 0.3, 0.3, 0.3, -0.1], (DConst::<2>, DConst::<3>));
+    let d_b = d_model.forward(d_a);
+
+    assert_close(&b.data(), &d_b.as_vec());
+}
 
 #[test]
 fn test_pool_1d_dims() {
@@ -388,7 +393,7 @@ fn test_pool_1d_dims() {
 
     let _ = cx.compile(<CairoCompiler>::default(), &mut out1);
 
-    cx.execute();
+    cx.execute_debug();
 
     assert_exact(
         &out1.data(),
@@ -422,7 +427,7 @@ fn test_pool_2d() {
 
     let _ = cx.compile(<CairoCompiler>::default(), &mut out1);
 
-    cx.execute();
+    cx.execute_debug();
 
     assert_exact(
         &out1.data(),
@@ -450,7 +455,7 @@ fn test_pool_1d_dilation() {
     let _ = cx.compile(<CairoCompiler>::default(), &mut out2);
     let _ = cx.compile(<CairoCompiler>::default(), &mut out3);
 
-    cx.execute();
+    cx.execute_debug();
 
     assert_exact(&out1.data(), &[1., 3., 2., 4., 3., 5.]);
     assert_exact(&out2.data(), &[1., 3., 3., 5.]);
@@ -526,7 +531,7 @@ fn test_conv2d() {
     let mut out1 = model.forward(inp1).retrieve();
 
     let _ = cx.compile(<(GenericCompiler, CairoCompiler)>::default(), &mut out1);
-    cx.execute();
+    cx.execute_debug();
 
     assert_close(
         &out1.data(),
@@ -565,7 +570,7 @@ fn test_conv1d_pad_stride() {
 
     let mut out1 = model.forward(inp1).retrieve();
     let _ = cx.compile(CairoCompiler::default(), &mut out1);
-    cx.execute();
+    cx.execute_debug();
 
     let input =
         candle_core::Tensor::from_vec(input_data, (1, CH_IN, DIM_IN), &candle_core::Device::Cpu)
