@@ -1,6 +1,6 @@
 use dfdx::prelude::{Module as DfdxModule, *};
 use luminal::{module::Module, prelude::*};
-use luminal_nn::{Conv1D, Linear, ReLU};
+use luminal_nn::{Conv1D, LayerNorm, Linear, ReLU};
 use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{binary_test, unary_test, CairoCompiler};
@@ -60,6 +60,135 @@ fn test_contiguous() {
     let d_b = d_a.permute::<Rank2<4, 3>, _>().reshape::<Rank2<12, 1>>();
 
     assert_close(&b.data(), &d_b.as_vec());
+}
+
+#[test]
+fn test_rotate() {
+    let mut cx = Graph::new();
+    const B: usize = 2;
+    const F: usize = 3;
+    const D: usize = 4;
+    let data = random_vec(D * B * F);
+    let a = cx.tensor((F, B, D)).set(data.clone()).permute((1, 0, 2));
+    let x1 = a.slice((.., .., ..D / 2));
+    let x2 = a.slice((.., .., D / 2..));
+    let mut rotated_a = (-x2).concat_along(x1, 1).retrieve();
+    cx.execute();
+    let unopt = rotated_a.data();
+    rotated_a.drop();
+
+    let _ = cx.compile(CairoCompiler::default(), &mut rotated_a);
+    cx.execute_debug();
+    assert_close(&unopt, &rotated_a.data());
+}
+
+#[test]
+fn test_constant() {
+    let mut cx = Graph::new();
+    let a = cx.constant_expr('a');
+    let mut a = (a * a).retrieve();
+    let _ = cx.compile(CairoCompiler::default(), &mut a);
+
+    cx.set_dyn_dim('a', 10);
+    cx.execute();
+    assert_exact(&a.data(), &[100.0]);
+    a.drop();
+    cx.set_dyn_dim('a', 25);
+    cx.execute();
+    assert_exact(&a.data(), &[625.0]);
+}
+
+#[test]
+fn test_slice() {
+    let data = random_vec(256);
+    let mut cx = Graph::new();
+    let mut a = cx.tensor(256).set(data.clone());
+    let c = a.slice(..20).contiguous().retrieve();
+
+    let _ = cx.compile(CairoCompiler::default(), &mut a);
+    cx.execute();
+
+    let d_dev = Cpu::default();
+    let d_a = d_dev
+        .tensor_from_vec(data, (DConst::<256>,))
+        .to_dtype::<f32>();
+    let d_c = d_a.slice((..20,)).to_dtype::<f32>();
+
+    assert_exact(&c.data(), &d_c.as_vec());
+}
+
+#[test]
+fn test_pad() {
+    // Pad a 8x2 mat to 10x4
+    let data = random_vec(8 * 2);
+    let mut cx = Graph::new();
+    let a = cx.tensor((8, 2)).set(data.clone());
+    let mut c = a.pad(((0, 2), (0, 2))).contiguous().retrieve();
+
+    let _ = cx.compile(CairoCompiler::default(), &mut c);
+    cx.execute();
+
+    let d_dev = Cpu::default();
+    let d_a = d_dev.tensor_from_vec(data, (8, 2)).to_dtype::<f32>();
+    // There is no pad function in dfdx, so we concat with zero tensors
+    let d_b = (d_a, d_dev.zeros_like(&(2, 2))).concat_along(DAxis::<0>);
+    let d_c = (d_b, d_dev.zeros_like(&(10, 2))).concat_along(DAxis::<1>);
+
+    assert_exact(&c.data(), &d_c.to_dtype::<f32>().as_vec());
+}
+
+#[test]
+fn test_pad_contig() {
+    let m = 13;
+    let k = 24;
+    let mut cx = Graph::new();
+    let mut rng = StdRng::seed_from_u64(0);
+    let a_data = random_vec_rng(m * k, &mut rng);
+    let mut a = cx.tensor(('M', 'K')).set_dyn(a_data, (m, k)).retrieve();
+    let mut b = a
+        .pad(((0, 0), (0, Expression::from(24) - 'K')))
+        .contiguous()
+        .retrieve();
+    let mut c = (a.slice((.., ..k)) / 1.0).retrieve();
+
+    let _ = cx.compile(CairoCompiler::default(), (&mut a, &mut b, &mut c));
+    cx.execute();
+
+    // Close because b and c are going through 16 bits, while a is not
+    assert_close(&a.data(), &b.data());
+    assert_close(&a.data(), &c.data());
+}
+
+#[test]
+fn test_movement() {
+    let data = random_vec(32);
+    let mut cx = Graph::new();
+    let a = cx.tensor(32).set(data.clone());
+    let b = a.pad((0, 10)).contiguous().retrieve();
+    let mut c = b.slice((..25,)).contiguous().retrieve();
+
+    let _ = cx.compile(CairoCompiler::default(), &mut c);
+    cx.execute();
+
+    let d_dev = Cpu::default();
+    let d_a = d_dev
+        .tensor_from_vec(data, (DConst::<32>,))
+        .to_dtype::<f32>();
+    let d_c = d_a.slice((..25,)).to_dtype::<f32>();
+
+    assert_exact(&c.data(), &d_c.as_vec());
+}
+
+#[test]
+fn test_slice_add() {
+    let mut cx = Graph::new();
+    let a = cx.tensor(256).set(random_array::<256>());
+    let mut b = (a.slice(0..64) + a.slice(64..128) + a.slice(128..192) + a.slice(192..256))
+        .expand(0, 4)
+        .retrieve();
+
+    let _ = cx.compile(CairoCompiler::default(), &mut b);
+    cx.execute();
 }
 
 // =============== REDUCE ===============
@@ -131,7 +260,7 @@ fn test_mean_reduce() {
 // =============== MATMUL ===============
 
 #[test]
-fn test_matmul() {
+fn test_matmul_simple() {
     let mut cx = Graph::new();
     let a_data = random_vec(3 * 3);
     let b_data = random_vec(3 * 3);
@@ -224,18 +353,17 @@ fn test_matmul_transpose() {
 // =============== NN ===============
 #[test]
 fn test_relu_and_linear() {
-    // Test single and batch, unoptimized and optimized
     let mut cx = Graph::new();
-    let input_data = random_vec(32);
-    let w1 = random_vec(32 * 64);
-    let w2 = random_vec(32 * 64);
-    let batch = cx.named_tensor("Batch", (2, 32)).set(random_vec(32 * 2));
-    let a = cx.named_tensor("Single", 32).set(input_data.clone());
+    let input_data = random_vec(8);
+    let w1 = random_vec(8 * 16);
+    let w2 = random_vec(16 * 8);
+    let batch = cx.named_tensor("Batch", (2, 8)).set(random_vec(8 * 2));
+    let a = cx.named_tensor("Single", 8).set(input_data.clone());
 
     let model = (
-        Linear::new(32, 64, false, &mut cx),
+        Linear::new(8, 16, false, &mut cx),
         ReLU,
-        Linear::new(64, 32, false, &mut cx),
+        Linear::new(16, 8, false, &mut cx),
     );
     model.0.weight.set(w1.clone());
     model.2.weight.set(w2.clone());
@@ -259,18 +387,18 @@ fn test_relu_and_linear() {
     // Test against dfdx
     let dev = Cpu::default();
     let mut model = <(
-        dfdx::nn::modules::builders::UnbiasedLinear<32, 64>,
+        dfdx::nn::modules::builders::UnbiasedLinear<8, 16>,
         dfdx::nn::modules::builders::ReLU,
-        dfdx::nn::modules::builders::UnbiasedLinear<64, 32>,
+        dfdx::nn::modules::builders::UnbiasedLinear<16, 8>,
     )>::build_on_device(&dev);
     // Set weights
     model.0.weight = dev
-        .tensor_from_vec(w1, (DConst::<32>, DConst::<64>))
+        .tensor_from_vec(w1, (DConst::<8>, DConst::<16>))
         .permute();
     model.2.weight = dev
-        .tensor_from_vec(w2, (DConst::<64>, DConst::<32>))
+        .tensor_from_vec(w2, (DConst::<16>, DConst::<8>))
         .permute();
-    let a = dev.tensor_from_vec(input_data, (DConst::<32>,));
+    let a = dev.tensor_from_vec(input_data, (DConst::<8>,));
     let out = model.forward(a);
 
     assert_close_precision(&unoptimized_b, &out.as_vec(), 1e-2);
@@ -301,21 +429,17 @@ fn test_transformer_encoder_block() {
         .w_o
         .weight
         .set(vec![0.1, 0.22, 0.03, 0.1, 0.2, 0.3, 0.1, 0.2, 0.3]);
-    model
-        .ff
-        .0
-        .weight
-        .set(vec![-0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.11, 0.2, 0.3]);
-    model
-        .ff
-        .2
-        .weight
-        .set(vec![-0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.3, -0.1, 0.2]);
+    model.ff.0.weight.set(vec![
+        -0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.11, 0.2, 0.3,
+    ]);
+    model.ff.2.weight.set(vec![
+        -0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.3, -0.1, 0.2,
+    ]);
 
     let a = cx
         .tensor(('a', 3))
         .set_dyn(vec![-0.1, 0.2, 0.3, 0.3, 0.3, -0.1], (2, 3));
-    
+
     let mut b = model.forward(a).retrieve();
 
     let _ = cx.compile(<(GenericCompiler, CairoCompiler)>::default(), &mut b);
@@ -356,14 +480,18 @@ fn test_transformer_encoder_block() {
         .permute();
     d_model.ff.0 .0.weight = d_dev
         .tensor_from_vec(
-            vec![-0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.11, 0.2, 0.3],
+            vec![
+                -0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.11, 0.2, 0.3,
+            ],
             (DConst::<3>, DConst::<4>),
         )
         .permute();
     d_model.ff.0 .0.bias = d_dev.tensor_from_vec(vec![0.0, 0.0, 0.0, 0.0], (DConst::<4>,));
     d_model.ff.0 .2.weight = d_dev
         .tensor_from_vec(
-            vec![-0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.3, -0.1, 0.2],
+            vec![
+                -0.1, 0.12, 0.03, -0.1, 0.2, -0.3, 0.11, 0.2, 0.3, 0.3, -0.1, 0.2,
+            ],
             (DConst::<4>, DConst::<3>),
         )
         .permute();
@@ -375,7 +503,10 @@ fn test_transformer_encoder_block() {
     d_model.norm1.beta = d_dev.tensor_from_vec(vec![0.0, 0.0, 0.0], (DConst::<3>,));
     d_model.norm2.epsilon = 1e-5;
 
-    let d_a = d_dev.tensor_from_vec(vec![-0.1, 0.2, 0.3, 0.3, 0.3, -0.1], (DConst::<2>, DConst::<3>));
+    let d_a = d_dev.tensor_from_vec(
+        vec![-0.1, 0.2, 0.3, 0.3, 0.3, -0.1],
+        (DConst::<2>, DConst::<3>),
+    );
     let d_b = d_model.forward(d_a);
 
     assert_close(&b.data(), &d_b.as_vec());
@@ -587,4 +718,94 @@ fn test_conv1d_pad_stride() {
         &out1.data(),
         &output.flatten_all().unwrap().to_vec1::<f32>().unwrap(),
     );
+}
+
+#[test]
+fn test_embedding() {
+    let mut cx = Graph::new();
+    let batch = cx
+        .named_tensor("Batch", (2, 3))
+        .set(vec![1.0, 0.0, 2.0, 1.0, 0.0, 1.0])
+        .keep();
+    let a = cx.named_tensor("Single", 3).set(vec![1.0, 0.0, 1.0]).keep();
+
+    let model = luminal_nn::Embedding::new(3, 4, &mut cx);
+    model
+        .weight
+        .set(vec![1.1, 2., 3., 1., 2., 3., 14., 2., 33., 1., 2., 3.]);
+    let mut b = model.forward(a).retrieve();
+    let mut batch_out = model.forward(batch).retrieve();
+
+    let _ = cx.compile(CairoCompiler::default(), (&mut b, &mut batch_out));
+    cx.execute();
+
+    let d_dev = Cpu::default();
+    let mut d_model: modules::Embedding<3, 4, f32, Cpu> =
+        <dfdx::nn::modules::builders::Embedding<3, 4>>::build_on_device(&d_dev);
+    d_model.weight = d_dev.tensor_from_vec(
+        vec![1.1, 2., 3., 1., 2., 3., 14., 2., 33., 1., 2., 3.],
+        (DConst::<3>, DConst::<4>),
+    );
+    let d_a = d_dev.tensor_from_vec(vec![1, 0, 1], (DConst::<3>,));
+    let d_batch = d_dev.tensor_from_vec(vec![1, 0, 2, 1, 0, 1], (DConst::<2>, DConst::<3>));
+
+    let d_b = d_model.forward(d_a);
+    let d_batch_out = d_model.forward(d_batch);
+
+    assert_close(&b.data(), &d_b.as_vec());
+    assert_close(&batch_out.data(), &d_batch_out.as_vec());
+}
+
+#[test]
+fn test_rms_norm() {
+    let mut rng = StdRng::seed_from_u64(0);
+    // Test single and batch, unoptimized and optimized
+    let inp_data = random_vec_rng(15 * 32, &mut rng);
+    let weight_data = random_vec_rng(32, &mut rng);
+    let mut cx = Graph::new();
+    let a = cx.tensor((15, 32)).set(inp_data.clone());
+
+    let model = LayerNorm::new(32, true, false, false, 1e-5, &mut cx);
+    model.weight.unwrap().set(weight_data.clone());
+    let mut b = model.forward(a).retrieve();
+
+    let _ = cx.compile(<(GenericCompiler, CairoCompiler)>::default(), &mut b);
+    cx.execute();
+
+    // Test against dfdx
+    let dev = Cpu::default();
+    let weight = dev
+        .tensor_from_vec(weight_data, (DConst::<32>,))
+        .to_dtype::<f32>();
+    let a = dev
+        .tensor_from_vec(inp_data, (DConst::<15>, DConst::<32>))
+        .to_dtype::<f32>();
+    let var_f32 = a.clone().square().mean::<_, DAxis<1>>();
+    let std_f32 = (var_f32 + 1e-6).sqrt();
+    let x_f32 = a / std_f32.broadcast();
+    let out = weight.broadcast() * x_f32.to_dtype::<f32>();
+
+    assert_close(&b.data(), &out.to_dtype::<f32>().as_vec());
+}
+
+#[test]
+fn test_layer_norm() {
+    let mut cx = Graph::new();
+    let a_data = random_vec(3 * 4 * 5);
+    let a = cx.tensor((3, 4, 5)).set(a_data.clone());
+    let mut b = a.layer_norm(0, 1e-5).retrieve();
+    let mut c = a.layer_norm(2, 1e-5).retrieve();
+    let _ = cx.compile(
+        <(GenericCompiler, CairoCompiler)>::default(),
+        (&mut b, &mut c),
+    );
+    cx.execute();
+
+    let d_dev = Cpu::default();
+    let d_a = d_dev.tensor_from_vec(a_data, (DConst::<3>, DConst::<4>, DConst::<5>));
+    let d_b = d_a.clone().normalize::<DAxis<0>>(1e-5);
+    let d_c = d_a.normalize::<DAxis<2>>(1e-5);
+
+    assert_close_precision(&b.data(), &d_b.as_vec(), 1e-2);
+    assert_close_precision(&c.data(), &d_c.as_vec(), 1e-2);
 }
