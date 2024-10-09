@@ -1,7 +1,6 @@
 use std::{
     any::{Any, TypeId},
     path::PathBuf,
-    str::FromStr,
     sync::Arc,
 };
 
@@ -237,6 +236,10 @@ pub struct PrimitiveCompiler {
 
 impl PrimitiveCompiler {
     pub fn new(config: CairoRunnerConfig) -> Self {
+        // Ensure the COMPILED_CAIRO_PATH is set
+        if COMPILED_CAIRO_PATH.to_str().unwrap().is_empty() {
+            panic!("COMPILED_CAIRO_PATH is not set. Please set the LUMINAIR_COMPILED_CAIRO_PATH environment variable or ensure the build script has run correctly.");
+        }
         Self {
             runner_config: config,
         }
@@ -260,27 +263,21 @@ impl Compiler for PrimitiveCompiler {
             let op_ref = graph.graph.node_weight_mut(id).unwrap();
 
             if is::<Log2>(op) {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("log2.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("log2.sierra.json");
 
                 *op_ref = Box::new(CairoLog2::new(
                     sierra_file,
                     self.runner_config.clone().into(),
                 ));
             } else if is::<Exp2>(op) {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("exp2.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("exp2.sierra.json");
 
                 *op_ref = Box::new(CairoExp2::new(
                     sierra_file,
                     self.runner_config.clone().into(),
                 ));
             } else if is::<Sin>(op) {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("sin.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("sin.sierra.json");
 
                 *op_ref = Box::new(CairoSin::new(
                     sierra_file,
@@ -289,54 +286,42 @@ impl Compiler for PrimitiveCompiler {
             } else if let Some(c) = op_ref.as_any().downcast_ref::<Constant>() {
                 *op_ref = Box::new(CairoConstant::new(c.0.clone(), &graph.dyn_map));
             } else if is::<Recip>(op) {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("recip.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("recip.sierra.json");
 
                 *op_ref = Box::new(CairoRecip::new(
                     sierra_file,
                     self.runner_config.clone().into(),
                 ));
             } else if is::<Sqrt>(op) {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("sqrt.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("sqrt.sierra.json");
 
                 *op_ref = Box::new(CairoSqrt::new(
                     sierra_file,
                     self.runner_config.clone().into(),
                 ));
             } else if is::<Add>(op) {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("add.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("add.sierra.json");
 
                 *op_ref = Box::new(CairoAdd::new(
                     sierra_file,
                     self.runner_config.clone().into(),
                 ));
             } else if is::<Mul>(op) {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("mul.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("mul.sierra.json");
 
                 *op_ref = Box::new(CairoMul::new(
                     sierra_file,
                     self.runner_config.clone().into(),
                 ));
             } else if is::<Mod>(op) {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("rem.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("rem.sierra.json");
 
                 *op_ref = Box::new(CairoMod::new(
                     sierra_file,
                     self.runner_config.clone().into(),
                 ));
             } else if is::<LessThan>(op) {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("lt.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("lt.sierra.json");
 
                 *op_ref = Box::new(CairoLessThan::new(
                     sierra_file,
@@ -345,9 +330,7 @@ impl Compiler for PrimitiveCompiler {
             } else if is::<Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
             } else if let Some(SumReduce(dim)) = op_ref.as_any().downcast_ref() {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("sum_reduce.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("sum_reduce.sierra.json");
 
                 *op_ref = Box::new(CairoSumReduce::new(
                     sierra_file,
@@ -355,9 +338,7 @@ impl Compiler for PrimitiveCompiler {
                     *dim,
                 ));
             } else if let Some(MaxReduce(dim)) = op_ref.as_any().downcast_ref() {
-                let sierra_file = PathBuf::from_str(COMPILED_CAIRO_PATH)
-                    .unwrap()
-                    .join("max_reduce.sierra.json");
+                let sierra_file = COMPILED_CAIRO_PATH.join("max_reduce.sierra.json");
 
                 *op_ref = Box::new(CairoMaxReduce::new(
                     sierra_file,
