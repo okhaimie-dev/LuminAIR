@@ -205,11 +205,7 @@ impl Operator for CairoConstant {
             }
             ConstantValue::Float(f) => vec![*f],
         };
-        let res = vec![Tensor::new(value)];
-
-        println!("Constant {:?}", res);
-
-        res
+        vec![Tensor::new(value)]
     }
 }
 
