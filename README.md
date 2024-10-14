@@ -85,7 +85,7 @@ To enhance LuminAir's efficiency and support for large models, the following tas
 - [ ] Investigate loading weights directly into bytecode instead of passing them as function parameters.
 - [ ] Implement fusion compilers.
 - [ ] Develop an efficient MatMul compiler.
-- [ ] Execute each node directly from a bootloader to reduce verification costs and enhance model privacy.
+- [ ] Execute each node directly from a [bootloader](https://github.com/starkware-libs/cairo-lang/tree/master/src/starkware/cairo/bootloaders) to reduce verification costs and enhance model privacy.
 - [ ] Explore parallel trace generation for certain operators at the compiler level.
 - [ ] Implement a zkTree structure to aggregate all proofs of a Neural Network execution.
 - [ ] Ensure that the inputs of a node match the outputs of preceding related nodes to guarantee the integrity of the entire computation process.
