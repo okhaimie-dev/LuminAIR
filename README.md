@@ -82,8 +82,8 @@ Choosing Cairo is driven by several factors:
 ## Roadmap
 To enhance LuminAir's efficiency and support for large models, the following tasks are planned:
 
-- [ ]: Investigate loading weights directly into bytecode instead of passing them as function parameters.
 - [ ] Implement fusion compilers.
+- [ ]: Investigate loading weights directly into bytecode instead of passing them as function parameters.
 - [ ] Develop an efficient MatMul compiler.
 - [ ] Execute each node directly from a bootloader to reduce verification costs and enhance model privacy.
 - [ ] Explore parallel trace generation for certain operators at the compiler level.
