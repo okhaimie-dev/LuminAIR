@@ -1,6 +1,6 @@
 # LuminAir - Unlocking AI Integrity
 
-LuminAir is a Deep Learning framework designed to ensure the integrity of Neural Networks using Zero-Knowledge proofs. Each node within a Neural Network operates independently on CairoVM, generating execution traces that facilitate parallel ZK proof generation.
+LuminAir is a Deep Learning framework designed to ensure the integrity of Neural Networks using Zero-Knowledge proofs. Each node within a Neural Network operates independently on [CairoVM](https://github.com/lambdaclass/cairo-vm?tab=readme-ov-file), generating execution traces that facilitate parallel ZK proof generation.
 
 Ensuring the integrity of AI is crucial as artificial intelligent systems impact critical sectors like healthcare, finance, autonomous transport or trustless environments like blockchains. ZK proofs enable a prover to guarantee, using cryptographic evidence, that the execution of a model has proceeded correctly. This assurance is provided without the verifier having to re-execute the program.
 
