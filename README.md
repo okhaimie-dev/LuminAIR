@@ -1,6 +1,6 @@
 # LuminAir - Unlocking AI Integrity
 
-LuminAir is a Deep Learning framework designed to ensure the integrity of Neural Networks using Zero-Knowledge (ZK) proofs. Each node within a Neural Network operates independently on CairoVM, generating execution traces that facilitate parallel ZK proof generation.
+LuminAir is a Deep Learning framework designed to ensure the integrity of Neural Networks using Zero-Knowledge proofs. Each node within a Neural Network operates independently on CairoVM, generating execution traces that facilitate parallel ZK proof generation.
 
 Ensuring the integrity of AI is crucial as artificial intelligent systems impact critical sectors like healthcare, finance, autonomous transport or trustless environments like blockchains. ZK proofs enable a prover to guarantee, using cryptographic evidence, that the execution of a model has proceeded correctly. This assurance is provided without the verifier having to re-execute the program.
 
@@ -59,9 +59,9 @@ fn main() {
 ### Easy to Maintain
 By building atop Luminal, LuminAir supports any Neural Network architecture using only 11 primitive operators:
 
-Unary Operators: `Log2, Exp2, Sin, Sqrt, Recip`
-Binary Operators: `Add, Mul, Mod, LessThan`
-Other Operators: `SumReduce, MaxReduce, Contiguous`
+- Unary Operators: `Log2, Exp2, Sin, Sqrt, Recip`
+- Binary Operators: `Add, Mul, Mod, LessThan`
+- Other Operators: `SumReduce, MaxReduce, Contiguous`
 
 These operators are sufficient to implement complex architectures like transformers and convolutional networks, making the framework straightforward to maintain.
 
@@ -82,14 +82,14 @@ Choosing Cairo is driven by several factors:
 ## Roadmap
 To enhance LuminAir's efficiency and support for large models, the following tasks are planned:
 
-- [] Investigate loading weights directly into bytecode instead of passing them as function parameters.
-- [] Implement fusion compilers.
-- [] Develop an efficient MatMul compiler.
-- [] Execute each node directly from a bootloader to reduce verification costs and enhance model privacy.
-- [] Explore parallel trace generation for certain operators at the compiler level.
-- [] Implement a zkTree structure to aggregate all proofs of a Neural Network execution.
-- [] Ensure that the inputs of a node match the outputs of preceding related nodes to guarantee the integrity of the entire computation process.
-- [] Investigate packed arithmetic to perform multiple operations in parallel within the same field.
+- [ ]: Investigate loading weights directly into bytecode instead of passing them as function parameters.
+- [ ] Implement fusion compilers.
+- [ ] Develop an efficient MatMul compiler.
+- [ ] Execute each node directly from a bootloader to reduce verification costs and enhance model privacy.
+- [ ] Explore parallel trace generation for certain operators at the compiler level.
+- [ ] Implement a zkTree structure to aggregate all proofs of a Neural Network execution.
+- [ ] Ensure that the inputs of a node match the outputs of preceding related nodes to guarantee the integrity of the entire computation process.
+- [ ] Investigate packed arithmetic to perform multiple operations in parallel within the same field.
 
 ## Acknowledgements
 A special thanks to the developers and maintainers of the foundational projects that make LuminAir possible:
