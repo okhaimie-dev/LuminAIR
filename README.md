@@ -90,6 +90,8 @@ To enhance LuminAir's efficiency and support for large models, the following tas
 - [ ] Implement a zkTree structure to aggregate all proofs of a Neural Network execution.
 - [ ] Ensure that the inputs of a node match the outputs of preceding related nodes to guarantee the integrity of the entire computation process.
 - [ ] Investigate packed arithmetic to perform multiple operations in parallel within the same field.
+- [ ] Support ONNX models.
+- [ ] Create a Python SDK to design NN in Python rather than Rust, attracting more developers.
 
 ## Acknowledgements
 A special thanks to the developers and maintainers of the foundational projects that make LuminAir possible:
