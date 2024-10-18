@@ -1,29 +1,56 @@
 # LuminAir - Unlocking AI Integrity
 
-LuminAir is a Deep Learning framework designed to ensure the integrity of Neural Networks using Zero-Knowledge proofs. Each node within a Neural Network operates independently on [CairoVM](https://github.com/lambdaclass/cairo-vm?tab=readme-ov-file), generating execution traces that facilitate parallel ZK proof generation.
-
-Ensuring the integrity of AI is crucial as artificial intelligent systems impact critical sectors like healthcare, finance, autonomous transport or trustless environments like blockchains. ZK proofs enable a prover to guarantee, using cryptographic evidence, that the execution of a model has proceeded correctly. This assurance is provided without the verifier having to re-execute the program.
-
-Built atop [Luminal](https://github.com/jafioti/luminal), a deep-learning library inspired by Tiny-Grad, LuminAir offers simplicity with composable compiler for precomputing, significantly reducing overhead on the Cairo runtime.
-
-> **⚠️ Disclaimer:** LuminAir is currently under development and is not recommended for production environments.
+LuminAir is a Machine Learning framework designed to guarantee the integrity of graph-based models using Zero-Knowledge proofs. A prover provides a guarantee that the execution of AI models has been computed correctly without the need for the model to be re-executed by the verifier.
 
 ## Table of Contents
 
-- [Getting Started](#getting-started)
-- [Design Choices](#design-choices)
-  - [Easy to Maintain](#easy-to-maintain)
-  - [Proof Parallel Friendly](#proof-parallel-friendly)
-  - [Lazy Computation](#lazy-computation)
-  - [Why Cairo?](#why-cairo)
+- [Introduction](#introduction)
+- [Features](#features)
+- [Add new zkVMs](#add-new-zkvms)
+- [Usage](#usage)
 - [Roadmap](#roadmap)
+- [Acknowledgements](#acknowledgements)
 - [License](#license)
 
-## Getting Started
+## Introduction
 
-No prior knowledge of Cairo is required. You can design your Neural Network directly in Rust and run on CairoVM.
+Ensuring the integrity of intelligence systems is crucial, especially as they increasingly impact critical sectors such as healthcare, finance, autonomous transportation, and decentralized environments like blockchains. LuminAir addresses this need by integrating Zero-Knowledge proofs into the ML workflow, providing cryptographic assurance that model executions are performed correctly.
 
-### Example
+Built atop [Luminal](https://github.com/jafioti/luminal), a LuminAir graph is decomposed into 11 primitive operators, making the framework compatible with parallel proof by allowing each node of a computation graph to be proved independently. This design not only improves efficiency but also simplifies the addition of new zkVMs, since only 11 operators need to be implemented to support a new VM.
+
+> **⚠️ Disclaimer:** LuminAir is currently under development and is not recommended for production environments.
+
+## Add new zkVMs
+
+LuminAir has been designed to support a wide range of zkVMs. Adding new VMs is easy, just implement 11 primitive operators to support any model.
+
+### Primitive operators
+
+- **Unary Operators:** `Log2, Exp2, Sin, Sqrt, Recip`
+- **Binary Operators:** `Add, Mul, Mod, LessThan`
+- **Other Operators:** `SumReduce, MaxReduce, Contiguous`
+
+These ops are enough to support transformers, convnets, etc.
+
+### Supported zkVMs
+
+| zkVMs | Status |
+| ----- | ------ |
+| Cairo | ✅     |
+| SP1   | ⏳     |
+| Risc0 | 👀     |
+| Noir  | 👀     |
+
+## Features
+
+- **Proof Parallelism:** Each node in the computation graph can be proved independently, enabling parallel proof generation.
+- **Extensible zkVM Support:** Easily add support for new zkVMs by implementing only 11 primitive operators to support any model.
+- **Precompilation Optimizations:** Reduce ZK circuit overhead and fuse operators at the compiler level for enhanced performance.
+- **Mainstream-Language Support:** Design ML models in Rust (with Python support coming soon) to onboard a wide range of developers.
+
+## Usage
+
+Below is a simple example demonstrating how to create and execute on CairoVM a computation graph using LuminAir in Rust:
 
 ```rust
 use luminair::CairoCompiler;
@@ -44,7 +71,7 @@ fn main() {
     let mut b = model.forward(a).retrieve();
 
     // Compile the graph using CairoCompiler
-    cx.compile(<CairoCompiler>::default(), &mut b);
+    cx.compile(CairoCompiler::default(), &mut b);
 
     // Execute the computation graph
     cx.execute();
@@ -54,51 +81,35 @@ fn main() {
 }
 ```
 
-## Design Choices
+## Key Concepts
 
-### Easy to Maintain
-By building atop Luminal, LuminAir supports any Neural Network architecture using only 11 primitive operators:
-
-- Unary Operators: `Log2, Exp2, Sin, Sqrt, Recip`
-- Binary Operators: `Add, Mul, Mod, LessThan`
-- Other Operators: `SumReduce, MaxReduce, Contiguous`
-
-These operators are sufficient to implement complex architectures like transformers and convolutional networks, making the framework straightforward to maintain.
-
-### Proof Parallel Friendly
-By decomposing Neural Networks into small operators, LuminAir enables the creation of independent ZK circuits for each graph node. CairoVM generates independent execution traces, allowing node proofs to be generated in parallel.
-
-### Lazy Computation
-Expressions like `x + y` are recorded in a directed acyclic computation graph without immediate computation. The actual computation occurs only when `graph.execute()` is invoked. This approach allows precompilation optimizations, such as reducing ZK circuit overhead and fusing operators, handled at the compiler level.
-
-### Why Cairo?
-
-Choosing Cairo is driven by several factors:
-
-- Simplicity: The Cairo programming language is straightforward, facilitating easy development and auditing of operators.
-- Advanced ZK Capabilities: [StarkWare](https://starkware.co/) continually advances ZK technologies. [Stwo](https://github.com/starkware-libs/stwo) is a promising prover that unlocking promising features for ZKML, like client-side proving and GPU-based proving.
-- Blockchain Verification: Cairo allows proof verification on blockchain platforms, enabling impartial verification by third parties.
+- **Graph-Based Execution:** Expressions like `x + y` are recorded in a directed acyclic computation graph without immediate computation. The actual computation occurs only when `graph.execute()` is invoked. This allows lazy computation to reduce the overhead on runtime.
+- **Parallel Proof Generation:** By decomposing the model into small operators, LuminAir enables the creation of independent and simple ZK circuits for each graph node. A zkVM then generates independent execution traces, allowing node proofs to be generated in parallel.
 
 ## Roadmap
-To enhance LuminAir's efficiency and support for large models, the following tasks are planned:
 
-- [ ] Investigate loading weights directly into bytecode instead of passing them as function parameters.
-- [ ] Implement fusion compilers.
-- [ ] Develop an efficient MatMul compiler.
-- [ ] Execute each node directly from a [bootloader](https://github.com/starkware-libs/cairo-lang/tree/master/src/starkware/cairo/bootloaders) to reduce verification costs and enhance model privacy.
-- [ ] Explore parallel trace generation for certain operators at the compiler level.
-- [ ] Implement a zkTree structure to aggregate all proofs of a Neural Network execution.
-- [ ] Ensure that the inputs of a node match the outputs of preceding related nodes to guarantee the integrity of the entire computation process.
-- [ ] Investigate packed arithmetic to perform multiple operations in parallel within the same field.
-- [ ] Support ONNX models.
-- [ ] Create a Python SDK to design NN in Python rather than Rust, attracting more developers.
+To enhance LuminAir's efficiency and support for large models, the following features are planned:
+
+- **Weight Loading:** Load weights directly into bytecode instead of passing them as program inputs.
+- **Fusion Compilers:** Implement fusion compilers for certain operators to optimize performance.
+- **Efficient MatMul Compiler:** Develop optimized compilers for matrix multiplication operations.
+- **Bootloader Integration:** Execute each circuit from a [bootloader](https://github.com/starkware-libs/cairo-lang/tree/master/src/starkware/cairo/bootloaders) to reduce verification costs and enhance model privacy.
+- **Trace Generation Parallelization:** Enhance parallelization in trace generation for faster model execution.
+- **Dataflow Integrity:** Ensure that the inputs of a node match the outputs of preceding related nodes to guarantee dataflow integrity.
+- **zkTree Structure:** Implement a zkTree structure to aggregate all proofs efficiently.
+- **Packed Arithmetic:** Investigate packed arithmetic to perform multiple operations in parallel within the same finite field.
+- **ONNX Support:** Enable support for ONNX models to broaden compatibility.
+- **Python SDK:** Create a Python SDK to allow model design in Python, attracting a larger developer base.
 
 ## Acknowledgements
+
 A special thanks to the developers and maintainers of the foundational projects that make LuminAir possible:
 
 - [Luminal](https://github.com/jafioti/luminal): For providing a robust and flexible deep-learning library that serves as the backbone of LuminAir.
 - [CairoVM](https://github.com/lambdaclass/cairo-vm): For offering a powerful VM that enables execution of Cairo programs.
 
-
 ## License
-[MIT License](https://opensource.org/license/mit)
+
+LuminAir is released under the [MIT](https://opensource.org/license/mit) License.
+
+_Feel free to contribute to LuminAir by opening issues or submitting pull requests. Your feedback and contributions are highly appreciated!_
