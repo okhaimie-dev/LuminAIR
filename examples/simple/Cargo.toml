@@ -1,9 +1,0 @@
-[package]
-name = "simple"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-luminal = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal" }
-luminal_nn = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal/crates/luminal_nn" }
-luminair = { path = "../.." }
