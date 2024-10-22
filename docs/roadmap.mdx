@@ -1,0 +1,52 @@
+---
+title: "Roadmap"
+description: "A plan to unlock AI integrity."
+---
+
+To enhance LuminAir's efficiency and support for large-scale models, here it's what's next:
+
+<AccordionGroup>
+
+    <Accordion title="⚡️ Compiler for Fused Operators">
+        Depending on the zkVM, certain primitive operators can be fused into more optimized versions tailored for the specific zkVM in use.
+
+        For instance, performing a subtraction often doesn't require separate `Add` and `Mul` operations with `-1`. 
+
+        We plan to develop a compiler that identifies such patterns within the computational graph and replaces them with circuits optimized for the higher-level `Subtract` operator.
+    </Accordion>
+
+    <Accordion title="⚡️ Efficient MatMul Compiler">
+        Matrix multiplication is a core component in machine learning. For each zkVM we implement, an efficient MatMul compiler is essential.
+
+        Developing a MatMul zk circuit can be resource-intensive. We will conduct rigorous research and development to create an optimized MatMul implementation that aligns with the constraints of each specific zkVM.
+    </Accordion>
+
+    <Accordion title="⚡️ Packed Arithmetic">
+        Explore packed arithmetic techniques to perform multiple operations simultaneously within the same finite field, thereby increasing computational efficiency.
+    </Accordion>
+
+    <Accordion title="🔐 Running Circuits from a Bootloader">
+        Execute each circuit from a [bootloader](https://github.com/starkware-libs/cairo-lang/tree/master/src/starkware/cairo/bootloaders) to **reduce verification costs** and enhance model **privacy**.
+    </Accordion>
+
+    <Accordion title="🔐 Dataflow Integrity">
+        Ensure that the inputs of each node correctly match the outputs of preceding related nodes to maintain dataflow integrity throughout the system.
+    </Accordion>
+
+    <Accordion title="⛷️ Running Independent Nodes with Hyperthreading">
+        Computational graphs are not always strictly sequential. We will leverage hyperthreading to run independent nodes in parallel, thereby accelerating trace generation.
+    </Accordion>
+
+    <Accordion title="⛷️ Aggregate All Generated Proofs">
+        Implement a zkTree structure to efficiently aggregate all proofs in parallel, enhancing scalability and performance.
+    </Accordion>
+
+    <Accordion title="🧑‍💻 ONNX Support">
+        Introduce support for [ONNX](https://onnx.ai/) models to expand compatibility and allow integration with a broader range of machine learning frameworks.
+    </Accordion>
+
+    <Accordion title="🧑‍💻 Python SDK">
+        Develop a Python SDK to facilitate model design in Python, thereby attracting a larger developer community and simplifying the development process.
+    </Accordion>
+    
+</AccordionGroup>

@@ -16,7 +16,7 @@ fn main() {
     let mut b = model.forward(a).retrieve();
 
     // Compile the graph on CairoCompiler
-    let _ = cx.compile(<CairoCompiler>::default(), &mut b);
+    let _ = cx.compile(CairoCompiler::default(), &mut b);
 
     // Display the graph to see the ops
     cx.display();

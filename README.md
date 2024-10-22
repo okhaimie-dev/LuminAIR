@@ -1,24 +1,21 @@
 # LuminAir - Unlocking AI Integrity
 
-LuminAir is a Machine Learning framework designed to guarantee the integrity of graph-based models using Zero-Knowledge proofs. A prover provides a guarantee that the execution of AI models has been computed correctly without the need for the model to be re-executed by the verifier.
+LuminAir is a **Machine Learning** framework that guarantees the integrity of graph-based models using **Zero-Knowledge proofs**. 
+It enables a prover to cryptographically prove that the AI model's computations have been executed correctly. 
+Consequently, a verifier can verify these proofs much faster and with fewer resources than by naively re-running the model.
+
+Designed for parallel processing in trace and proof generation, LuminAir also makes it easy to add support for new zkVMs.
+
+> **⚠️ Disclaimer:** LuminAir is currently under development and is not recommended for production environments.
 
 ## Table of Contents
 
-- [Introduction](#introduction)
-- [Features](#features)
 - [Add new zkVMs](#add-new-zkvms)
+- [Features](#features)
 - [Usage](#usage)
 - [Roadmap](#roadmap)
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
-
-## Introduction
-
-Ensuring the integrity of intelligence systems is crucial, especially as they increasingly impact critical sectors such as healthcare, finance, autonomous transportation, and decentralized environments like blockchains. LuminAir addresses this need by integrating Zero-Knowledge proofs into the ML workflow, providing cryptographic assurance that model executions are performed correctly.
-
-Built atop [Luminal](https://github.com/jafioti/luminal), a LuminAir graph is decomposed into 11 primitive operators, making the framework compatible with parallel proof by allowing each node of a computation graph to be proved independently. This design not only improves efficiency but also simplifies the addition of new zkVMs, since only 11 operators need to be implemented to support a new VM.
-
-> **⚠️ Disclaimer:** LuminAir is currently under development and is not recommended for production environments.
 
 ## Add new zkVMs
 
@@ -37,7 +34,7 @@ These ops are enough to support transformers, convnets, etc.
 | zkVMs | Status |
 | ----- | ------ |
 | Cairo | ✅     |
-| SP1   | ⏳     |
+| SP1   | 👀     |
 | Risc0 | 👀     |
 | Noir  | 👀     |
 
@@ -90,7 +87,6 @@ fn main() {
 
 To enhance LuminAir's efficiency and support for large models, the following features are planned:
 
-- **Weight Loading:** Load weights directly into bytecode instead of passing them as program inputs.
 - **Fusion Compilers:** Implement fusion compilers for certain operators to optimize performance.
 - **Efficient MatMul Compiler:** Develop optimized compilers for matrix multiplication operations.
 - **Bootloader Integration:** Execute each circuit from a [bootloader](https://github.com/starkware-libs/cairo-lang/tree/master/src/starkware/cairo/bootloaders) to reduce verification costs and enhance model privacy.
