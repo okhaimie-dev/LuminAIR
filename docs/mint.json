@@ -7,12 +7,12 @@
   },
   "favicon": "/favicon.svg",
   "colors": {
-    "primary": "#FF77B7",
-    "light": "#FF77B7",
-    "dark": "#FF77B7",
+    "primary": "#FF1385",
+    "light": "#FF1385",
+    "dark": "#FF1385",
     "anchors": {
-      "from": "#FF77B7",
-      "to": "#FF77B7"
+      "from": "#FF1385",
+      "to": "#FF1385"
     }
   },
   "theme": "venus",
@@ -42,5 +42,9 @@
     "headings": {
       "family": "IBM Plex Mono"
     }
+  },
+  "modeToggle": {
+    "default": "light",
+    "isHidden": false
   }
 }
