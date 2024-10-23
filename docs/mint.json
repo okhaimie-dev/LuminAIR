@@ -15,6 +15,7 @@
       "to": "#FF77B7"
     }
   },
+    "theme": "venus",
   "topbarCtaButton": {
     "name": "Github",
     "url": "https://github.com/raphaelDkhn/LuminAir"
