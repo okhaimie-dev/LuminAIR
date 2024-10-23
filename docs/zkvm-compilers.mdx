@@ -1,15 +1,16 @@
 ---
 title: 'zkVM Compilers'
 description: 'Compile your model to run on a zkVM.'
+icon: 'microchip'
 ---
 
-LuminAir offers a suite of compilers specialized for Zero-Knowledge Machine Learning.
+Luminair offers a suite of compilers specialized for Zero-Knowledge Machine Learning.
 
 ## How It Works
 
 A computational graph is broken down into individual operators, with each operator representing a node within the graph.
-In LuminAir, every operator is a precompiled zk circuit. 
-When you compile a graph for a specific zkVM supported by LuminAir, the `Compiler` matches each node's operator to its 
+In Luminair, every operator is a precompiled zk circuit. 
+When you compile a graph for a specific zkVM supported by Luminair, the `Compiler` matches each node's operator to its 
 corresponding zk circuit.
 
 Executing the graph (`cx.execute()`) runs each circuit in a separate instance of the chosen zkVM. 
@@ -17,7 +18,7 @@ This approach generates independent execution traces, which can then be proved i
 
 ## Supported zkVMs
 
-LuminAir is actively developing support for a wide range of zkVMs. 
+Luminair is actively developing support for a wide range of zkVMs. 
 We encourage the community to contribute by adding support for new zkVMs. Feel free to open a PRs.
 
 | zkVM  | Status |
@@ -27,12 +28,12 @@ We encourage the community to contribute by adding support for new zkVMs. Feel f
 | Risc0 | 👀     |
 | Noir  | 👀     |
 
-### LuminAir's Cairo Compiler
+### Luminair's Cairo Compiler
 
-The `CairoCompiler` in LuminAir allows you to run a graph on CairoVM and generate proofs 
+The `CairoCompiler` in Luminair allows you to run a graph on CairoVM and generate proofs 
 for the execution traces using a Cairo prover (like [Stone](https://github.com/starkware-libs/stone-prover/tree/main) or [Stwo](https://github.com/starkware-libs/stwo)).
 
-The simplest way to compile a graph using LuminAir's `CairoCompiler` is by using the default settings:
+The simplest way to compile a graph using Luminair's `CairoCompiler` is by using the default settings:
 
 ```rust
 use luminair_cairo::CairoCompiler;

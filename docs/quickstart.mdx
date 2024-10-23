@@ -1,10 +1,11 @@
 ---
 title: 'Quickstart'
 description: 'Start running your first model on a zkVM.'
+icon: 'rocket'
 ---
 
-Welcome to the LuminAir Quickstart! 
-In this guid, you'll see how to set up a Rust project and run a simple neural network model on a zkVM using LuminAir. 
+Welcome to the Luminair Quickstart! 
+In this guid, you'll see how to set up a Rust project and run a simple neural network model on a zkVM using Luminair. 
 Follow these steps to get started quickly.
 
 ## Prerequisites
@@ -26,7 +27,7 @@ Replace the existing [dependencies] section with the following:
 
 ```toml
 [dependencies]
-luminair_cairo = { git = "https://github.com/raphaelDkhn/LuminAir" }
+luminair_cairo = { git = "https://github.com/raphaelDkhn/Luminair" }
 luminal = { git = "https://github.com/jafioti/luminal" }
 luminal_nn = { git = "https://github.com/jafioti/luminal" }
 ```
@@ -75,7 +76,7 @@ With the project set up, you can now build and run it.
 cargo run
 ```
 
-The `display()` method visualizes the computational graph compiled by the LuminAir `CairoCompiler`. 
+The `display()` method visualizes the computational graph compiled by the Luminair `CairoCompiler`. 
 ![Computational graph](./images/quickstart-graph.svg)
 
 Each operator node in the graph represents a distinct zk circuit executing on its own zkVM instance (CairoVM in this example). 

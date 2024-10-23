@@ -1,16 +1,17 @@
 ---
 title: 'Concepts'
-description: 'A deep dive into LuminAir.'
+description: 'A deep dive into Luminair.'
+icon: 'lightbulb'
 ---
 
-LuminAir provides compilers built on top of [Luminal](https://github.com/jafioti/luminal), 
+Luminair provides compilers built on top of [Luminal](https://github.com/jafioti/luminal), 
 an ML library primarily designed to simplify adding support for new backends. 
 We leveraged Luminal to develop an AI framework that facilitates the easy addition of new zkVMs 
 and the parallelization of numerous operations, whether for trace or proof generation. 
-Let's understand how LuminAir works.
+Let's understand how Luminair works.
 
 <Info>
-Some sections of this resource will discuss Luminal's characteristics, while others will focus specifically on LuminAir. 
+Some sections of this resource will discuss Luminal's characteristics, while others will focus specifically on Luminair. 
 You can read more about Luminal [here](https://luminalai.com/docs/introduction).
 </Info>
 
@@ -66,8 +67,8 @@ It's up to you (the compiler developer) to create compilers that fit the needs o
 For example, if it's less resource-intensive for your zkVM to subtract two tensors directly rather than decomposing the operation into `Add` and `Mul` (of -1), 
 you can implement a compiler that detects this pattern of nodes and replaces it with a `Subtract` circuit.
 
-Compilers are entirely separate from Luminal, allowing them to be fully implemented by third-party crates. That's what we did with LuminAir.
-In this sense, **LuminAir offers a collection of compilers specialized in Zero-Knowledge Machine Learning**.
+Compilers are entirely separate from Luminal, allowing them to be fully implemented by third-party crates. That's what we did with Luminair.
+In this sense, **Luminair offers a collection of compilers specialized in Zero-Knowledge Machine Learning**.
 
 ## GraphTensors
 
@@ -123,4 +124,4 @@ So, `R1<3>` defines a one-dimensional tensor with 3 elements—a 3-dimensional v
 By incorporating tensor shapes directly into their types, 
 the compiler ensures that shapes are tracked at compile time. 
 This design makes sure tensor operations are only performed on tensors with compatible 
-shapes and avoid shape calculations at running time. As part of LuminAir, this simplifies circuit logic.
+shapes and avoid shape calculations at running time. As part of Luminair, this simplifies circuit logic.

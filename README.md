@@ -1,12 +1,12 @@
-# LuminAir - Unlocking AI Integrity
+# Luminair - Unlocking AI Integrity
 
-LuminAir is a **Machine Learning** framework that guarantees the integrity of graph-based models using **Zero-Knowledge proofs**. 
+Luminair is a **Machine Learning** framework that guarantees the integrity of graph-based models using **Zero-Knowledge proofs**. 
 It enables a prover to cryptographically prove that the AI model's computations have been executed correctly. 
 Consequently, a verifier can verify these proofs much faster and with fewer resources than by naively re-running the model.
 
-Designed for parallel processing in trace and proof generation, LuminAir also makes it easy to add support for new zkVMs.
+Designed for parallel processing in trace and proof generation, Luminair also makes it easy to add support for new zkVMs.
 
-> **⚠️ Disclaimer:** LuminAir is currently under development and is not recommended for production environments.
+> **⚠️ Disclaimer:** Luminair is currently under development and is not recommended for production environments.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ Designed for parallel processing in trace and proof generation, LuminAir also ma
 
 ## Add new zkVMs
 
-LuminAir has been designed to support a wide range of zkVMs. Adding new VMs is easy, just implement 11 primitive operators to support any model.
+Luminair has been designed to support a wide range of zkVMs. Adding new VMs is easy, just implement 11 primitive operators to support any model.
 
 ### Primitive operators
 
@@ -47,7 +47,7 @@ These ops are enough to support transformers, convnets, etc.
 
 ## Usage
 
-Below is a simple example demonstrating how to create and execute on CairoVM a computation graph using LuminAir in Rust:
+Below is a simple example demonstrating how to create and execute on CairoVM a computation graph using Luminair in Rust:
 
 ```rust
 use luminair::CairoCompiler;
@@ -81,11 +81,11 @@ fn main() {
 ## Key Concepts
 
 - **Graph-Based Execution:** Expressions like `x + y` are recorded in a directed acyclic computation graph without immediate computation. The actual computation occurs only when `graph.execute()` is invoked. This allows lazy computation to reduce the overhead on runtime.
-- **Parallel Proof Generation:** By decomposing the model into small operators, LuminAir enables the creation of independent and simple ZK circuits for each graph node. A zkVM then generates independent execution traces, allowing node proofs to be generated in parallel.
+- **Parallel Proof Generation:** By decomposing the model into small operators, Luminair enables the creation of independent and simple ZK circuits for each graph node. A zkVM then generates independent execution traces, allowing node proofs to be generated in parallel.
 
 ## Roadmap
 
-To enhance LuminAir's efficiency and support for large models, the following features are planned:
+To enhance Luminair's efficiency and support for large models, the following features are planned:
 
 - **Fusion Compilers:** Implement fusion compilers for certain operators to optimize performance.
 - **Efficient MatMul Compiler:** Develop optimized compilers for matrix multiplication operations.
@@ -99,13 +99,13 @@ To enhance LuminAir's efficiency and support for large models, the following fea
 
 ## Acknowledgements
 
-A special thanks to the developers and maintainers of the foundational projects that make LuminAir possible:
+A special thanks to the developers and maintainers of the foundational projects that make Luminair possible:
 
-- [Luminal](https://github.com/jafioti/luminal): For providing a robust and flexible deep-learning library that serves as the backbone of LuminAir.
+- [Luminal](https://github.com/jafioti/luminal): For providing a robust and flexible deep-learning library that serves as the backbone of Luminair.
 - [CairoVM](https://github.com/lambdaclass/cairo-vm): For offering a powerful VM that enables execution of Cairo programs.
 
 ## License
 
-LuminAir is released under the [MIT](https://opensource.org/license/mit) License.
+Luminair is released under the [MIT](https://opensource.org/license/mit) License.
 
-_Feel free to contribute to LuminAir by opening issues or submitting pull requests. Your feedback and contributions are highly appreciated!_
+_Feel free to contribute to Luminair by opening issues or submitting pull requests. Your feedback and contributions are highly appreciated!_

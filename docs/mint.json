@@ -15,24 +15,32 @@
       "to": "#FF77B7"
     }
   },
-    "theme": "venus",
+  "theme": "venus",
   "topbarCtaButton": {
     "name": "Github",
-    "url": "https://github.com/raphaelDkhn/LuminAir"
+    "url": "https://github.com/raphaelDkhn/Luminair"
   },
   "navigation": [
     {
-      "group": "Documentation",
-      "pages": [
-        "introduction",
-        "quickstart",
-        "concepts",
-        "zkvm-compilers",
-        "roadmap"
-      ]
+      "group": "Getting Started",
+      "pages": ["introduction", "quickstart"]
+    },
+    {
+      "group": "Guides",
+      "pages": ["concepts", "zkvm-compilers"]
+    },
+    {
+      "group": "Development",
+      "pages": ["roadmap", "contribute"]
     }
+
   ],
   "footerSocials": {
-    "github": "https://github.com/raphaelDkhn/LuminAir"
+    "github": "https://github.com/raphaelDkhn/Luminair"
+  },
+  "font": {
+    "headings": {
+      "family": "IBM Plex Mono"
+    }
   }
 }
