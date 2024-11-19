@@ -116,6 +116,7 @@ impl CairoRunner {
             finalize_builtins: config.air_private_input.is_some()
                 || config.cairo_pie_output.is_some(),
             append_return_values: config.append_return_values,
+            dynamic_layout_params: None,
         };
 
         // Run the program

@@ -6,5 +6,5 @@ repository.workspace = true
 
 [dependencies]
 luminair_cairo = {path="../../../zkVMs/cairo"}
-luminal = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal" }
-luminal_nn = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal/crates/luminal_nn" }
+luminal.workspace = true
+luminal_nn.workspace = true

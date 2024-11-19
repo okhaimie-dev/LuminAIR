@@ -5,13 +5,15 @@ edition.workspace = true
 build = "build.rs"
 
 [dependencies]
-luminal = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal" }
-cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm.git", rev = "v1.0.1", features = [
+luminal.workspace = true
+luminal_cpu.workspace = true
+luminal_nn.workspace = true
+cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm.git", rev = "0d86936", features = [
     "std",
     "cairo-1-hints",
 ] }
-cairo1-run = { git = "https://github.com/lambdaclass/cairo-vm", rev = "v1.0.1" }
-cairo-lang-sierra = { version = "2.7.0", default-features = false }
+cairo1-run = { git = "https://github.com/lambdaclass/cairo-vm", rev = "0d86936" }
+cairo-lang-sierra = { version = "2.9.0-dev.0", default-features = false }
 thiserror = "1.0.63"
 itertools = "0.12.1"
 bincode = { version = "2.0.0-rc.3", default-features = false, features = [
@@ -23,8 +25,6 @@ num-traits = "0.2.19"
 serde_json = "1.0.120"
 lazy_static = "1.5.0"
 rustc-hash = "1.1.0"
-luminal_cpu = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal/crates/luminal_cpu" }
-luminal_nn = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal/crates/luminal_nn" }
 
 [dev-dependencies]
 paste = "1.0.15"
@@ -32,8 +32,6 @@ rand = "0.8.5"
 dfdx = { version = "0.13" }
 candle-core = "0.5.0"
 ctor = "0.2.8"
-luminal_cpu = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal/crates/luminal_cpu" }
-luminal_nn = { path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/luminal/crates/luminal_nn" }
 
 [build-dependencies]
 walkdir = "2.3.3"
