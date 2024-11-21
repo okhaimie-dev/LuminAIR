@@ -85,7 +85,7 @@ fn test_rotate() {
 #[test]
 fn test_constant() {
     let mut cx = Graph::new();
-    let a = cx.constant_expr('a');
+    let a = cx.constant('a');
     let mut a = (a * a).retrieve();
     let _ = cx.compile(CairoCompiler::default(), &mut a);
 
