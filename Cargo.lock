@@ -2220,6 +2220,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "linear_regression"
+version = "0.0.1"
+dependencies = [
+ "luminair_cairo",
+ "luminal",
+ "luminal_nn",
+]
+
+[[package]]
 name = "litemap"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

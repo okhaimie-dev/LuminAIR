@@ -1,0 +1,12 @@
+[package]
+name = "linear_regression"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+license-file.workspace = true
+
+[dependencies]
+luminair_cairo = {path="../../../zkVMs/cairo"}
+luminal.workspace = true
+luminal_nn.workspace = true
