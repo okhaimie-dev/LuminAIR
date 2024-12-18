@@ -22,12 +22,11 @@ use stwo_prover::{
     },
 };
 
-// Struct to represent our tensor with SIMD-friendly storage
 #[derive(Clone)]
 pub struct Tensor {
-    data: Vec<PackedBaseField>,
-    dims: Vec<usize>,
-    stride: Vec<usize>,
+    pub data: Vec<PackedBaseField>,
+    pub dims: Vec<usize>,
+    pub stride: Vec<usize>,
 }
 
 impl Tensor {
@@ -36,7 +35,7 @@ impl Tensor {
         Self { data, dims, stride }
     }
 
-    fn compute_stride(dims: &[usize]) -> Vec<usize> {
+    pub fn compute_stride(dims: &[usize]) -> Vec<usize> {
         let mut stride = vec![1; dims.len()];
         for i in (0..dims.len() - 1).rev() {
             stride[i] = stride[i + 1] * dims[i + 1];
@@ -72,6 +71,33 @@ impl Tensor {
             }
         }
         true
+    }
+
+    // helper function to create SIMD-efficient packed data
+    pub fn pack_data(data: Vec<u32>, dims: &[usize]) -> Vec<PackedBaseField> {
+        let total_size = dims.iter().product::<usize>();
+        let n_packed = (total_size + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
+        let mut packed_data = Vec::with_capacity(n_packed);
+
+        // Pack data in chunks of SIMD lane size
+        for chunk_idx in 0..n_packed {
+            let start = chunk_idx << LOG_N_LANES;
+            let mut lane_values = [0u32; 1 << LOG_N_LANES];
+
+            // Fill each lane with values
+            for (i, lane) in lane_values.iter_mut().enumerate() {
+                let data_idx = start + i;
+                if data_idx < data.len() {
+                    *lane = data[data_idx] % 1000;
+                }
+            }
+
+            packed_data.push(PackedBaseField::from_array(
+                lane_values.map(|x| BaseField::from_u32_unchecked(x)),
+            ));
+        }
+
+        packed_data
     }
 }
 
@@ -123,12 +149,16 @@ pub fn generate_trace(
         Col::<SimdBackend, BaseField>::zeros(1 << log_size),
     ];
 
+    // Calculate number of SIMD-packed rows needed for each tensor
+    let a_packed_size = (a.size() + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
+    let b_packed_size = (b.size() + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
+
     // Fill trace with tensor data
     for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
         if vec_row < max_size {
-            // Handle broadcasting by repeating values as needed
-            let a_idx = vec_row % a.size();
-            let b_idx = vec_row % b.size();
+            // Calculate the packed indices with broadcasting
+            let a_idx = vec_row % a_packed_size;
+            let b_idx = vec_row % b_packed_size;
 
             trace[0].data[vec_row] = a.data[a_idx];
             trace[1].data[vec_row] = b.data[b_idx];
@@ -143,7 +173,7 @@ pub fn generate_trace(
         .collect()
 }
 
-fn prover<MC: MerkleChannel>(
+pub fn prover<MC: MerkleChannel>(
     log_size: u32,
     config: PcsConfig,
     a: Tensor,
@@ -169,12 +199,8 @@ where
     tree_builder.commit(prover_channel);
 
     // Generate Trace
-    println!("Start generating trace ...");
     let trace = generate_trace(log_size, a, b);
-    println!("Trace 0 len: {:?}", trace[0].length);
-    println!("Trace 0: {:?}", trace[0]);
 
-    println!("Trace generated!");
     let mut tree_builder = commitment_scheme.tree_builder();
     tree_builder.extend_evals(trace);
     tree_builder.commit(prover_channel);
@@ -187,14 +213,12 @@ where
     );
 
     // Generate Proof
-    println!("Start proving trace ...");
     let proof = prove::<SimdBackend, MC>(&[&component], prover_channel, commitment_scheme).unwrap();
-    println!("Proved successfully!");
 
     (component, proof)
 }
 
-fn verifier<MC: MerkleChannel>(
+pub fn verifier<MC: MerkleChannel>(
     config: PcsConfig,
     component: TensorAddComponent,
     proof: StarkProof<MC::H>,
@@ -218,10 +242,7 @@ fn verifier<MC: MerkleChannel>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
-        core::{pcs::TreeVec, vcs::blake2_merkle::Blake2sMerkleChannel},
-    };
+    use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
     #[test]
     fn test_tensor_broadcasting() {
@@ -237,8 +258,27 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "Tensors must be broadcastable")]
+    fn test_non_broadcastable_tensors() {
+        const LOG_SIZE: u32 = 4;
+        let config = PcsConfig::default();
+
+        // Create tensors with incompatible shapes (2x3 and 3x2)
+        let a = Tensor::new(
+            vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
+            vec![2, 3],
+        );
+        let b = Tensor::new(
+            vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 6],
+            vec![3, 2],
+        );
+
+        // This should panic due to non-broadcastable shapes
+        let _ = prover::<Blake2sMerkleChannel>(LOG_SIZE, config, a, b);
+    }
+
+    #[test]
     fn test_tensor_add_different_shapes() {
-        const LOG_SIZE: u32 = 8; // Increased to handle larger tensors
         let config = PcsConfig::default();
 
         // Test cases with different shapes
@@ -298,87 +338,34 @@ mod tests {
                     vec![2, 1, 3],
                 ),
             ),
+            // Case 6: Large matrices
+            (
+                Tensor::new(
+                    Tensor::pack_data((0..50 * 50).map(|i| i as u32).collect(), &[50, 50]),
+                    vec![50, 50],
+                ),
+                Tensor::new(
+                    Tensor::pack_data((0..50).map(|i| i as u32).collect(), &[50, 1]),
+                    vec![50, 1],
+                ),
+            ),
         ];
 
         // Run each test case through the prover and verifier
         for (i, (tensor_a, tensor_b)) in test_cases.into_iter().enumerate() {
             println!("Testing case {}", i + 1);
+
+            // Calculate required log_size based on tensor dimensions
+            let max_elements = tensor_a.size().max(tensor_b.size());
+            let required_log_size = ((max_elements + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES)
+                .next_power_of_two()
+                .trailing_zeros()
+                + LOG_N_LANES;
+
             let (component, proof) =
-                prover::<Blake2sMerkleChannel>(LOG_SIZE, config, tensor_a, tensor_b);
+                prover::<Blake2sMerkleChannel>(required_log_size, config, tensor_a, tensor_b);
             verifier::<Blake2sMerkleChannel>(config, component, proof)
                 .unwrap_or_else(|_| panic!("Verification failed for test case {}", i + 1));
         }
-    }
-
-    #[test]
-    fn test_large_tensor_add() {
-        // Create large tensors with different shapes
-        // Shape: 10 x 10
-        let large_matrix_a = {
-            let n = 10;
-            let data = (0..n * n)
-                .map(|i| PackedBaseField::broadcast(BaseField::from_u32_unchecked(i as u32 % 1000)))
-                .collect();
-            Tensor::new(data, vec![n, n])
-        };
-
-        // Shape: 10 x 1 (broadcasting column)
-        let column_b = {
-            let n = 10;
-            let data = (0..n)
-                .map(|i| PackedBaseField::broadcast(BaseField::from_u32_unchecked(i as u32 % 100)))
-                .collect();
-            Tensor::new(data, vec![n, 1])
-        };
-
-        // Calculate required log_size based on tensor dimensions
-        let max_elements = large_matrix_a.size().max(column_b.size());
-        // Need to account for SIMD lanes and round up to next power of 2
-        let required_log_size = (max_elements * LOG_N_LANES as usize)
-            .next_power_of_two()
-            .trailing_zeros();
-
-        println!(
-            "Using log_size = {} for {} elements",
-            required_log_size, max_elements
-        );
-        let config = PcsConfig::default();
-
-        println!("Starting proving process for large tensors...");
-        let start = std::time::Instant::now();
-
-        // Run proof generation
-        let (component, proof) =
-            prover::<Blake2sMerkleChannel>(required_log_size, config, large_matrix_a, column_b);
-
-        let proving_time = start.elapsed();
-        println!("Proving completed in {:?}", proving_time);
-
-        // Run verification
-        let verify_start = std::time::Instant::now();
-        verifier::<Blake2sMerkleChannel>(config, component, proof).unwrap();
-        let verify_time = verify_start.elapsed();
-
-        println!("Verification completed in {:?}", verify_time);
-    }
-
-    #[test]
-    #[should_panic(expected = "Tensors must be broadcastable")]
-    fn test_non_broadcastable_tensors() {
-        const LOG_SIZE: u32 = 4;
-        let config = PcsConfig::default();
-
-        // Create tensors with incompatible shapes (2x3 and 3x2)
-        let a = Tensor::new(
-            vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
-            vec![2, 3],
-        );
-        let b = Tensor::new(
-            vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 6],
-            vec![3, 2],
-        );
-
-        // This should panic due to non-broadcastable shapes
-        let _ = prover::<Blake2sMerkleChannel>(LOG_SIZE, config, a, b);
     }
 }
