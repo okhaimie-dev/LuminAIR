@@ -5,6 +5,6 @@ edition.workspace = true
 repository.workspace = true
 
 [dependencies]
-luminair_cairo = {path="../../../zkVMs/cairo"}
+luminair_cairo = {path="../../../backends/cairo"}
 luminal.workspace = true
 luminal_nn.workspace = true
