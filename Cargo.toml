@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["examples/cairo/*", "backends/cairo"]
+members = ["examples/cairo/*", "backends/cairo", "backends/stwo"]
 
 [workspace.package]
 version = "0.0.1"
