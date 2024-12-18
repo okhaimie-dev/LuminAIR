@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["examples/cairo/*", "backends/cairo", "backends/stwo"]
+members = ["backends/stwo"]
 
 [workspace.package]
 version = "0.0.1"
@@ -10,6 +10,6 @@ license = "MIT"
 license-file = "LICENSE"
 
 [workspace.dependencies]
-luminal = { git = "https://github.com/jafioti/luminal.git", rev = "d311003" }
-luminal_cpu = { git = "https://github.com/jafioti/luminal.git", rev = "d311003" }
-luminal_nn = { git = "https://github.com/jafioti/luminal.git", rev = "d311003" }
+luminal = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
+luminal_cpu = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
+luminal_nn = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }

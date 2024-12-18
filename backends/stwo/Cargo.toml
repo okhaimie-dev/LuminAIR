@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 repository.workspace = true
 license.workspace = true
-license-file.workspace = true
 
 [dependencies]
+stwo-prover = { git = "https://github.com/starkware-libs/stwo.git", rev = "e0d930e" }
+itertools = "0.12.0"
+num-traits = "0.2.17"
