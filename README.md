@@ -29,14 +29,12 @@ Luminair has been designed to support a wide range of zkVMs. Adding new VMs is e
 
 These ops are enough to support transformers, convnets, etc.
 
-### Supported zkVMs
+### Supported backends
 
 | zkVMs | Status |
 | ----- | ------ |
 | Cairo | ✅     |
-| SP1   | 👀     |
-| Risc0 | 👀     |
-| Noir  | 👀     |
+| Stwo  | 👀     |
 
 ## Features
 
