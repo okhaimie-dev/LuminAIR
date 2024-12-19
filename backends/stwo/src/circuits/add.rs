@@ -1,4 +1,5 @@
 use num_traits::Zero;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use stwo_prover::{
     constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval, TraceLocationAllocator},
     core::{
@@ -78,27 +79,25 @@ impl Tensor {
     pub fn pack_data(data: Vec<u32>, dims: &[usize]) -> Vec<PackedBaseField> {
         let total_size = dims.iter().product::<usize>();
         let n_packed = (total_size + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
-        let mut packed_data = Vec::with_capacity(n_packed);
 
-        // Pack data in chunks of SIMD lane size
-        for chunk_idx in 0..n_packed {
-            let start = chunk_idx << LOG_N_LANES;
-            let mut lane_values = [0u32; 1 << LOG_N_LANES];
+        (0..n_packed)
+            .into_par_iter()
+            .map(|chunk_idx| {
+                let start = chunk_idx << LOG_N_LANES;
+                let mut lane_values = [0u32; 1 << LOG_N_LANES];
 
-            // Fill each lane with values
-            for (i, lane) in lane_values.iter_mut().enumerate() {
-                let data_idx = start + i;
-                if data_idx < data.len() {
-                    *lane = data[data_idx] % 1000;
+                for (i, lane) in lane_values.iter_mut().enumerate() {
+                    let data_idx = start + i;
+                    *lane = if data_idx < data.len() {
+                        data[data_idx] % 1000
+                    } else {
+                        0
+                    };
                 }
-            }
 
-            packed_data.push(PackedBaseField::from_array(
-                lane_values.map(|x| BaseField::from_u32_unchecked(x)),
-            ));
-        }
-
-        packed_data
+                PackedBaseField::from_array(lane_values.map(|x| BaseField::from_u32_unchecked(x)))
+            })
+            .collect()
     }
 }
 
@@ -157,53 +156,66 @@ pub fn generate_trace(
     assert!(log_size >= LOG_N_LANES);
 
     // Initialize trace columns
-    let mut trace = vec![
-        Col::<SimdBackend, BaseField>::zeros(1 << log_size),
-        Col::<SimdBackend, BaseField>::zeros(1 << log_size),
-        Col::<SimdBackend, BaseField>::zeros(1 << log_size),
-    ];
+
+    let trace_size = 1 << log_size;
+    let mut trace: Vec<Col<SimdBackend, BaseField>> = Vec::with_capacity(3);
+    let mut c_data = Vec::with_capacity((max_size + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES);
+    for _ in 0..3 {
+        trace.push(Col::<SimdBackend, BaseField>::zeros(trace_size));
+    }
 
     // Calculate number of SIMD-packed rows needed for each tensor
+    let n_rows = 1 << (log_size - LOG_N_LANES);
     let a_packed_size = (a.size() + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
     let b_packed_size = (b.size() + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
 
-    // Vector to store output tensor data
-    let mut c_data = Vec::new();
-
     // Fill trace with tensor data
-    for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
-        if vec_row < max_size {
-            // Calculate the packed indices with broadcasting
-            let a_idx = vec_row % a_packed_size;
-            let b_idx = vec_row % b_packed_size;
+    // Process in chunks for better cache utilization
+    const CHUNK_SIZE: usize = 64;
+    for chunk in (0..n_rows).step_by(CHUNK_SIZE) {
+        let end = (chunk + CHUNK_SIZE).min(n_rows);
 
-            let sum = a.data[a_idx] + b.data[b_idx];
+        for vec_row in chunk..end {
+            if vec_row < max_size {
+                // Calculate the packed indices with broadcasting
+                let a_idx = vec_row % a_packed_size;
+                let b_idx = vec_row % b_packed_size;
 
-            trace[0].data[vec_row] = a.data[a_idx];
-            trace[1].data[vec_row] = b.data[b_idx];
-            trace[2].data[vec_row] = sum;
+                let sum = a.data[a_idx] + b.data[b_idx];
 
-            c_data.push(sum);
+                trace[0].data[vec_row] = a.data[a_idx];
+                trace[1].data[vec_row] = b.data[b_idx];
+                trace[2].data[vec_row] = sum;
+
+                c_data.push(sum);
+            }
         }
     }
 
     // Create output tensor C
-    let c = Tensor::new(
-        c_data,
-        if a.size() > b.size() {
+    let c = Tensor {
+        data: c_data,
+        dims: if a.size() > b.size() {
             a.dims.clone()
         } else {
             b.dims.clone()
         },
-    );
+        stride: Tensor::compute_stride(if a.size() > b.size() {
+            &a.dims
+        } else {
+            &b.dims
+        }),
+    };
 
     let domain = CanonicCoset::new(log_size).circle_domain();
-    let trace = trace
-        .into_iter()
-        .map(|eval| CircleEvaluation::new(domain, eval))
-        .collect();
 
-    (trace, c)
+    (
+        trace
+            .into_iter()
+            .map(|eval| CircleEvaluation::new(domain, eval))
+            .collect(),
+        c,
+    )
 }
 
 pub fn prover<MC: MerkleChannel>(
