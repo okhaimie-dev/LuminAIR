@@ -40,14 +40,14 @@ Each new zkVM compiler must support at least the following 11 primitive operator
 
 #### Testing
 
-Ensure all [tests](https://github.com/raphaelDkhn/LuminAir/blob/master/zkVMs/cairo/src/tests/ops.rs) pass for primitive operations to verify compatibility and functionality.
+Ensure all [tests](https://github.com/raphaelDkhn/LuminAir/blob/master/backends/cairo/src/tests/ops.rs) pass for primitive operations to verify compatibility and functionality.
 
 ### Step-by-Step Development Guide
 
 <AccordionGroup>
     <Accordion title="1. Create a New Directory">
       - Navigate to the [zkVMs](https://github.com/raphaelDkhn/LuminAir/tree/master/zkVMs) directory in the repository.
-      - Create a new folder for your zkVM, e.g., `zkVMs/myZkVM`.
+      - Create a new folder for your zkVM, e.g., `backends/myZkVM`.
     </Accordion>
     <Accordion title="2. Implement the Compiler">
         - Define your compiler type by inheriting from `PrimitiveCompiler`.
@@ -60,7 +60,7 @@ Ensure all [tests](https://github.com/raphaelDkhn/LuminAir/blob/master/zkVMs/cai
     </Accordion>
     <Accordion title="4. Ensure Compliance">
         - Verify that all 11 primitive operators are supported.
-        - Implement tests similar to those found [here](https://github.com/raphaelDkhn/LuminAir/blob/master/zkVMs/cairo/src/tests/ops.rs) to ensure compatibility.
+        - Implement tests similar to those found [here](https://github.com/raphaelDkhn/LuminAir/blob/master/backends/cairo/src/tests/ops.rs) to ensure compatibility.
     </Accordion>
     <Accordion title="5. Document Your Compiler">
       - Provide clear documentation and examples for your compiler.
