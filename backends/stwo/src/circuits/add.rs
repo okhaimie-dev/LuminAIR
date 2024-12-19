@@ -10,7 +10,7 @@ use stwo_prover::{
             },
             BackendForChannel, Col, Column,
         },
-        channel::MerkleChannel,
+        channel::{Channel, MerkleChannel},
         fields::{m31::BaseField, qm31::SecureField},
         pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
         poly::{
@@ -18,11 +18,12 @@ use stwo_prover::{
             BitReversedOrder,
         },
         prover::{prove, verify, StarkProof, VerificationError},
+        vcs::ops::MerkleHasher,
         ColumnVec,
     },
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Tensor {
     pub data: Vec<PackedBaseField>,
     pub dims: Vec<usize>,
@@ -104,6 +105,16 @@ impl Tensor {
 // The main circuit component for tensor addition
 pub type TensorAddComponent = FrameworkComponent<TensorAddEval>;
 
+#[derive(Clone, Debug)]
+pub struct TensorAddPublicInputs {
+    pub c: Tensor, // Result tensor as public input
+}
+
+pub struct TensorAddProof<H: MerkleHasher> {
+    pub public_inputs: TensorAddPublicInputs,
+    pub stark_proof: StarkProof<H>,
+}
+
 #[derive(Clone)]
 pub struct TensorAddEval {
     pub log_size: u32,
@@ -135,7 +146,10 @@ pub fn generate_trace(
     log_size: u32,
     a: Tensor,
     b: Tensor,
-) -> ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>> {
+) -> (
+    ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
+    Tensor,
+) {
     assert!(a.is_broadcastable_with(&b), "Tensors must be broadcastable");
 
     // Calculate required trace size
@@ -153,6 +167,9 @@ pub fn generate_trace(
     let a_packed_size = (a.size() + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
     let b_packed_size = (b.size() + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
 
+    // Vector to store output tensor data
+    let mut c_data = Vec::new();
+
     // Fill trace with tensor data
     for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
         if vec_row < max_size {
@@ -160,17 +177,33 @@ pub fn generate_trace(
             let a_idx = vec_row % a_packed_size;
             let b_idx = vec_row % b_packed_size;
 
+            let sum = a.data[a_idx] + b.data[b_idx];
+
             trace[0].data[vec_row] = a.data[a_idx];
             trace[1].data[vec_row] = b.data[b_idx];
-            trace[2].data[vec_row] = a.data[a_idx] + b.data[b_idx];
+            trace[2].data[vec_row] = sum;
+
+            c_data.push(sum);
         }
     }
 
+    // Create output tensor C
+    let c = Tensor::new(
+        c_data,
+        if a.size() > b.size() {
+            a.dims.clone()
+        } else {
+            b.dims.clone()
+        },
+    );
+
     let domain = CanonicCoset::new(log_size).circle_domain();
-    trace
+    let trace = trace
         .into_iter()
         .map(|eval| CircleEvaluation::new(domain, eval))
-        .collect()
+        .collect();
+
+    (trace, c)
 }
 
 pub fn prover<MC: MerkleChannel>(
@@ -178,7 +211,7 @@ pub fn prover<MC: MerkleChannel>(
     config: PcsConfig,
     a: Tensor,
     b: Tensor,
-) -> (TensorAddComponent, StarkProof<MC::H>)
+) -> (TensorAddComponent, TensorAddProof<MC::H>)
 where
     SimdBackend: BackendForChannel<MC>,
 {
@@ -193,14 +226,22 @@ where
     let prover_channel = &mut MC::C::default();
     let mut commitment_scheme = CommitmentSchemeProver::<SimdBackend, MC>::new(config, &twiddles);
 
-    // Preprocess Trace
+    // Generate trace and get output tensor C
+    let (trace, c) = generate_trace(log_size, a, b);
+
+    // Mix public outputs into channel
+    for value in &c.data {
+        for base_value in value.to_array() {
+            prover_channel.mix_felts(&[SecureField::from(base_value)]);
+        }
+    }
+
+    // Commit preprocessing trace
     let mut tree_builder = commitment_scheme.tree_builder();
     tree_builder.extend_evals([]);
     tree_builder.commit(prover_channel);
 
-    // Generate Trace
-    let trace = generate_trace(log_size, a, b);
-
+    // Commit trace
     let mut tree_builder = commitment_scheme.tree_builder();
     tree_builder.extend_evals(trace);
     tree_builder.commit(prover_channel);
@@ -213,34 +254,50 @@ where
     );
 
     // Generate Proof
-    let proof = prove::<SimdBackend, MC>(&[&component], prover_channel, commitment_scheme).unwrap();
+    let stark_proof =
+        prove::<SimdBackend, MC>(&[&component], prover_channel, commitment_scheme).unwrap();
 
-    (component, proof)
+    (
+        component,
+        TensorAddProof {
+            public_inputs: TensorAddPublicInputs { c },
+            stark_proof,
+        },
+    )
 }
 
 pub fn verifier<MC: MerkleChannel>(
     config: PcsConfig,
     component: TensorAddComponent,
-    proof: StarkProof<MC::H>,
+    proof: TensorAddProof<MC::H>,
 ) -> Result<(), VerificationError> {
     let channel = &mut MC::C::default();
     let commitment_scheme = &mut CommitmentSchemeVerifier::<MC>::new(config);
+
+    // Mix the public inputs into the channel
+    for value in &proof.public_inputs.c.data {
+        for base_value in value.to_array() {
+            channel.mix_felts(&[SecureField::from(base_value)]);
+        }
+    }
 
     // Get expected column sizes from component
     let log_sizes = component.trace_log_degree_bounds();
 
     // Verify main trace commitment
-    commitment_scheme.commit(proof.commitments[0], &log_sizes[0], channel);
+    commitment_scheme.commit(proof.stark_proof.commitments[0], &log_sizes[0], channel);
 
     // Verify constant trace commitment
-    commitment_scheme.commit(proof.commitments[1], &log_sizes[1], channel);
+    commitment_scheme.commit(proof.stark_proof.commitments[1], &log_sizes[1], channel);
 
     // Verify the proof
-    verify(&[&component], channel, commitment_scheme, proof)
+    verify(&[&component], channel, commitment_scheme, proof.stark_proof)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use super::*;
     use stwo_prover::core::vcs::blake2_merkle::Blake2sMerkleChannel;
 
@@ -362,10 +419,17 @@ mod tests {
                 .trailing_zeros()
                 + LOG_N_LANES;
 
+            let start_prove = Instant::now();
             let (component, proof) =
                 prover::<Blake2sMerkleChannel>(required_log_size, config, tensor_a, tensor_b);
+            let prove_time = start_prove.elapsed();
+            println!("Proving time for case {}: {:?}", i + 1, prove_time);
+
+            let start_verify = Instant::now();
             verifier::<Blake2sMerkleChannel>(config, component, proof)
                 .unwrap_or_else(|_| panic!("Verification failed for test case {}", i + 1));
+            let verify_time = start_verify.elapsed();
+            println!("Verifying time for case {}: {:?}", i + 1, verify_time);
         }
     }
 }
