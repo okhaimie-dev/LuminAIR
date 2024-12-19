@@ -1,1 +1,1 @@
-pub(crate) mod circuits;
+pub mod circuits;
