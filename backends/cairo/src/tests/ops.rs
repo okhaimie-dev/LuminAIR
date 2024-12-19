@@ -381,8 +381,6 @@ fn test_relu_and_linear() {
     );
     cx.execute_debug();
 
-    cx.display();
-
     assert_close_precision(&unoptimized_b, &b.data(), 1e-2);
     assert_close_precision(&unoptimized_batch_out, &batch_out.data(), 1e-2);
 
