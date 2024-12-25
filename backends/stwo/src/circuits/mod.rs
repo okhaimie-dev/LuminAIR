@@ -8,9 +8,12 @@ use stwo_prover::core::{
         BackendForChannel,
     },
     channel::MerkleChannel,
-    fields::m31::BaseField,
+    fields::{m31::BaseField, IntoSlice},
     pcs::PcsConfig,
-    vcs::ops::MerkleHasher,
+    vcs::{
+        blake2_hash::{Blake2sHash, Blake2sHasher},
+        ops::MerkleHasher,
+    },
 };
 
 pub mod add;
@@ -65,6 +68,27 @@ impl Tensor {
 
     pub fn data(&self) -> &[PackedBaseField] {
         &self.data
+    }
+
+    pub fn hash(&self) -> Blake2sHash {
+        let mut hasher = Blake2sHasher::new();
+
+        // Hash dimensions
+        hasher.update(&(self.dims.len() as u64).to_le_bytes());
+        for dim in &self.dims {
+            hasher.update(&(*dim as u64).to_le_bytes());
+        }
+
+        // Unpack SIMD data into base field values
+        let unpacked_data: Vec<BaseField> = self
+            .data
+            .iter()
+            .flat_map(|packed| packed.to_array())
+            .collect();
+
+        // Hash unpacked data
+        hasher.update(IntoSlice::<u8>::into_slice(&unpacked_data));
+        hasher.finalize()
     }
 
     pub fn compute_stride(dims: &[usize]) -> Vec<usize> {

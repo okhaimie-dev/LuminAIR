@@ -12,7 +12,7 @@ use stwo_prover::{
             BitReversedOrder,
         },
         prover::{prove, verify, StarkProof, VerificationError},
-        vcs::ops::MerkleHasher,
+        vcs::{blake2_hash::Blake2sHash, ops::MerkleHasher},
         ColumnVec,
     },
 };
@@ -25,7 +25,9 @@ pub mod trace;
 
 #[derive(Clone, Debug)]
 pub struct TensorAddPublicInputs {
-    pub c: Tensor, // Result tensor as public input
+    pub a_hash: Blake2sHash,
+    pub b_hash: Blake2sHash,
+    pub c_hash: Blake2sHash,
 }
 
 pub struct TensorAddProof<'a, H: MerkleHasher> {
@@ -48,7 +50,20 @@ impl<'t> Circuit for TensorAdd<'t> {
 
     fn generate_trace(&self) -> (Self::Trace, Self::PublicInputs) {
         let (trace, c) = generate_trace(self.log_size, self.a, self.b);
-        (trace, TensorAddPublicInputs { c })
+
+        // Hash tensors
+        let a_hash = self.a.hash();
+        let b_hash = self.b.hash();
+        let c_hash = c.hash();
+
+        (
+            trace,
+            TensorAddPublicInputs {
+                a_hash,
+                b_hash,
+                c_hash,
+            },
+        )
     }
 
     fn prove<'a, MC: MerkleChannel>(
@@ -71,6 +86,35 @@ impl<'t> Circuit for TensorAdd<'t> {
         let mut commitment_scheme =
             CommitmentSchemeProver::<SimdBackend, MC>::new(config, &twiddles);
 
+        // Mix tensor hashes into channel
+        channel.mix_felts(
+            &public_inputs
+                .a_hash
+                .0
+                .chunks(4)
+                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+                .map(|x| x.into())
+                .collect::<Vec<_>>(),
+        );
+        channel.mix_felts(
+            &public_inputs
+                .b_hash
+                .0
+                .chunks(4)
+                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+                .map(|x| x.into())
+                .collect::<Vec<_>>(),
+        );
+        channel.mix_felts(
+            &public_inputs
+                .c_hash
+                .0
+                .chunks(4)
+                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+                .map(|x| x.into())
+                .collect::<Vec<_>>(),
+        );
+
         // Create component
         let component = TensorAddComponent::new(
             &mut TraceLocationAllocator::default(),
@@ -79,13 +123,6 @@ impl<'t> Circuit for TensorAdd<'t> {
             },
             (Default::default(), None),
         );
-
-        // Mix public inputs into channel
-        for value in &public_inputs.c.data {
-            for base_value in value.to_array() {
-                channel.mix_felts(&[base_value.into()]);
-            }
-        }
 
         // Commit preprocessing trace
         let mut tree_builder = commitment_scheme.tree_builder();
@@ -122,12 +159,37 @@ impl<'t> Circuit for TensorAdd<'t> {
         let channel = &mut MC::C::default();
         let commitment_scheme = &mut CommitmentSchemeVerifier::<MC>::new(config);
 
-        // Mix the public inputs into the channel
-        for value in &proof.public_inputs.c.data {
-            for base_value in value.to_array() {
-                channel.mix_felts(&[base_value.into()]);
-            }
-        }
+        // Mix tensor hashes into channel
+        channel.mix_felts(
+            &proof
+                .public_inputs
+                .a_hash
+                .0
+                .chunks(4)
+                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+                .map(|x| x.into())
+                .collect::<Vec<_>>(),
+        );
+        channel.mix_felts(
+            &proof
+                .public_inputs
+                .b_hash
+                .0
+                .chunks(4)
+                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+                .map(|x| x.into())
+                .collect::<Vec<_>>(),
+        );
+        channel.mix_felts(
+            &proof
+                .public_inputs
+                .c_hash
+                .0
+                .chunks(4)
+                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
+                .map(|x| x.into())
+                .collect::<Vec<_>>(),
+        );
 
         // Get expected column sizes from component
         let log_sizes = components[0].trace_log_degree_bounds();
@@ -259,6 +321,11 @@ mod tests {
             let (trace, public_inputs) = circuit.generate_trace();
             let trace_time = start_trace.elapsed();
             println!("Trace generation time for case {}: {:?}", i + 1, trace_time);
+
+            // Verify hashes match tensors
+            assert_eq!(tensor_a.hash(), public_inputs.a_hash);
+            assert_eq!(tensor_b.hash(), public_inputs.b_hash);
+            assert!(public_inputs.c_hash != Blake2sHash::default()); // Ensure hash is non-zero
 
             // Generate proof
             let start_prove = Instant::now();
