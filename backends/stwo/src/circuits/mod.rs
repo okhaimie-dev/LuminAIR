@@ -1,17 +1,45 @@
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use stwo_prover::core::{
-    backend::simd::m31::{PackedBaseField, LOG_N_LANES},
+    backend::{
+        simd::{
+            m31::{PackedBaseField, LOG_N_LANES},
+            SimdBackend,
+        },
+        BackendForChannel,
+    },
+    channel::MerkleChannel,
     fields::m31::BaseField,
+    pcs::PcsConfig,
+    vcs::ops::MerkleHasher,
 };
 
 pub mod add;
 
 pub trait Circuit {
-    fn trace_generator(/* ... */) {/* ... */}
+    type PublicInputs;
+    type Component;
+    type Proof<H: MerkleHasher>;
+    type Error;
+    type Trace;
 
-    fn prover(/* ... */) {/* ... */}
+    /// Generates the execution trace for the circuit
+    fn generate_trace(&self) -> (Self::Trace, Self::PublicInputs);
 
-    fn verifier(/* ... */) {/* ... */}
+    /// Creates proof for a given trace
+    fn prove<MC: MerkleChannel>(
+        trace: &Self::Trace,
+        public_inputs: &Self::PublicInputs,
+        config: PcsConfig,
+    ) -> (Vec<Self::Component>, Self::Proof<MC::H>)
+    where
+        SimdBackend: BackendForChannel<MC>;
+
+    /// Verifies a proof
+    fn verify<MC: MerkleChannel>(
+        components: Vec<Self::Component>,
+        proof: Self::Proof<MC::H>,
+        config: PcsConfig,
+    ) -> Result<(), Self::Error>;
 }
 
 #[derive(Clone, Debug)]
