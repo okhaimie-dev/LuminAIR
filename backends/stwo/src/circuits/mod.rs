@@ -18,7 +18,7 @@ pub mod add;
 pub trait Circuit {
     type PublicInputs;
     type Component;
-    type Proof<H: MerkleHasher>;
+    type Proof<'a, H: MerkleHasher>;
     type Error;
     type Trace;
 
@@ -26,18 +26,18 @@ pub trait Circuit {
     fn generate_trace(&self) -> (Self::Trace, Self::PublicInputs);
 
     /// Creates proof for a given trace
-    fn prove<MC: MerkleChannel>(
+    fn prove<'a, MC: MerkleChannel>(
         trace: &Self::Trace,
-        public_inputs: &Self::PublicInputs,
+        public_inputs: &'a Self::PublicInputs,
         config: PcsConfig,
-    ) -> (Vec<Self::Component>, Self::Proof<MC::H>)
+    ) -> (Vec<Self::Component>, Self::Proof<'a, MC::H>)
     where
         SimdBackend: BackendForChannel<MC>;
 
     /// Verifies a proof
-    fn verify<MC: MerkleChannel>(
+    fn verify<'a, MC: MerkleChannel>(
         components: Vec<Self::Component>,
-        proof: Self::Proof<MC::H>,
+        proof: Self::Proof<'a, MC::H>,
         config: PcsConfig,
     ) -> Result<(), Self::Error>;
 }

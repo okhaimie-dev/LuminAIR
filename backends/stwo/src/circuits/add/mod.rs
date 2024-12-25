@@ -28,8 +28,8 @@ pub struct TensorAddPublicInputs {
     pub c: Tensor, // Result tensor as public input
 }
 
-pub struct TensorAddProof<H: MerkleHasher> {
-    pub public_inputs: TensorAddPublicInputs,
+pub struct TensorAddProof<'a, H: MerkleHasher> {
+    pub public_inputs: &'a TensorAddPublicInputs,
     pub stark_proof: StarkProof<H>,
 }
 
@@ -39,10 +39,10 @@ pub struct TensorAdd<'a> {
     pub log_size: u32,
 }
 
-impl<'a> Circuit for TensorAdd<'a> {
+impl<'t> Circuit for TensorAdd<'t> {
     type PublicInputs = TensorAddPublicInputs;
     type Component = TensorAddComponent;
-    type Proof<H: MerkleHasher> = TensorAddProof<H>;
+    type Proof<'a, H: MerkleHasher> = TensorAddProof<'a, H>;
     type Error = VerificationError;
     type Trace = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
 
@@ -51,11 +51,11 @@ impl<'a> Circuit for TensorAdd<'a> {
         (trace, TensorAddPublicInputs { c })
     }
 
-    fn prove<MC: MerkleChannel>(
+    fn prove<'a, MC: MerkleChannel>(
         trace: &Self::Trace,
-        public_inputs: &Self::PublicInputs,
+        public_inputs: &'a Self::PublicInputs,
         config: PcsConfig,
-    ) -> (Vec<Self::Component>, Self::Proof<MC::H>)
+    ) -> (Vec<Self::Component>, Self::Proof<'a, MC::H>)
     where
         SimdBackend: BackendForChannel<MC>,
     {
@@ -108,15 +108,15 @@ impl<'a> Circuit for TensorAdd<'a> {
         (
             vec![component],
             TensorAddProof {
-                public_inputs: public_inputs.clone(),
+                public_inputs,
                 stark_proof,
             },
         )
     }
 
-    fn verify<MC: MerkleChannel>(
+    fn verify<'a, MC: MerkleChannel>(
         components: Vec<Self::Component>,
-        proof: Self::Proof<MC::H>,
+        proof: Self::Proof<'a, MC::H>,
         config: PcsConfig,
     ) -> Result<(), Self::Error> {
         let channel = &mut MC::C::default();
