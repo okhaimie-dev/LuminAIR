@@ -87,7 +87,7 @@ impl<'t> Circuit for TensorAdd<'t> {
             }
         }
 
-        // Commit preprocessing trace (empty for addition)
+        // Commit preprocessing trace
         let mut tree_builder = commitment_scheme.tree_builder();
         tree_builder.extend_evals([]);
         tree_builder.commit(channel);

@@ -1,6 +1,5 @@
 use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval};
 
-// The main circuit component for tensor addition
 pub type TensorAddComponent = FrameworkComponent<TensorAddEval>;
 
 pub struct TensorAddEval {

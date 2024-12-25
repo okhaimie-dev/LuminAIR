@@ -38,7 +38,6 @@ pub fn generate_trace(
         trace.push(Col::<SimdBackend, BaseField>::zeros(trace_size));
     }
 
-    // Wrap trace in Arc<Mutex> for thread-safe access
     let trace = Arc::new(
         trace
             .into_iter()
