@@ -55,6 +55,18 @@ impl Tensor {
         Self { data, dims, stride }
     }
 
+    pub fn dims(&self) -> &[usize] {
+        &self.dims
+    }
+
+    pub fn stride(&self) -> &[usize] {
+        &self.stride
+    }
+
+    pub fn data(&self) -> &[PackedBaseField] {
+        &self.data
+    }
+
     pub fn compute_stride(dims: &[usize]) -> Vec<usize> {
         let mut stride = vec![1; dims.len()];
         for i in (0..dims.len() - 1).rev() {
@@ -69,12 +81,12 @@ impl Tensor {
     }
 
     // Check if tensors are broadcastable
-    pub fn is_broadcastable_with(&self, other: &Tensor) -> bool {
+    pub fn is_broadcastable_with(&self, other: &Self) -> bool {
         let max_dims = self.dims.len().max(other.dims.len());
         let pad_self = max_dims - self.dims.len();
         let pad_other = max_dims - other.dims.len();
 
-        for i in 0..max_dims {
+        (0..max_dims).all(|i| {
             let dim_self = if i < pad_self {
                 1
             } else {
@@ -85,12 +97,8 @@ impl Tensor {
             } else {
                 other.dims[i - pad_other]
             };
-
-            if dim_self != dim_other && dim_self != 1 && dim_other != 1 {
-                return false;
-            }
-        }
-        true
+            dim_self == dim_other || dim_self == 1 || dim_other == 1
+        })
     }
 
     // helper function to create SIMD-efficient packed data

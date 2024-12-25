@@ -10,3 +10,4 @@ stwo-prover = { git = "https://github.com/starkware-libs/stwo.git", rev = "e0d93
 itertools = "0.12.0"
 num-traits = "0.2.17"
 rayon = "1.10.0"
+parking_lot = "0.12.3"

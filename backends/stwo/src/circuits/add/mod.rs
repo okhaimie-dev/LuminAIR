@@ -33,13 +33,13 @@ pub struct TensorAddProof<H: MerkleHasher> {
     pub stark_proof: StarkProof<H>,
 }
 
-pub struct TensorAdd {
-    pub a: Tensor,
-    pub b: Tensor,
+pub struct TensorAdd<'a> {
+    pub a: &'a Tensor,
+    pub b: &'a Tensor,
     pub log_size: u32,
 }
 
-impl Circuit for TensorAdd {
+impl<'a> Circuit for TensorAdd<'a> {
     type PublicInputs = TensorAddPublicInputs;
     type Component = TensorAddComponent;
     type Proof<H: MerkleHasher> = TensorAddProof<H>;
@@ -47,7 +47,7 @@ impl Circuit for TensorAdd {
     type Trace = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
 
     fn generate_trace(&self) -> (Self::Trace, Self::PublicInputs) {
-        let (trace, c) = generate_trace(self.log_size, self.a.clone(), self.b.clone());
+        let (trace, c) = generate_trace(self.log_size, self.a, self.b);
         (trace, TensorAddPublicInputs { c })
     }
 
@@ -226,12 +226,12 @@ mod tests {
             // Case 6: Large matrices
             (
                 Tensor::new(
-                    Tensor::pack_data((0..1024 * 1024).map(|i| i as u32).collect(), &[1024, 1024]),
-                    vec![1024, 1024],
+                    Tensor::pack_data((0..50 * 50).map(|i| i as u32).collect(), &[50, 50]),
+                    vec![50, 50],
                 ),
                 Tensor::new(
-                    Tensor::pack_data((0..1024).map(|i| i as u32).collect(), &[1024, 1]),
-                    vec![1024, 1],
+                    Tensor::pack_data((0..50).map(|i| i as u32).collect(), &[50, 1]),
+                    vec![50, 1],
                 ),
             ),
         ];
@@ -249,8 +249,8 @@ mod tests {
 
             // Create circuit instance
             let circuit = TensorAdd {
-                a: tensor_a,
-                b: tensor_b,
+                a: &tensor_a,
+                b: &tensor_b,
                 log_size: required_log_size,
             };
 

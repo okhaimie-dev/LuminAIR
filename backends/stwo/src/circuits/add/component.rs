@@ -3,7 +3,6 @@ use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, Framework
 // The main circuit component for tensor addition
 pub type TensorAddComponent = FrameworkComponent<TensorAddEval>;
 
-#[derive(Clone)]
 pub struct TensorAddEval {
     pub log_size: u32,
 }
@@ -24,7 +23,7 @@ impl FrameworkEval for TensorAddEval {
         let c = eval.next_trace_mask();
 
         // Add constraint: c = a + b
-        eval.add_constraint(c.clone() - (a + b));
+        eval.add_constraint(c - (a + b));
 
         eval
     }
