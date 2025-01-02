@@ -35,11 +35,19 @@ jobs:
             # Create and set up gh-pages branch
             git checkout --orphan gh-pages
             git rm -rf .
-            mkdir -p dev/bench/data
-            echo "# Benchmark Results" > dev/bench/data/README.md
-            # Create initial index.html that will redirect to the correct location
-            echo '<!DOCTYPE html><meta http-equiv="refresh" content="0; url=criterion/summary/">' > index.html
-            git add dev/bench/data/README.md index.html
+            mkdir -p criterion/summary dev/bench/data
+            
+            # Create root index.html that redirects to criterion/summary/
+            cat > index.html << 'EOL'
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="refresh" content="0;url=criterion/summary/">
+            </head>
+            </html>
+            EOL
+            
+            git add index.html
             git commit -m "Initialize gh-pages branch"
             git push https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git gh-pages
           fi
@@ -238,3 +246,4 @@ jobs:
           publish_dir: target/criterion
           publish_branch: gh-pages
           keep_files: true
+          force_orphan: false
