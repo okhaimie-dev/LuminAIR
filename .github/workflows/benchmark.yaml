@@ -23,7 +23,12 @@ jobs:
           toolchain: nightly-2024-12-17
 
       - name: Run benchmark
-        run: cargo bench --bench tensor_ops | tee output.txt
+        run: |
+          # Run benchmarks and capture output
+          cargo bench --bench tensor_ops > raw_output.txt
+
+          # Process the output to match criterion format
+          cat raw_output.txt | grep "time:.*\[.*\]" | sed -E 's/time:\s*\[(.*?) .*\]/\1/' > output.txt
 
       - name: Download previous benchmark data
         uses: actions/cache@v4
@@ -34,9 +39,11 @@ jobs:
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
-          tool: "cargo"
+          tool: "criterion"
           output-file-path: output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           alert-threshold: "200%"
           comment-on-alert: true
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
