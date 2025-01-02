@@ -27,8 +27,20 @@ jobs:
           # Run benchmarks and capture output
           cargo bench --bench tensor_ops > raw_output.txt
 
-          # Process the output to match criterion format
-          cat raw_output.txt | grep "time:.*\[.*\]" | sed -E 's/time:\s*\[(.*?) .*\]/\1/' > output.txt
+          # Process the output to match cargo benchmark format
+          cat raw_output.txt | while IFS= read -r line; do
+            if [[ $line =~ time:.*\[(.*?) .*\] ]]; then
+              name=$(echo "$line" | grep -oP '^[^time]*' | tr -d ' ')
+              time="${BASH_REMATCH[1]}"
+              # Convert to ns if needed
+              if [[ $line =~ µs ]]; then
+                time=$(echo "$time * 1000" | bc)
+              elif [[ $line =~ ms ]]; then
+                time=$(echo "$time * 1000000" | bc)
+              fi
+              echo "test $name ... bench: $time ns/iter (+/- 0)"
+            fi
+          done > output.txt
 
       - name: Download previous benchmark data
         uses: actions/cache@v4
@@ -39,7 +51,7 @@ jobs:
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
-          tool: "criterion"
+          tool: "cargo"
           output-file-path: output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true

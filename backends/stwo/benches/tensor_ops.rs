@@ -57,7 +57,7 @@ fn bench_tensor_add(c: &mut Criterion) {
 
     // Benchmark trace generation
     {
-        let mut group = c.benchmark_group("TensorAdd");
+        let mut group = c.benchmark_group("TensorAdd/tracing");
         group.measurement_time(std::time::Duration::from_secs(10));
         group.sample_size(10);
         for (name, tensor_a, tensor_b, log_size) in test_cases.iter() {
