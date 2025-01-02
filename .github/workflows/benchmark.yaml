@@ -2,9 +2,9 @@ name: Benchmarks
 
 on:
   push:
-    branches: [main]
+    branches: [stwo-backend]
   pull_request:
-    branches: [main]
+    branches: [stwo-backend]
 
 env:
   CARGO_TERM_COLOR: always
