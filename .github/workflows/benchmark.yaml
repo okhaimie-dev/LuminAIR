@@ -38,9 +38,111 @@ jobs:
           cargo bench --bench tensor_ops
 
           # Process Criterion's output into a format compatible with benchmark-action
-          echo '{"command":"benchmark","mean":' > bench_result.json
-          cat target/criterion/TensorAdd/new/estimates.json | jq '.mean.point_estimate' >> bench_result.json
-          echo ',"unit":"ns"}' >> bench_result.json
+          echo '[' > bench_result.json
+
+          # Process TensorAdd benchmarks
+          jq -r '[
+            {
+              "name": "TensorAdd/2x2_+_2x2",
+              "value": .mean.point_estimate,
+              "unit": "ns",
+              "range": "±\(.mean.standard_error)",
+              "extra": "Iterations: \(.mean.sample_size)"
+            }
+          ]' target/criterion/TensorAdd/2x2_+_2x2/new/estimates.json >> bench_result.json
+          echo ',' >> bench_result.json
+
+          jq -r '[
+            {
+              "name": "TensorAdd/50x50_+_50x1",
+              "value": .mean.point_estimate,
+              "unit": "ns",
+              "range": "±\(.mean.standard_error)",
+              "extra": "Iterations: \(.mean.sample_size)"
+            }
+          ]' target/criterion/TensorAdd/50x50_+_50x1/new/estimates.json >> bench_result.json
+          echo ',' >> bench_result.json
+
+          jq -r '[
+            {
+              "name": "TensorAdd/100x100_+_100x1",
+              "value": .mean.point_estimate,
+              "unit": "ns",
+              "range": "±\(.mean.standard_error)",
+              "extra": "Iterations: \(.mean.sample_size)"
+            }
+          ]' target/criterion/TensorAdd/100x100_+_100x1/new/estimates.json >> bench_result.json
+          echo ',' >> bench_result.json
+
+          # Process proving benchmarks
+          jq -r '[
+            {
+              "name": "TensorAdd/proving/2x2_+_2x2",
+              "value": .mean.point_estimate,
+              "unit": "ns",
+              "range": "±\(.mean.standard_error)",
+              "extra": "Iterations: \(.mean.sample_size)"
+            }
+          ]' target/criterion/TensorAdd/proving/2x2_+_2x2/new/estimates.json >> bench_result.json
+          echo ',' >> bench_result.json
+
+          jq -r '[
+            {
+              "name": "TensorAdd/proving/50x50_+_50x1",
+              "value": .mean.point_estimate,
+              "unit": "ns",
+              "range": "±\(.mean.standard_error)",
+              "extra": "Iterations: \(.mean.sample_size)"
+            }
+          ]' target/criterion/TensorAdd/proving/50x50_+_50x1/new/estimates.json >> bench_result.json
+          echo ',' >> bench_result.json
+
+          jq -r '[
+            {
+              "name": "TensorAdd/proving/100x100_+_100x1",
+              "value": .mean.point_estimate,
+              "unit": "ns",
+              "range": "±\(.mean.standard_error)",
+              "extra": "Iterations: \(.mean.sample_size)"
+            }
+          ]' target/criterion/TensorAdd/proving/100x100_+_100x1/new/estimates.json >> bench_result.json
+          echo ',' >> bench_result.json
+
+          # Process verification benchmarks
+          jq -r '[
+            {
+              "name": "TensorAdd/verification/2x2_+_2x2",
+              "value": .mean.point_estimate,
+              "unit": "ns",
+              "range": "±\(.mean.standard_error)",
+              "extra": "Iterations: \(.mean.sample_size)"
+            }
+          ]' target/criterion/TensorAdd/verification/2x2_+_2x2/new/estimates.json >> bench_result.json
+          echo ',' >> bench_result.json
+
+          jq -r '[
+            {
+              "name": "TensorAdd/verification/50x50_+_50x1",
+              "value": .mean.point_estimate,
+              "unit": "ns",
+              "range": "±\(.mean.standard_error)",
+              "extra": "Iterations: \(.mean.sample_size)"
+            }
+          ]' target/criterion/TensorAdd/verification/50x50_+_50x1/new/estimates.json >> bench_result.json
+          echo ',' >> bench_result.json
+
+          jq -r '[
+            {
+              "name": "TensorAdd/verification/100x100_+_100x1",
+              "value": .mean.point_estimate,
+              "unit": "ns",
+              "range": "±\(.mean.standard_error)",
+              "extra": "Iterations: \(.mean.sample_size)"
+            }
+          ]' target/criterion/TensorAdd/verification/100x100_+_100x1/new/estimates.json >> bench_result.json
+
+          # Remove the last comma and close the array
+          sed -i '$ s/,$/]/' bench_result.json
 
       - name: Download previous benchmark data
         uses: actions/cache@v4
@@ -60,6 +162,8 @@ jobs:
           comment-on-alert: true
           fail-on-alert: true
           summary-always: true
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/stwo-backend'
