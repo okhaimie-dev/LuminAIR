@@ -24,29 +24,21 @@ jobs:
 
       - name: Run benchmark
         run: |
-          # Run benchmarks and capture output
-          cargo bench --bench tensor_ops > raw_output.txt
-
-          # Process the output to match cargo benchmark format
-          cat raw_output.txt | while IFS= read -r line; do
-            if [[ $line =~ time:.*\[(.*?) .*\] ]]; then
-              name=$(echo "$line" | grep -oP '^[^time]*' | tr -d ' ')
-              time="${BASH_REMATCH[1]}"
-              # Convert to ns if needed
-              if [[ $line =~ µs ]]; then
-                time=$(echo "$time * 1000" | bc)
-              elif [[ $line =~ ms ]]; then
-                time=$(echo "$time * 1000000" | bc)
-              fi
-              echo "test $name ... bench: $time ns/iter (+/- 0)"
-            fi
-          done > output.txt
-
-      - name: Download previous benchmark data
-        uses: actions/cache@v4
-        with:
-          path: ./cache
-          key: ${{ runner.os }}-benchmark
+          # Run benchmarks and format output
+          cargo bench --bench tensor_ops 2>&1 | awk '
+            /time:/ {
+              name=$1
+              split($4, times, " ")
+              gsub(/[\[\],]/, "", times[1])
+              
+              # Convert to nanoseconds
+              time=times[1]
+              if ($5 ~ /µs/) time=time*1000
+              if ($5 ~ /ms/) time=time*1000000
+              
+              printf "test %s ... bench: %d ns/iter (+/- 0)\n", name, time
+            }
+          ' > output.txt
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
