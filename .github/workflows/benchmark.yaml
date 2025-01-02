@@ -21,17 +21,26 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly-2024-12-17
+          toolchain: nightly
           components: rustfmt, clippy
 
-      - name: Install criterion requirements
+      - name: Install requirements
         run: |
           sudo apt-get update
-          sudo apt-get install -y gnuplot
+          sudo apt-get install -y gnuplot jq
 
-      - name: Run benchmark
+      - name: Run benchmark and process results
         run: |
-          cargo bench --bench tensor_ops -- --output-format csv > benchmark_result.csv
+          # Create a directory for the benchmark results
+          mkdir -p target/criterion
+
+          # Run the benchmark
+          cargo bench --bench tensor_ops
+
+          # Process Criterion's output into a format compatible with benchmark-action
+          echo '{"command":"benchmark","mean":' > bench_result.json
+          cat target/criterion/TensorAdd/new/estimates.json | jq '.mean.point_estimate' >> bench_result.json
+          echo ',"unit":"ns"}' >> bench_result.json
 
       - name: Download previous benchmark data
         uses: actions/cache@v4
@@ -43,15 +52,13 @@ jobs:
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Criterion Benchmark
-          tool: "criterion"
-          output-file-path: benchmark_result.csv
+          tool: "customBiggerIsBetter"
+          output-file-path: bench_result.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
-          # Show alert with commit comment on detecting possible performance regression
           alert-threshold: "200%"
           comment-on-alert: true
           fail-on-alert: true
-          # Enable Job Summary for GitHub Actions
           summary-always: true
 
       - name: Deploy to GitHub Pages
