@@ -38,14 +38,14 @@ jobs:
             mkdir -p criterion/summary dev/bench/data
             
             # Create root index.html that redirects to criterion/summary/
-            cat > index.html << 'ENDOFFILE'
+            cat > index.html << 'EOF'
             <!DOCTYPE html>
             <html>
             <head>
                 <meta http-equiv="refresh" content="0;url=criterion/summary/">
             </head>
             </html>
-            ENDOFFILE
+            EOF
 
             git add index.html
             git commit -m "Initialize gh-pages branch"
@@ -87,7 +87,7 @@ jobs:
           mkdir -p target/criterion/summary
 
           # Create the summary page
-          cat > target/criterion/summary/index.html << 'ENDOFFILE'
+          cat > target/criterion/summary/index.html << 'EOF'
           <!DOCTYPE html>
           <html>
           <head>
@@ -198,10 +198,10 @@ jobs:
               </div>
           </body>
           </html>
-          ENDOFFILE
+          EOF
 
           # Create dummy JSON data for github-action-benchmark
-          cat > benchmark_output.json << ENDOFFILE
+          cat > benchmark_output.json << 'EOF'
           [
             {
               "name": "TensorAdd/trace_generation/2x2_+_2x2",
@@ -222,7 +222,7 @@ jobs:
               "unit": "ns"
             }
           ]
-          ENDOFFILE
+          EOF
 
       - name: Store benchmark results
         uses: benchmark-action/github-action-benchmark@v1
