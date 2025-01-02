@@ -1,8 +1,8 @@
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use stwo_prover::core::{
     backend::{
-        simd::m31::{PackedBaseField, LOG_N_LANES},
-        Backend, BackendForChannel,
+        simd::{m31::{PackedBaseField, LOG_N_LANES}, SimdBackend},
+        Backend, BackendForChannel, CpuBackend,
     },
     channel::MerkleChannel,
     fields::m31::BaseField,
@@ -37,15 +37,31 @@ pub trait Circuit<B: Backend> {
     ) -> Result<(), Self::Error>;
 }
 
+pub trait TensorField: Clone + Send + Sync {
+    fn zero() -> Self;
+}
+
+impl TensorField for BaseField {
+    fn zero() -> Self {
+        BaseField::from_u32_unchecked(0)
+    }
+}
+
+impl TensorField for PackedBaseField {
+    fn zero() -> Self {
+        PackedBaseField::broadcast(BaseField::from_u32_unchecked(0))
+    }
+}
+
 #[derive(Clone, Debug)]
-pub struct Tensor {
-    pub data: Vec<PackedBaseField>,
+pub struct Tensor<F: TensorField> {
+    pub data: Vec<F>,
     pub dims: Vec<usize>,
     pub stride: Vec<usize>,
 }
 
-impl Tensor {
-    pub fn new(data: Vec<PackedBaseField>, dims: Vec<usize>) -> Self {
+impl<F: TensorField> Tensor<F> {
+    pub fn new(data: Vec<F>, dims: Vec<usize>) -> Self {
         let stride = Self::compute_stride(&dims);
         Self { data, dims, stride }
     }
@@ -58,7 +74,7 @@ impl Tensor {
         &self.stride
     }
 
-    pub fn data(&self) -> &[PackedBaseField] {
+    pub fn data(&self) -> &[F] {
         &self.data
     }
 
@@ -70,13 +86,11 @@ impl Tensor {
         stride
     }
 
-    // Get total number of elements
     pub fn size(&self) -> usize {
         self.dims.iter().product()
     }
 
-    // Check if tensors are broadcastable
-    pub fn is_broadcastable_with(&self, other: &Self) -> bool {
+    pub fn is_broadcastable_with<G: TensorField>(&self, other: &Tensor<G>) -> bool {
         let max_dims = self.dims.len().max(other.dims.len());
         let pad_self = max_dims - self.dims.len();
         let pad_other = max_dims - other.dims.len();
@@ -95,9 +109,28 @@ impl Tensor {
             dim_self == dim_other || dim_self == 1 || dim_other == 1
         })
     }
+}
 
-    // helper function to create SIMD-efficient packed data
-    pub fn pack_data(data: Vec<u32>, dims: &[usize]) -> Vec<PackedBaseField> {
+pub trait TensorPacker {
+    type Field: TensorField;
+
+    fn pack_data(data: Vec<u32>, dims: &[usize]) -> Vec<Self::Field>;
+}
+
+impl TensorPacker for CpuBackend {
+    type Field = BaseField;
+
+    fn pack_data(data: Vec<u32>, dims: &[usize]) -> Vec<Self::Field> {
+        data.into_iter()
+            .map(|x| BaseField::from_u32_unchecked(x % 1000))
+            .collect()
+    }
+}
+
+impl TensorPacker for SimdBackend {
+    type Field = PackedBaseField;
+
+    fn pack_data(data: Vec<u32>, dims: &[usize]) -> Vec<Self::Field> {
         let total_size = dims.iter().product::<usize>();
         let n_packed = (total_size + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
 
@@ -119,6 +152,14 @@ impl Tensor {
                 PackedBaseField::from_array(lane_values.map(|x| BaseField::from_u32_unchecked(x)))
             })
             .collect()
+    }
+}
+
+// Helper function to create tensors for specific backends
+impl<F: TensorField> Tensor<F> {
+    pub fn create<B: Backend + TensorPacker<Field = F>>(data: Vec<u32>, dims: Vec<usize>) -> Self {
+        let packed_data = B::pack_data(data, &dims);
+        Self::new(packed_data, dims)
     }
 }
 

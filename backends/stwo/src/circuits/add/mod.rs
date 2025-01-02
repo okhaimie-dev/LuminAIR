@@ -18,7 +18,7 @@ use stwo_prover::{
 };
 use trace::TensorAddTracer;
 
-use super::{Circuit, Tensor};
+use super::{Circuit, Tensor, TensorField};
 
 pub mod component;
 pub mod trace;
@@ -27,13 +27,13 @@ pub struct TensorAddProof<H: MerkleHasher> {
     pub stark_proof: StarkProof<H>,
 }
 
-pub struct TensorAdd<'a> {
-    pub a: &'a Tensor,
-    pub b: &'a Tensor,
+pub struct TensorAdd<'a, F: TensorField> {
+    pub a: &'a Tensor<F>,
+    pub b: &'a Tensor<F>,
     pub log_size: u32,
 }
 
-impl<'t, B: Backend + TensorAddTracer> Circuit<B> for TensorAdd<'t>
+impl<'t, F: TensorField, B: Backend + TensorAddTracer<F>> Circuit<B> for TensorAdd<'t, F>
 where
     FrameworkComponent<TensorAddEval>: ComponentProver<B>,
 {
@@ -132,7 +132,10 @@ mod tests {
 
     use super::*;
     use stwo_prover::core::{
-        backend::simd::m31::{PackedBaseField, LOG_N_LANES},
+        backend::simd::{
+            m31::{PackedBaseField, LOG_N_LANES},
+            SimdBackend,
+        },
         fields::m31::BaseField,
         vcs::blake2_merkle::Blake2sMerkleChannel,
     };
@@ -200,14 +203,11 @@ mod tests {
             ),
             // Case 6: Large matrices
             (
-                Tensor::new(
-                    Tensor::pack_data((0..50 * 50).map(|i| i as u32).collect(), &[50, 50]),
+                Tensor::create::<SimdBackend>(
+                    (0..50 * 50).map(|i| i as u32).collect(),
                     vec![50, 50],
                 ),
-                Tensor::new(
-                    Tensor::pack_data((0..50).map(|i| i as u32).collect(), &[50, 1]),
-                    vec![50, 1],
-                ),
+                Tensor::create::<SimdBackend>((0..50).map(|i| i as u32).collect(), vec![50, 1]),
             ),
         ];
 

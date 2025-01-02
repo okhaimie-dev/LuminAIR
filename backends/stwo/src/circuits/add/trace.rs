@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
-use crate::circuits::Tensor;
+use crate::circuits::{Tensor, TensorField};
 use parking_lot::Mutex;
 use rayon::iter::{ParallelBridge, ParallelIterator};
+use stwo_prover::core::backend::simd::m31::PackedBaseField;
 use stwo_prover::core::backend::{Backend, Column, CpuBackend};
 use stwo_prover::core::{
     backend::{
@@ -17,40 +18,40 @@ use stwo_prover::core::{
     ColumnVec,
 };
 
-pub trait TensorAddTracer {
+pub trait TensorAddTracer<F: TensorField> {
     fn generate_trace(
         log_size: u32,
-        a: &Tensor,
-        b: &Tensor,
+        a: &Tensor<F>,
+        b: &Tensor<F>,
     ) -> (
         ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        Tensor,
+        Tensor<F>,
     )
     where
         Self: Backend;
 }
 
-impl TensorAddTracer for CpuBackend {
+impl TensorAddTracer<BaseField> for CpuBackend {
     fn generate_trace(
         log_size: u32,
-        a: &Tensor,
-        b: &Tensor,
+        a: &Tensor<BaseField>,
+        b: &Tensor<BaseField>,
     ) -> (
         ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        Tensor,
+        Tensor<BaseField>,
     ) {
         generate_trace_cpu(log_size, a, b)
     }
 }
 
-impl TensorAddTracer for SimdBackend {
+impl TensorAddTracer<PackedBaseField> for SimdBackend {
     fn generate_trace(
         log_size: u32,
-        a: &Tensor,
-        b: &Tensor,
+        a: &Tensor<PackedBaseField>,
+        b: &Tensor<PackedBaseField>,
     ) -> (
         ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        Tensor,
+        Tensor<PackedBaseField>,
     ) {
         generate_trace_simd(log_size, a, b)
     }
@@ -58,22 +59,22 @@ impl TensorAddTracer for SimdBackend {
 
 fn generate_trace_cpu(
     log_size: u32,
-    a: &Tensor,
-    b: &Tensor,
+    a: &Tensor<BaseField>,
+    b: &Tensor<BaseField>,
 ) -> (
     ColumnVec<CircleEvaluation<CpuBackend, BaseField, BitReversedOrder>>,
-    Tensor,
+    Tensor<BaseField>,
 ) {
     todo!()
 }
 
 fn generate_trace_simd(
     log_size: u32,
-    a: &Tensor,
-    b: &Tensor,
+    a: &Tensor<PackedBaseField>,
+    b: &Tensor<PackedBaseField>,
 ) -> (
     ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
-    Tensor,
+    Tensor<PackedBaseField>,
 ) {
     assert!(a.is_broadcastable_with(b), "Tensors must be broadcastable");
 
@@ -151,7 +152,7 @@ fn generate_trace_simd(
         } else {
             b.dims().to_vec()
         },
-        stride: Tensor::compute_stride(if a.size() > b.size() {
+        stride: Tensor::<PackedBaseField>::compute_stride(if a.size() > b.size() {
             a.dims()
         } else {
             b.dims()
@@ -175,7 +176,7 @@ mod tests {
     use stwo_prover::core::backend::simd::m31::PackedBaseField;
     use stwo_prover::core::fields::m31::BaseField;
 
-    fn unpack_tensor(tensor: &Tensor) -> Vec<u32> {
+    fn unpack_tensor(tensor: &Tensor<PackedBaseField>) -> Vec<u32> {
         tensor
             .data()
             .iter()
@@ -229,8 +230,8 @@ mod tests {
             ),
             // Case 4: Different values in matrices
             (
-                Tensor::new(Tensor::pack_data(vec![1, 2, 3, 4], &[2, 2]), vec![2, 2]),
-                Tensor::new(Tensor::pack_data(vec![5, 6, 7, 8], &[2, 2]), vec![2, 2]),
+                Tensor::create::<SimdBackend>(vec![1, 2, 3, 4], vec![2, 2]),
+                Tensor::create::<SimdBackend>(vec![5, 6, 7, 8], vec![2, 2]),
                 vec![2, 2],
                 vec![6, 8, 10, 12], // Element-wise addition
             ),

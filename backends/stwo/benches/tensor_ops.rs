@@ -7,7 +7,12 @@ use stwo_prover::core::{
     vcs::blake2_merkle::Blake2sMerkleChannel,
 };
 
-fn get_test_cases() -> Vec<(String, Tensor, Tensor, u32)> {
+fn get_test_cases() -> Vec<(
+    String,
+    Tensor<PackedBaseField>,
+    Tensor<PackedBaseField>,
+    u32,
+)> {
     vec![
         // Small matrices (2x2)
         (
