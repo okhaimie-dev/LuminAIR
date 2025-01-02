@@ -19,6 +19,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Initialize gh-pages branch if it doesn't exist
+      - name: Initialize gh-pages branch
+        run: |
+          git checkout -b gh-pages || git checkout gh-pages
+          # Create initial structure if branch is new
+          if [ ! -d "dev/bench/data" ]; then
+            mkdir -p dev/bench/data
+            echo "# Benchmark Results" > dev/bench/data/README.md
+            git add dev/bench/data/README.md
+            git config --global user.email "github-actions@github.com"
+            git config --global user.name "GitHub Actions"
+            git commit -m "Initialize gh-pages branch"
+            git push -u origin gh-pages
+          fi
+          git checkout ${GITHUB_REF##*/}
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -157,7 +173,7 @@ jobs:
           </head>
           <body>
               <div class="container">
-                  <h1>LuminAIR Benchmarks by Giza</h1>
+                  <h1>LuminAIR Benchmark, by Giza</h1>
                   
                   <div class="commit-info">
                       <strong>Latest Commit:</strong> ${{ github.sha }}
@@ -188,7 +204,7 @@ jobs:
           EOL
 
       - name: Deploy benchmark results
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/stwo-backend'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
