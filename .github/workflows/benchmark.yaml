@@ -46,11 +46,11 @@ jobs:
 
       - name: Prepare Benchmark Results
         run: |
-          # Create a shorter path structure
-          mkdir -p processed_benchmarks
-          cp -r target/criterion/* processed_benchmarks/
+          # Create the benchmarks directory structure
+          mkdir -p processed_benchmarks/benchmarks
+          cp -r target/criterion/* processed_benchmarks/benchmarks/
           # Rename long directories to shorter versions if needed
-          cd processed_benchmarks
+          cd processed_benchmarks/benchmarks
           if [ -d "TensorAdd_verification" ]; then
             mv "TensorAdd_verification" "verify"
           fi
