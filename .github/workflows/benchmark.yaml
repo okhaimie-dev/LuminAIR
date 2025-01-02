@@ -8,7 +8,6 @@ on:
 permissions:
   deployments: write
   contents: write
-  pages: write
 
 jobs:
   benchmark:
@@ -22,127 +21,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: nightly-2024-12-17
-          components: rustfmt, clippy
 
-      - name: Install requirements
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gnuplot jq
-
-      - name: Run benchmark and process results
-        run: |
-          # Create a directory for the benchmark results
-          mkdir -p target/criterion
-
-          # Run the benchmark
-          cargo bench --bench tensor_ops
-
-          # Process Criterion's output into a format compatible with benchmark-action
-          echo '[' > bench_result.json
-
-          # Process TensorAdd benchmarks
-          jq -r '[
-            {
-              "name": "TensorAdd/2x2_+_2x2",
-              "value": .mean.point_estimate,
-              "unit": "ns",
-              "range": "±\(.mean.standard_error)",
-              "extra": "Iterations: \(.mean.sample_size)"
-            }
-          ]' target/criterion/TensorAdd/2x2_+_2x2/new/estimates.json >> bench_result.json
-          echo ',' >> bench_result.json
-
-          jq -r '[
-            {
-              "name": "TensorAdd/50x50_+_50x1",
-              "value": .mean.point_estimate,
-              "unit": "ns",
-              "range": "±\(.mean.standard_error)",
-              "extra": "Iterations: \(.mean.sample_size)"
-            }
-          ]' target/criterion/TensorAdd/50x50_+_50x1/new/estimates.json >> bench_result.json
-          echo ',' >> bench_result.json
-
-          jq -r '[
-            {
-              "name": "TensorAdd/100x100_+_100x1",
-              "value": .mean.point_estimate,
-              "unit": "ns",
-              "range": "±\(.mean.standard_error)",
-              "extra": "Iterations: \(.mean.sample_size)"
-            }
-          ]' target/criterion/TensorAdd/100x100_+_100x1/new/estimates.json >> bench_result.json
-          echo ',' >> bench_result.json
-
-          # Process proving benchmarks
-          jq -r '[
-            {
-              "name": "TensorAdd/proving/2x2_+_2x2",
-              "value": .mean.point_estimate,
-              "unit": "ns",
-              "range": "±\(.mean.standard_error)",
-              "extra": "Iterations: \(.mean.sample_size)"
-            }
-          ]' target/criterion/TensorAdd/proving/2x2_+_2x2/new/estimates.json >> bench_result.json
-          echo ',' >> bench_result.json
-
-          jq -r '[
-            {
-              "name": "TensorAdd/proving/50x50_+_50x1",
-              "value": .mean.point_estimate,
-              "unit": "ns",
-              "range": "±\(.mean.standard_error)",
-              "extra": "Iterations: \(.mean.sample_size)"
-            }
-          ]' target/criterion/TensorAdd/proving/50x50_+_50x1/new/estimates.json >> bench_result.json
-          echo ',' >> bench_result.json
-
-          jq -r '[
-            {
-              "name": "TensorAdd/proving/100x100_+_100x1",
-              "value": .mean.point_estimate,
-              "unit": "ns",
-              "range": "±\(.mean.standard_error)",
-              "extra": "Iterations: \(.mean.sample_size)"
-            }
-          ]' target/criterion/TensorAdd/proving/100x100_+_100x1/new/estimates.json >> bench_result.json
-          echo ',' >> bench_result.json
-
-          # Process verification benchmarks
-          jq -r '[
-            {
-              "name": "TensorAdd/verification/2x2_+_2x2",
-              "value": .mean.point_estimate,
-              "unit": "ns",
-              "range": "±\(.mean.standard_error)",
-              "extra": "Iterations: \(.mean.sample_size)"
-            }
-          ]' target/criterion/TensorAdd/verification/2x2_+_2x2/new/estimates.json >> bench_result.json
-          echo ',' >> bench_result.json
-
-          jq -r '[
-            {
-              "name": "TensorAdd/verification/50x50_+_50x1",
-              "value": .mean.point_estimate,
-              "unit": "ns",
-              "range": "±\(.mean.standard_error)",
-              "extra": "Iterations: \(.mean.sample_size)"
-            }
-          ]' target/criterion/TensorAdd/verification/50x50_+_50x1/new/estimates.json >> bench_result.json
-          echo ',' >> bench_result.json
-
-          jq -r '[
-            {
-              "name": "TensorAdd/verification/100x100_+_100x1",
-              "value": .mean.point_estimate,
-              "unit": "ns",
-              "range": "±\(.mean.standard_error)",
-              "extra": "Iterations: \(.mean.sample_size)"
-            }
-          ]' target/criterion/TensorAdd/verification/100x100_+_100x1/new/estimates.json >> bench_result.json
-
-          # Remove the last comma and close the array
-          sed -i '$ s/,$/]/' bench_result.json
+      - name: Run benchmark
+        run: cargo bench --bench tensor_ops | tee output.txt
 
       - name: Download previous benchmark data
         uses: actions/cache@v4
@@ -153,23 +34,9 @@ jobs:
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
-          name: Criterion Benchmark
-          tool: "customBiggerIsBetter"
-          output-file-path: bench_result.json
+          tool: "cargo"
+          output-file-path: output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           alert-threshold: "200%"
           comment-on-alert: true
-          fail-on-alert: true
-          summary-always: true
-          gh-pages-branch: gh-pages
-          benchmark-data-dir-path: dev/bench
-
-      - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/stwo-backend'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./cache
-          publish_branch: gh-pages
-          keep_files: true
