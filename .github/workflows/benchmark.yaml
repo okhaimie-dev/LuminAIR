@@ -20,10 +20,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Setup Rust (Nightly)
-      - uses: dtolnay/rust-toolchain@master
+      - name: Setup Rust
+        uses: moonrepo/setup-rust@v0
         with:
-          toolchain: nightly-2024-12-17
+          channel: stable
+          cache-target: release
 
       - name: Cache Benchmark Data
         uses: actions/cache@v3
@@ -35,7 +36,7 @@ jobs:
             ${{ runner.os }}-bench-
 
       - name: Run Benchmarks
-        run: cargo +nightly-2024-12-17 bench --bench tensor_ops
+        run: cargo bench --bench tensor_ops
 
       - name: Process Benchmark Results
         uses: joshua-auchincloss/criterion-pages@v1
