@@ -6,6 +6,11 @@ on:
       - stwo-backend
   workflow_dispatch:
 
+# Add concurrency control
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pages: write
@@ -63,7 +68,8 @@ jobs:
 
       - name: Create Custom Index Template
         run: |
-          cat > processed_benchmarks/custom_index.html << 'EOL'
+          mkdir -p processed_benchmarks
+          cat > processed_benchmarks/index.html << 'EOL'
           <!DOCTYPE html>
           <html>
           <head>
@@ -71,9 +77,45 @@ jobs:
               <title>LuminAIR Benchmark, by Giza</title>
               <style>
                   .footer { display: none !important; }
-                  body { font-family: Arial, sans-serif; }
-                  h1 { font-size: 2.5em; text-align: center; color: #333; }
-                  .header { text-align: center; margin-bottom: 2em; }
+                  body { 
+                      font-family: Arial, sans-serif;
+                      max-width: 1200px;
+                      margin: 0 auto;
+                      padding: 20px;
+                  }
+                  h1 { 
+                      font-size: 2.5em; 
+                      text-align: center; 
+                      color: #333;
+                      margin-bottom: 0.5em;
+                  }
+                  .header { 
+                      text-align: center; 
+                      margin-bottom: 2em;
+                      border-bottom: 2px solid #eee;
+                      padding-bottom: 1em;
+                  }
+                  .content {
+                      margin-top: 2em;
+                  }
+                  .benchmark-list {
+                      list-style: none;
+                      padding: 0;
+                  }
+                  .benchmark-list li {
+                      margin: 1em 0;
+                      padding: 1em;
+                      background: #f8f9fa;
+                      border-radius: 4px;
+                  }
+                  .benchmark-list a {
+                      color: #0366d6;
+                      text-decoration: none;
+                      font-size: 1.1em;
+                  }
+                  .benchmark-list a:hover {
+                      text-decoration: underline;
+                  }
               </style>
           </head>
           <body>
@@ -82,7 +124,11 @@ jobs:
                   <p>Performance benchmarks for tensor operators (stwo-backend support)</p>
               </div>
               <div class="content">
-                  <!-- Include benchmark results here -->
+                  <ul class="benchmark-list">
+                      {{#each benchmarks}}
+                      <li><a href="{{this.path}}">{{this.name}}</a></li>
+                      {{/each}}
+                  </ul>
               </div>
           </body>
           </html>
@@ -95,27 +141,24 @@ jobs:
           config: |
             {
               "title": "LuminAIR Benchmark, by Giza",
-              "header": "Performance Metrics on supported operators",
-              "description": "Performance benchmarks for tensor operators (stwo-backend support)",
+              "template": {
+                "index": "index.html"
+              },
               "css": {
                 "footer": {
                   "display": "none"
                 },
-                "title": {
-                  "text-align": "center",
-                  "font-family": "Arial, sans-serif",
-                  "font-size": "2.5em"
+                "body": {
+                  "font-family": "Arial, sans-serif"
                 },
-                "header": {
+                "h1": {
                   "text-align": "center",
-                  "color": "#333",
-                  "margin-bottom": "1em"
+                  "font-size": "2.5em",
+                  "color": "#333"
                 }
-              },
-              "template": {
-                "index": "./processed_benchmarks/custom_index.html"
               }
             }
+
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v3
 
