@@ -38,15 +38,15 @@ jobs:
             mkdir -p criterion/summary dev/bench/data
             
             # Create root index.html that redirects to criterion/summary/
-            cat > index.html << 'EOL'
+            cat > index.html << 'ENDOFFILE'
             <!DOCTYPE html>
             <html>
             <head>
                 <meta http-equiv="refresh" content="0;url=criterion/summary/">
             </head>
             </html>
-            EOL
-            
+            ENDOFFILE
+
             git add index.html
             git commit -m "Initialize gh-pages branch"
             git push https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git gh-pages
@@ -87,7 +87,7 @@ jobs:
           mkdir -p target/criterion/summary
 
           # Create the summary page
-          cat > target/criterion/summary/index.html << 'EOL'
+          cat > target/criterion/summary/index.html << 'ENDOFFILE'
           <!DOCTYPE html>
           <html>
           <head>
@@ -176,21 +176,21 @@ jobs:
                               <h3>Trace Generation</h3>
                               <a href="../../TensorAdd/trace_generation/report/">View Results</a>
                               <div class="benchmark-details">
-                                Test cases: 2x2, 50x50, 100x100 matrices
+                                  Test cases: 2x2, 50x50, 100x100 matrices
                               </div>
                           </div>
                           <div class="phase-card">
                               <h3>Proving</h3>
                               <a href="../../TensorAdd/proving/report/">View Results</a>
                               <div class="benchmark-details">
-                                STARK proof generation time
+                                  STARK proof generation time
                               </div>
                           </div>
                           <div class="phase-card">
                               <h3>Verification</h3>
                               <a href="../../TensorAdd/verification/report/">View Results</a>
                               <div class="benchmark-details">
-                                STARK proof verification time
+                                  STARK proof verification time
                               </div>
                           </div>
                       </div>
@@ -198,10 +198,10 @@ jobs:
               </div>
           </body>
           </html>
-          EOL
+          ENDOFFILE
 
           # Create dummy JSON data for github-action-benchmark
-          cat > benchmark_output.json << EOF
+          cat > benchmark_output.json << ENDOFFILE
           [
             {
               "name": "TensorAdd/trace_generation/2x2_+_2x2",
@@ -222,7 +222,7 @@ jobs:
               "unit": "ns"
             }
           ]
-          EOF
+          ENDOFFILE
 
       - name: Store benchmark results
         uses: benchmark-action/github-action-benchmark@v1
