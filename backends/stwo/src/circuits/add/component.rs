@@ -2,6 +2,7 @@ use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, Framework
 
 pub type TensorAddComponent = FrameworkComponent<TensorAddEval>;
 
+#[derive(Clone)]
 pub struct TensorAddEval {
     pub log_size: u32,
 }
@@ -27,4 +28,3 @@ impl FrameworkEval for TensorAddEval {
         eval
     }
 }
-
