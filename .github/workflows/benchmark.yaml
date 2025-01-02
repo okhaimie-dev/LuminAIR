@@ -1,53 +1,60 @@
-name: Benchmark
+name: Benchmark and Publish
 
 on:
   push:
     branches:
       - stwo-backend
+  workflow_dispatch:
 
 permissions:
-  deployments: write
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   benchmark:
-    name: Run benchmarks
+    name: Run Benchmarks
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: moonrepo/setup-rust@v0
         with:
           toolchain: nightly-2024-12-17
 
-      - name: Run benchmark
-        run: |
-          # Run benchmarks and format output
-          cargo bench --bench tensor_ops 2>&1 | awk '
-            /time:/ {
-              name=$1
-              split($4, times, " ")
-              gsub(/[\[\],]/, "", times[1])
-              
-              # Convert to nanoseconds
-              time=times[1]
-              if ($5 ~ /µs/) time=time*1000
-              if ($5 ~ /ms/) time=time*1000000
-              
-              printf "test %s ... bench: %d ns/iter (+/- 0)\n", name, time
-            }
-          ' > output.txt
-
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
+      - name: Cache Benchmark Data
+        uses: actions/cache@v3
+        id: cache-bench
         with:
-          tool: "cargo"
-          output-file-path: output.txt
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          alert-threshold: "200%"
-          comment-on-alert: true
-          gh-pages-branch: gh-pages
-          benchmark-data-dir-path: dev/bench
+          path: ./target/criterion
+          key: ${{ runner.os }}-bench-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-bench-
+
+      - name: Run Benchmarks
+        run: cargo bench --bench tensor_ops
+
+      - name: Process Benchmark Results
+        uses: joshua-auchincloss/criterion-pages@v1
+        with:
+          path: "./target/criterion"
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v3
+
+      - name: Upload Benchmark Artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: "./target/criterion"
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: benchmark
+
+    steps:
+      - name: Deploy Benchmark Results
+        uses: actions/deploy-pages@v2
