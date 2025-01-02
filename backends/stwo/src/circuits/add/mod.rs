@@ -4,7 +4,7 @@ use stwo_prover::{
     core::{
         air::Component,
         backend::{simd::SimdBackend, BackendForChannel},
-        channel::{Channel, MerkleChannel},
+        channel::MerkleChannel,
         fields::m31::BaseField,
         pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
         poly::{
@@ -12,7 +12,7 @@ use stwo_prover::{
             BitReversedOrder,
         },
         prover::{prove, verify, StarkProof, VerificationError},
-        vcs::{blake2_hash::Blake2sHash, ops::MerkleHasher},
+        vcs::ops::MerkleHasher,
         ColumnVec,
     },
 };
@@ -23,15 +23,7 @@ use super::{Circuit, Tensor};
 pub mod component;
 pub mod trace;
 
-#[derive(Clone, Debug)]
-pub struct TensorAddPublicInputs {
-    pub a_hash: Blake2sHash,
-    pub b_hash: Blake2sHash,
-    pub c_hash: Blake2sHash,
-}
-
-pub struct TensorAddProof<'a, H: MerkleHasher> {
-    pub public_inputs: &'a TensorAddPublicInputs,
+pub struct TensorAddProof<H: MerkleHasher> {
     pub stark_proof: StarkProof<H>,
 }
 
@@ -42,33 +34,19 @@ pub struct TensorAdd<'a> {
 }
 
 impl<'t> Circuit for TensorAdd<'t> {
-    type PublicInputs = TensorAddPublicInputs;
     type Component = TensorAddComponent;
-    type Proof<'a, H: MerkleHasher> = TensorAddProof<'a, H>;
+    type Proof<'a, H: MerkleHasher> = TensorAddProof<H>;
     type Error = VerificationError;
     type Trace = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
 
-    fn generate_trace(&self) -> (Self::Trace, Self::PublicInputs) {
-        let (trace, c) = generate_trace(self.log_size, self.a, self.b);
+    fn generate_trace(&self) -> Self::Trace {
+        let (trace, _c) = generate_trace(self.log_size, self.a, self.b);
 
-        // Hash tensors
-        let a_hash = self.a.hash();
-        let b_hash = self.b.hash();
-        let c_hash = c.hash();
-
-        (
-            trace,
-            TensorAddPublicInputs {
-                a_hash,
-                b_hash,
-                c_hash,
-            },
-        )
+        trace
     }
 
     fn prove<'a, MC: MerkleChannel>(
         trace: &Self::Trace,
-        public_inputs: &'a Self::PublicInputs,
         config: PcsConfig,
     ) -> (Vec<Self::Component>, Self::Proof<'a, MC::H>)
     where
@@ -85,35 +63,6 @@ impl<'t> Circuit for TensorAdd<'t> {
         let channel = &mut MC::C::default();
         let mut commitment_scheme =
             CommitmentSchemeProver::<SimdBackend, MC>::new(config, &twiddles);
-
-        // Mix tensor hashes into channel
-        channel.mix_felts(
-            &public_inputs
-                .a_hash
-                .0
-                .chunks(4)
-                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
-                .map(|x| x.into())
-                .collect::<Vec<_>>(),
-        );
-        channel.mix_felts(
-            &public_inputs
-                .b_hash
-                .0
-                .chunks(4)
-                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
-                .map(|x| x.into())
-                .collect::<Vec<_>>(),
-        );
-        channel.mix_felts(
-            &public_inputs
-                .c_hash
-                .0
-                .chunks(4)
-                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
-                .map(|x| x.into())
-                .collect::<Vec<_>>(),
-        );
 
         // Create component
         let component = TensorAddComponent::new(
@@ -142,13 +91,7 @@ impl<'t> Circuit for TensorAdd<'t> {
         )
         .unwrap();
 
-        (
-            vec![component],
-            TensorAddProof {
-                public_inputs,
-                stark_proof,
-            },
-        )
+        (vec![component], TensorAddProof { stark_proof })
     }
 
     fn verify<'a, MC: MerkleChannel>(
@@ -158,38 +101,6 @@ impl<'t> Circuit for TensorAdd<'t> {
     ) -> Result<(), Self::Error> {
         let channel = &mut MC::C::default();
         let commitment_scheme = &mut CommitmentSchemeVerifier::<MC>::new(config);
-
-        // Mix tensor hashes into channel
-        channel.mix_felts(
-            &proof
-                .public_inputs
-                .a_hash
-                .0
-                .chunks(4)
-                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
-                .map(|x| x.into())
-                .collect::<Vec<_>>(),
-        );
-        channel.mix_felts(
-            &proof
-                .public_inputs
-                .b_hash
-                .0
-                .chunks(4)
-                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
-                .map(|x| x.into())
-                .collect::<Vec<_>>(),
-        );
-        channel.mix_felts(
-            &proof
-                .public_inputs
-                .c_hash
-                .0
-                .chunks(4)
-                .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
-                .map(|x| x.into())
-                .collect::<Vec<_>>(),
-        );
 
         // Get expected column sizes from component
         let log_sizes = components[0].trace_log_degree_bounds();
@@ -318,19 +229,13 @@ mod tests {
 
             // Generate trace
             let start_trace = Instant::now();
-            let (trace, public_inputs) = circuit.generate_trace();
+            let trace = circuit.generate_trace();
             let trace_time = start_trace.elapsed();
             println!("Trace generation time for case {}: {:?}", i + 1, trace_time);
 
-            // Verify hashes match tensors
-            assert_eq!(tensor_a.hash(), public_inputs.a_hash);
-            assert_eq!(tensor_b.hash(), public_inputs.b_hash);
-            assert!(public_inputs.c_hash != Blake2sHash::default()); // Ensure hash is non-zero
-
             // Generate proof
             let start_prove = Instant::now();
-            let (components, proof) =
-                TensorAdd::prove::<Blake2sMerkleChannel>(&trace, &public_inputs, config);
+            let (components, proof) = TensorAdd::prove::<Blake2sMerkleChannel>(&trace, config);
             let prove_time = start_prove.elapsed();
             println!("Proving time for case {}: {:?}", i + 1, prove_time);
 

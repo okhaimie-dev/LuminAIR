@@ -8,30 +8,25 @@ use stwo_prover::core::{
         BackendForChannel,
     },
     channel::MerkleChannel,
-    fields::{m31::BaseField, IntoSlice},
+    fields::m31::BaseField,
     pcs::PcsConfig,
-    vcs::{
-        blake2_hash::{Blake2sHash, Blake2sHasher},
-        ops::MerkleHasher,
-    },
+    vcs::ops::MerkleHasher,
 };
 
 pub mod add;
 
 pub trait Circuit {
-    type PublicInputs;
     type Component;
     type Proof<'a, H: MerkleHasher>;
     type Error;
     type Trace;
 
     /// Generates the execution trace for the circuit
-    fn generate_trace(&self) -> (Self::Trace, Self::PublicInputs);
+    fn generate_trace(&self) -> Self::Trace;
 
     /// Creates proof for a given trace
     fn prove<'a, MC: MerkleChannel>(
         trace: &Self::Trace,
-        public_inputs: &'a Self::PublicInputs,
         config: PcsConfig,
     ) -> (Vec<Self::Component>, Self::Proof<'a, MC::H>)
     where
@@ -68,27 +63,6 @@ impl Tensor {
 
     pub fn data(&self) -> &[PackedBaseField] {
         &self.data
-    }
-
-    pub fn hash(&self) -> Blake2sHash {
-        let mut hasher = Blake2sHasher::new();
-
-        // Hash dimensions
-        hasher.update(&(self.dims.len() as u64).to_le_bytes());
-        for dim in &self.dims {
-            hasher.update(&(*dim as u64).to_le_bytes());
-        }
-
-        // Unpack SIMD data into base field values
-        let unpacked_data: Vec<BaseField> = self
-            .data
-            .iter()
-            .flat_map(|packed| packed.to_array())
-            .collect();
-
-        // Hash unpacked data
-        hasher.update(IntoSlice::<u8>::into_slice(&unpacked_data));
-        hasher.finalize()
     }
 
     pub fn compute_stride(dims: &[usize]) -> Vec<usize> {
