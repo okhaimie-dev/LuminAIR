@@ -31,7 +31,7 @@ jobs:
 
       - name: Run benchmark
         run: |
-          cargo bench --bench tensor_add -- --output-format csv > benchmark_result.csv
+          cargo bench --bench tensor_ops -- --output-format csv > benchmark_result.csv
 
       - name: Download previous benchmark data
         uses: actions/cache@v4
@@ -55,7 +55,7 @@ jobs:
           summary-always: true
 
       - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/stwo-backend' # Deploy only on your working branch
+        if: github.ref == 'refs/heads/stwo-backend'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
