@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTFLAGS: "--cfg tokio_unstable" # Enable unstable features if needed
 
 jobs:
   benchmark:
@@ -18,11 +19,10 @@ jobs:
         with:
           fetch-depth: 0 # Get full history for benchmarking across commits
 
-      - name: Install latest nightly Rust
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly
-          override: true
+          toolchain: nightly-2024-01-04
           components: rustfmt, clippy
 
       - name: Cache dependencies
@@ -37,30 +37,14 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
+      - name: Install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
       - name: Run benchmarks
         run: |
-          cargo bench --bench tensor_ops | tee benchmark_output.txt
-
-      - name: Convert benchmark results
-        run: |
-          # Create a JSON file for benchmark-action
-          echo "[" > output.json
-          # Parse Criterion output and convert to benchmark-action format
-          cat benchmark_output.txt | perl -ne '
-            if (/time:\s+\[(\d+\.\d+) ns/) {
-              $name = $ARGV if !$name;
-              print qq|  {
-                "name": "$name",
-                "value": $1,
-                "unit": "ns"
-              },\n|;
-            }
-            if (/benchmark:\s+(.+)/) {
-              $name = $1;
-            }
-          ' >> output.json
-          # Remove trailing comma and close array
-          sed -i '$ s/,$/\n]/' output.json
+          cargo +nightly-2024-01-04 bench --bench tensor_ops -- --output-format criterion | tee output.txt
 
       - name: Create benchmark summary
         run: |
@@ -168,8 +152,8 @@ jobs:
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Rust Circuit Benchmarks
-          tool: customSmallerIsBetter
-          output-file-path: output.json
+          tool: "criterion"
+          output-file-path: output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           alert-threshold: "150%"
