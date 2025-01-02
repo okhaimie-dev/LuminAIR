@@ -1,15 +1,14 @@
-# .github/workflows/benchmark.yml
 name: Benchmarks
 
 on:
   push:
-    branches: [ stwo-backend ]
+    branches: [main]
   pull_request:
-    branches: [ stwo-backend ]
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
-  
+
 jobs:
   benchmark:
     name: Run benchmarks
@@ -17,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Get full history for benchmarking across commits
+          fetch-depth: 0 # Get full history for benchmarking across commits
 
       - name: Install latest nightly Rust
         uses: actions-rs/toolchain@v1
@@ -40,7 +39,28 @@ jobs:
 
       - name: Run benchmarks
         run: |
-          cargo bench --bench tensor_ops -- --output-format criterion | tee output.txt
+          cargo bench --bench tensor_ops | tee benchmark_output.txt
+
+      - name: Convert benchmark results
+        run: |
+          # Create a JSON file for benchmark-action
+          echo "[" > output.json
+          # Parse Criterion output and convert to benchmark-action format
+          cat benchmark_output.txt | perl -ne '
+            if (/time:\s+\[(\d+\.\d+) ns/) {
+              $name = $ARGV if !$name;
+              print qq|  {
+                "name": "$name",
+                "value": $1,
+                "unit": "ns"
+              },\n|;
+            }
+            if (/benchmark:\s+(.+)/) {
+              $name = $1;
+            }
+          ' >> output.json
+          # Remove trailing comma and close array
+          sed -i '$ s/,$/\n]/' output.json
 
       - name: Create benchmark summary
         run: |
@@ -139,27 +159,6 @@ jobs:
                           </div>
                       </div>
                   </div>
-
-                  <!-- Template for future operations -->
-                  <!--
-                  <div class="operation">
-                      <h2>TensorMul</h2>
-                      <div class="phase-grid">
-                          <div class="phase-card">
-                              <h3>Trace Generation</h3>
-                              <a href="../TensorMul/trace_generation/report/">View Results</a>
-                          </div>
-                          <div class="phase-card">
-                              <h3>Proving</h3>
-                              <a href="../TensorMul/proving/report/">View Results</a>
-                          </div>
-                          <div class="phase-card">
-                              <h3>Verification</h3>
-                              <a href="../TensorMul/verification/report/">View Results</a>
-                          </div>
-                      </div>
-                  </div>
-                  -->
               </div>
           </body>
           </html>
@@ -169,11 +168,11 @@ jobs:
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Rust Circuit Benchmarks
-          tool: 'criterion'
-          output-file-path: output.txt
+          tool: customSmallerIsBetter
+          output-file-path: output.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
-          alert-threshold: '150%'
+          alert-threshold: "150%"
           comment-on-alert: true
           fail-on-alert: true
           gh-pages-branch: gh-pages
