@@ -26,6 +26,12 @@ jobs:
           channel: stable
           cache-target: release
 
+      - name: Clean Previous Benchmark Data
+        run: |
+          if [ -d ./target/criterion ]; then
+            rm -rf ./target/criterion
+          fi
+
       - name: Cache Benchmark Data
         uses: actions/cache@v3
         id: cache-bench
