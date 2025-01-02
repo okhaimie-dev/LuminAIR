@@ -65,6 +65,17 @@ jobs:
         uses: joshua-auchincloss/criterion-pages@v1
         with:
           path: "./processed_benchmarks"
+          config: |
+            {
+              "title": "LuminAIR Benchmark, by Giza",
+              "header": "Performance Metrics on supported operators",
+              "description": "Performance benchmarks for tensor operators (stwo-backend support)"
+              "css": {
+                "footer": {
+                  "display": "none"
+                }
+              }
+            }
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v3
