@@ -61,6 +61,33 @@ jobs:
             mv "TensorAdd_tracing" "trace"
           fi
 
+      - name: Create Custom Index Template
+        run: |
+          cat > processed_benchmarks/custom_index.html << 'EOL'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="utf-8">
+              <title>LuminAIR Benchmark, by Giza</title>
+              <style>
+                  .footer { display: none !important; }
+                  body { font-family: Arial, sans-serif; }
+                  h1 { font-size: 2.5em; text-align: center; color: #333; }
+                  .header { text-align: center; margin-bottom: 2em; }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <h1>Performance Metrics on Supported Operators</h1>
+                  <p>Performance benchmarks for tensor operators (stwo-backend support)</p>
+              </div>
+              <div class="content">
+                  <!-- Include benchmark results here -->
+              </div>
+          </body>
+          </html>
+          EOL
+
       - name: Process Benchmark Results
         uses: joshua-auchincloss/criterion-pages@v1
         with:
@@ -89,33 +116,6 @@ jobs:
                 "index": "./processed_benchmarks/custom_index.html"
               }
             }
-            
-      - name: Create Custom Index Template
-        run: |
-          cat > processed_benchmarks/custom_index.html << 'EOL'
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <meta charset="utf-8">
-              <title>${title}</title>
-              <style>
-                  .footer { display: none !important; }
-                  body { font-family: Arial, sans-serif; }
-                  h1 { font-size: 2.5em; text-align: center; color: #333; }
-                  .header { text-align: center; margin-bottom: 2em; }
-              </style>
-          </head>
-          <body>
-              <div class="header">
-                  <h1>${header}</h1>
-                  <p>${description}</p>
-              </div>
-              <div class="content">
-                  ${content}
-              </div>
-          </body>
-          </html>
-          EOL            
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v3
 
