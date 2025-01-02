@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::circuits::Tensor;
 use parking_lot::Mutex;
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use stwo_prover::core::backend::Column;
+use stwo_prover::core::backend::{Backend, Column, CpuBackend};
 use stwo_prover::core::{
     backend::{
         simd::{m31::LOG_N_LANES, SimdBackend},
@@ -17,7 +17,57 @@ use stwo_prover::core::{
     ColumnVec,
 };
 
-pub fn generate_trace(
+pub trait TensorAddTracer {
+    fn generate_trace(
+        log_size: u32,
+        a: &Tensor,
+        b: &Tensor,
+    ) -> (
+        ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
+        Tensor,
+    )
+    where
+        Self: Backend;
+}
+
+impl TensorAddTracer for CpuBackend {
+    fn generate_trace(
+        log_size: u32,
+        a: &Tensor,
+        b: &Tensor,
+    ) -> (
+        ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
+        Tensor,
+    ) {
+        generate_trace_cpu(log_size, a, b)
+    }
+}
+
+impl TensorAddTracer for SimdBackend {
+    fn generate_trace(
+        log_size: u32,
+        a: &Tensor,
+        b: &Tensor,
+    ) -> (
+        ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
+        Tensor,
+    ) {
+        generate_trace_simd(log_size, a, b)
+    }
+}
+
+fn generate_trace_cpu(
+    log_size: u32,
+    a: &Tensor,
+    b: &Tensor,
+) -> (
+    ColumnVec<CircleEvaluation<CpuBackend, BaseField, BitReversedOrder>>,
+    Tensor,
+) {
+    todo!()
+}
+
+fn generate_trace_simd(
     log_size: u32,
     a: &Tensor,
     b: &Tensor,
@@ -197,7 +247,8 @@ mod tests {
                 + LOG_N_LANES;
 
             // Generate trace and get result tensor
-            let (trace, result) = generate_trace(required_log_size, &tensor_a, &tensor_b);
+            let (trace, result) =
+                SimdBackend::generate_trace(required_log_size, &tensor_a, &tensor_b);
 
             // Check trace size
             assert_eq!(
@@ -276,6 +327,6 @@ mod tests {
         );
 
         let log_size = LOG_N_LANES + 1;
-        generate_trace(log_size, &tensor_a, &tensor_b); // Should panic
+        SimdBackend::generate_trace(log_size, &tensor_a, &tensor_b); // Should panic
     }
 }

@@ -1,11 +1,8 @@
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use stwo_prover::core::{
     backend::{
-        simd::{
-            m31::{PackedBaseField, LOG_N_LANES},
-            SimdBackend,
-        },
-        BackendForChannel,
+        simd::m31::{PackedBaseField, LOG_N_LANES},
+        Backend, BackendForChannel,
     },
     channel::MerkleChannel,
     fields::m31::BaseField,
@@ -15,7 +12,7 @@ use stwo_prover::core::{
 
 pub mod add;
 
-pub trait Circuit {
+pub trait Circuit<B: Backend> {
     type Component;
     type Proof<'a, H: MerkleHasher>;
     type Error;
@@ -30,7 +27,7 @@ pub trait Circuit {
         config: PcsConfig,
     ) -> (Vec<Self::Component>, Self::Proof<'a, MC::H>)
     where
-        SimdBackend: BackendForChannel<MC>;
+        B: BackendForChannel<MC>;
 
     /// Verifies a proof
     fn verify<'a, MC: MerkleChannel>(

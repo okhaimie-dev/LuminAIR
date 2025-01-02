@@ -1,14 +1,14 @@
 use component::{TensorAddComponent, TensorAddEval};
 use stwo_prover::{
-    constraint_framework::TraceLocationAllocator,
+    constraint_framework::{FrameworkComponent, TraceLocationAllocator},
     core::{
-        air::Component,
-        backend::{simd::SimdBackend, BackendForChannel},
+        air::{Component, ComponentProver},
+        backend::{Backend, BackendForChannel},
         channel::MerkleChannel,
         fields::m31::BaseField,
         pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
         poly::{
-            circle::{CanonicCoset, CircleEvaluation, PolyOps},
+            circle::{CanonicCoset, CircleEvaluation},
             BitReversedOrder,
         },
         prover::{prove, verify, StarkProof, VerificationError},
@@ -16,7 +16,7 @@ use stwo_prover::{
         ColumnVec,
     },
 };
-use trace::generate_trace;
+use trace::TensorAddTracer;
 
 use super::{Circuit, Tensor};
 
@@ -33,14 +33,17 @@ pub struct TensorAdd<'a> {
     pub log_size: u32,
 }
 
-impl<'t> Circuit for TensorAdd<'t> {
+impl<'t, B: Backend + TensorAddTracer> Circuit<B> for TensorAdd<'t>
+where
+    FrameworkComponent<TensorAddEval>: ComponentProver<B>,
+{
     type Component = TensorAddComponent;
     type Proof<'a, H: MerkleHasher> = TensorAddProof<H>;
     type Error = VerificationError;
-    type Trace = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
+    type Trace = ColumnVec<CircleEvaluation<B, BaseField, BitReversedOrder>>;
 
     fn generate_trace(&self) -> Self::Trace {
-        let (trace, _c) = generate_trace(self.log_size, self.a, self.b);
+        let (trace, _c) = B::generate_trace(self.log_size, self.a, self.b);
 
         trace
     }
@@ -50,10 +53,10 @@ impl<'t> Circuit for TensorAdd<'t> {
         config: PcsConfig,
     ) -> (Vec<Self::Component>, Self::Proof<'a, MC::H>)
     where
-        SimdBackend: BackendForChannel<MC>,
+        B: BackendForChannel<MC>,
     {
         // Precompute twiddles
-        let twiddles = SimdBackend::precompute_twiddles(
+        let twiddles = B::precompute_twiddles(
             CanonicCoset::new(trace[0].domain.log_size() + 1 + config.fri_config.log_blowup_factor)
                 .circle_domain()
                 .half_coset,
@@ -61,8 +64,7 @@ impl<'t> Circuit for TensorAdd<'t> {
 
         // Setup protocol
         let channel = &mut MC::C::default();
-        let mut commitment_scheme =
-            CommitmentSchemeProver::<SimdBackend, MC>::new(config, &twiddles);
+        let mut commitment_scheme = CommitmentSchemeProver::<B, MC>::new(config, &twiddles);
 
         // Create component
         let component = TensorAddComponent::new(
@@ -84,8 +86,8 @@ impl<'t> Circuit for TensorAdd<'t> {
         tree_builder.commit(channel);
 
         // Generate proof
-        let stark_proof = prove::<SimdBackend, MC>(
-            &[&component as &dyn stwo_prover::core::air::ComponentProver<SimdBackend>],
+        let stark_proof = prove::<B, MC>(
+            &[&component as &dyn stwo_prover::core::air::ComponentProver<B>],
             channel,
             commitment_scheme,
         )
