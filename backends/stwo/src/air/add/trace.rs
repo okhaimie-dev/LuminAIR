@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::circuits::{Tensor, TensorField};
+use crate::air::{Tensor, TensorField};
 use parking_lot::Mutex;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use stwo_prover::core::backend::simd::m31::PackedBaseField;

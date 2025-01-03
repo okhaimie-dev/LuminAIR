@@ -1,2 +1,2 @@
-pub mod circuits;
+pub mod air;
 pub mod compilers;

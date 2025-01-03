@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use stwo::circuits::{add::TensorAdd, Circuit, Tensor};
+use stwo::air::{add::TensorAdd, Circuit, Tensor};
 use stwo_prover::core::{
     backend::simd::m31::{PackedBaseField, LOG_N_LANES},
     fields::m31::BaseField,
