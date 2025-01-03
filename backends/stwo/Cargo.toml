@@ -19,3 +19,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name = "tensor_ops"
 harness = false
+
+[package.metadata.resolver]
+[patch.crates-io]
+home = "=0.5.10"
