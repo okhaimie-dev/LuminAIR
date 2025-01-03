@@ -13,3 +13,7 @@ license-file = "LICENSE"
 luminal = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
 luminal_cpu = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
 luminal_nn = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
+
+[workspace.metadata.resolver]
+[patch.crates-io]
+home = "=0.5.10"
