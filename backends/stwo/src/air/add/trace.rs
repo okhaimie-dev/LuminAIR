@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::air::{Tensor, TensorField};
+use crate::air::tensor::{AirTensor, TensorField};
 use parking_lot::Mutex;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use stwo_prover::core::backend::simd::m31::PackedBaseField;
@@ -21,11 +21,11 @@ use stwo_prover::core::{
 pub trait TensorAddTracer<F: TensorField> {
     fn generate_trace(
         log_size: u32,
-        a: &Tensor<F>,
-        b: &Tensor<F>,
+        a: &AirTensor<F>,
+        b: &AirTensor<F>,
     ) -> (
         ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        Tensor<F>,
+        AirTensor<F>,
     )
     where
         Self: Backend;
@@ -34,11 +34,11 @@ pub trait TensorAddTracer<F: TensorField> {
 impl TensorAddTracer<BaseField> for CpuBackend {
     fn generate_trace(
         log_size: u32,
-        a: &Tensor<BaseField>,
-        b: &Tensor<BaseField>,
+        a: &AirTensor<BaseField>,
+        b: &AirTensor<BaseField>,
     ) -> (
         ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        Tensor<BaseField>,
+        AirTensor<BaseField>,
     ) {
         generate_trace_cpu(log_size, a, b)
     }
@@ -47,11 +47,11 @@ impl TensorAddTracer<BaseField> for CpuBackend {
 impl TensorAddTracer<PackedBaseField> for SimdBackend {
     fn generate_trace(
         log_size: u32,
-        a: &Tensor<PackedBaseField>,
-        b: &Tensor<PackedBaseField>,
+        a: &AirTensor<PackedBaseField>,
+        b: &AirTensor<PackedBaseField>,
     ) -> (
         ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        Tensor<PackedBaseField>,
+        AirTensor<PackedBaseField>,
     ) {
         generate_trace_simd(log_size, a, b)
     }
@@ -59,22 +59,22 @@ impl TensorAddTracer<PackedBaseField> for SimdBackend {
 
 fn generate_trace_cpu(
     _log_size: u32,
-    _a: &Tensor<BaseField>,
-    _b: &Tensor<BaseField>,
+    _a: &AirTensor<BaseField>,
+    _b: &AirTensor<BaseField>,
 ) -> (
     ColumnVec<CircleEvaluation<CpuBackend, BaseField, BitReversedOrder>>,
-    Tensor<BaseField>,
+    AirTensor<BaseField>,
 ) {
     todo!()
 }
 
 fn generate_trace_simd(
     log_size: u32,
-    a: &Tensor<PackedBaseField>,
-    b: &Tensor<PackedBaseField>,
+    a: &AirTensor<PackedBaseField>,
+    b: &AirTensor<PackedBaseField>,
 ) -> (
     ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
-    Tensor<PackedBaseField>,
+    AirTensor<PackedBaseField>,
 ) {
     assert!(a.is_broadcastable_with(b), "Tensors must be broadcastable");
 
@@ -145,14 +145,14 @@ fn generate_trace_simd(
     let c_data = Arc::try_unwrap(c_data).unwrap().into_inner();
 
     // Create output tensor C
-    let c = Tensor {
+    let c = AirTensor {
         data: c_data,
         dims: if a.size() > b.size() {
             a.dims().to_vec()
         } else {
             b.dims().to_vec()
         },
-        stride: Tensor::<PackedBaseField>::compute_stride(if a.size() > b.size() {
+        stride: AirTensor::<PackedBaseField>::compute_stride(if a.size() > b.size() {
             a.dims()
         } else {
             b.dims()
@@ -176,7 +176,7 @@ mod tests {
     use stwo_prover::core::backend::simd::m31::PackedBaseField;
     use stwo_prover::core::fields::m31::BaseField;
 
-    fn unpack_tensor(tensor: &Tensor<PackedBaseField>) -> Vec<u32> {
+    fn unpack_tensor(tensor: &AirTensor<PackedBaseField>) -> Vec<u32> {
         tensor
             .data()
             .iter()
@@ -191,11 +191,11 @@ mod tests {
         let test_cases = vec![
             // Case 1: Simple 2x2 matrices
             (
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 4],
                     vec![2, 2],
                 ),
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 4],
                     vec![2, 2],
                 ),
@@ -204,11 +204,11 @@ mod tests {
             ),
             // Case 2: Broadcasting scalar to matrix
             (
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(5))],
                     vec![1],
                 ),
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
                     vec![2, 3],
                 ),
@@ -217,11 +217,11 @@ mod tests {
             ),
             // Case 3: Broadcasting row to matrix
             (
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 3],
                     vec![1, 3],
                 ),
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 6],
                     vec![2, 3],
                 ),
@@ -230,8 +230,8 @@ mod tests {
             ),
             // Case 4: Different values in matrices
             (
-                Tensor::create::<SimdBackend>(vec![1, 2, 3, 4], vec![2, 2]),
-                Tensor::create::<SimdBackend>(vec![5, 6, 7, 8], vec![2, 2]),
+                AirTensor::create::<SimdBackend>(vec![1, 2, 3, 4], vec![2, 2]),
+                AirTensor::create::<SimdBackend>(vec![5, 6, 7, 8], vec![2, 2]),
                 vec![2, 2],
                 vec![6, 8, 10, 12], // Element-wise addition
             ),
@@ -318,11 +318,11 @@ mod tests {
     #[should_panic(expected = "Tensors must be broadcastable")]
     fn test_generate_trace_non_broadcastable() {
         // Try to add incompatible tensors: 2x3 and 3x2
-        let tensor_a = Tensor::new(
+        let tensor_a = AirTensor::new(
             vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
             vec![2, 3],
         );
-        let tensor_b = Tensor::new(
+        let tensor_b = AirTensor::new(
             vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
             vec![3, 2],
         );

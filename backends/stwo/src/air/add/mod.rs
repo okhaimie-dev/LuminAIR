@@ -18,7 +18,10 @@ use stwo_prover::{
 };
 use trace::TensorAddTracer;
 
-use super::{Circuit, Tensor, TensorField};
+use super::{
+    tensor::{AirTensor, TensorField},
+    Circuit,
+};
 
 pub mod component;
 pub mod trace;
@@ -28,8 +31,8 @@ pub struct TensorAddProof<H: MerkleHasher> {
 }
 
 pub struct TensorAdd<'a, F: TensorField> {
-    pub a: &'a Tensor<F>,
-    pub b: &'a Tensor<F>,
+    pub a: &'a AirTensor<F>,
+    pub b: &'a AirTensor<F>,
     pub log_size: u32,
 }
 
@@ -148,66 +151,66 @@ mod tests {
         let test_cases = vec![
             // Case 1: Same shape tensors (2x2)
             (
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 4],
                     vec![2, 2],
                 ),
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 4],
                     vec![2, 2],
                 ),
             ),
             // Case 2: Broadcasting scalar to matrix (1 -> 2x3)
             (
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(5))],
                     vec![1],
                 ),
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
                     vec![2, 3],
                 ),
             ),
             // Case 3: Broadcasting row to matrix (1x3 -> 2x3)
             (
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 3],
                     vec![1, 3],
                 ),
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 6],
                     vec![2, 3],
                 ),
             ),
             // Case 4: Broadcasting column to matrix (2x1 -> 2x3)
             (
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(3)); 2],
                     vec![2, 1],
                 ),
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
                     vec![2, 3],
                 ),
             ),
             // Case 5: Different rank tensors (1x1x3 -> 2x1x3)
             (
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 3],
                     vec![1, 1, 3],
                 ),
-                Tensor::new(
+                AirTensor::new(
                     vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(3)); 6],
                     vec![2, 1, 3],
                 ),
             ),
             // Case 6: Large matrices
             (
-                Tensor::create::<SimdBackend>(
+                AirTensor::create::<SimdBackend>(
                     (0..50 * 50).map(|i| i as u32).collect(),
                     vec![50, 50],
                 ),
-                Tensor::create::<SimdBackend>((0..50).map(|i| i as u32).collect(), vec![50, 1]),
+                AirTensor::create::<SimdBackend>((0..50).map(|i| i as u32).collect(), vec![50, 1]),
             ),
         ];
 

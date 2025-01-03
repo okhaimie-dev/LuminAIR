@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use stwo::air::{add::TensorAdd, Circuit, Tensor};
+use stwo::air::{add::TensorAdd, tensor::AirTensor, Circuit};
 use stwo_prover::core::{
     backend::simd::m31::{PackedBaseField, LOG_N_LANES},
     fields::m31::BaseField,
@@ -9,19 +9,19 @@ use stwo_prover::core::{
 
 fn get_test_cases() -> Vec<(
     String,
-    Tensor<PackedBaseField>,
-    Tensor<PackedBaseField>,
+    AirTensor<PackedBaseField>,
+    AirTensor<PackedBaseField>,
     u32,
 )> {
     vec![
         // Small matrices (2x2)
         (
             "2x2_+_2x2".to_string(),
-            Tensor::new(
+            AirTensor::new(
                 vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 4],
                 vec![2, 2],
             ),
-            Tensor::new(
+            AirTensor::new(
                 vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 4],
                 vec![2, 2],
             ),
@@ -30,11 +30,11 @@ fn get_test_cases() -> Vec<(
         // Medium matrices (50x50)
         (
             "50x50_+_50x1".to_string(),
-            Tensor::new(
+            AirTensor::new(
                 vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 50 * 50],
                 vec![50, 50],
             ),
-            Tensor::new(
+            AirTensor::new(
                 vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 50],
                 vec![50, 1],
             ),
@@ -43,11 +43,11 @@ fn get_test_cases() -> Vec<(
         // Large matrices (100x100)
         (
             "100x100_+_100x1".to_string(),
-            Tensor::new(
+            AirTensor::new(
                 vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 100 * 100],
                 vec![100, 100],
             ),
-            Tensor::new(
+            AirTensor::new(
                 vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 100],
                 vec![100, 1],
             ),
