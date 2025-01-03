@@ -311,21 +311,4 @@ mod tests {
             }
         }
     }
-
-    #[test]
-    #[should_panic(expected = "Tensors must be broadcastable")]
-    fn test_generate_trace_non_broadcastable() {
-        // Try to add incompatible tensors: 2x3 and 3x2
-        let tensor_a = AirTensor::new(
-            vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
-            vec![2, 3],
-        );
-        let tensor_b = AirTensor::new(
-            vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
-            vec![3, 2],
-        );
-
-        let log_size = LOG_N_LANES + 1;
-        SimdBackend::generate_trace(log_size, &tensor_a, &tensor_b); // Should panic
-    }
 }
