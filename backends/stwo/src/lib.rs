@@ -1,2 +1,2 @@
 pub mod air;
-pub mod compilers;
+pub mod compiler;
