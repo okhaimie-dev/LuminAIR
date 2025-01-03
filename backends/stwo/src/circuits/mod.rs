@@ -1,7 +1,10 @@
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use stwo_prover::core::{
     backend::{
-        simd::{m31::{PackedBaseField, LOG_N_LANES}, SimdBackend},
+        simd::{
+            m31::{PackedBaseField, LOG_N_LANES},
+            SimdBackend,
+        },
         Backend, BackendForChannel, CpuBackend,
     },
     channel::MerkleChannel,
@@ -120,7 +123,7 @@ pub trait TensorPacker {
 impl TensorPacker for CpuBackend {
     type Field = BaseField;
 
-    fn pack_data(data: Vec<u32>, dims: &[usize]) -> Vec<Self::Field> {
+    fn pack_data(data: Vec<u32>, _dims: &[usize]) -> Vec<Self::Field> {
         data.into_iter()
             .map(|x| BaseField::from_u32_unchecked(x % 1000))
             .collect()

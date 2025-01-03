@@ -58,9 +58,9 @@ impl TensorAddTracer<PackedBaseField> for SimdBackend {
 }
 
 fn generate_trace_cpu(
-    log_size: u32,
-    a: &Tensor<BaseField>,
-    b: &Tensor<BaseField>,
+    _log_size: u32,
+    _a: &Tensor<BaseField>,
+    _b: &Tensor<BaseField>,
 ) -> (
     ColumnVec<CircleEvaluation<CpuBackend, BaseField, BitReversedOrder>>,
     Tensor<BaseField>,
