@@ -28,7 +28,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2024-01-04
+          toolchain: nightly-2025-01-02
 
       - name: Clean Previous Benchmark Data
         run: |
