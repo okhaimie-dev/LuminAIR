@@ -31,8 +31,8 @@ pub struct TensorAddProof<H: MerkleHasher> {
 }
 
 pub struct TensorAdd<'a, F: TensorField> {
-    pub a: &'a AirTensor<F>,
-    pub b: &'a AirTensor<F>,
+    pub a: &'a AirTensor<'a, F>,
+    pub b: &'a AirTensor<'a, F>,
     pub log_size: u32,
 }
 
@@ -148,61 +148,41 @@ mod tests {
         let config = PcsConfig::default();
 
         // Test cases with different shapes
+        let binding_a_1 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 4];
+        let binding_b_1 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 4];
+        let binding_a_2 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(5))];
+        let binding_b_2 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6];
+        let binding_a_3 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 3];
+        let binding_b_3 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 6];
+        let binding_a_4 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(3)); 2];
+        let binding_b_4 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6];
+        let binding_a_5 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 3];
+        let binding_b_5 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(3)); 6];
         let test_cases = vec![
             // Case 1: Same shape tensors (2x2)
             (
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 4],
-                    vec![2, 2],
-                ),
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 4],
-                    vec![2, 2],
-                ),
+                AirTensor::new(&binding_a_1, vec![2, 2]),
+                AirTensor::new(&binding_b_1, vec![2, 2]),
             ),
             // Case 2: Broadcasting scalar to matrix (1 -> 2x3)
             (
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(5))],
-                    vec![1],
-                ),
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
-                    vec![2, 3],
-                ),
+                AirTensor::new(&binding_a_2, vec![1]),
+                AirTensor::new(&binding_b_2, vec![2, 3]),
             ),
             // Case 3: Broadcasting row to matrix (1x3 -> 2x3)
             (
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 3],
-                    vec![1, 3],
-                ),
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 6],
-                    vec![2, 3],
-                ),
+                AirTensor::new(&binding_a_3, vec![1, 3]),
+                AirTensor::new(&binding_b_3, vec![2, 3]),
             ),
             // Case 4: Broadcasting column to matrix (2x1 -> 2x3)
             (
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(3)); 2],
-                    vec![2, 1],
-                ),
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
-                    vec![2, 3],
-                ),
+                AirTensor::new(&binding_a_4, vec![2, 1]),
+                AirTensor::new(&binding_b_4, vec![2, 3]),
             ),
             // Case 5: Different rank tensors (1x1x3 -> 2x1x3)
             (
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 3],
-                    vec![1, 1, 3],
-                ),
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(3)); 6],
-                    vec![2, 1, 3],
-                ),
+                AirTensor::new(&binding_a_5, vec![1, 1, 3]),
+                AirTensor::new(&binding_b_5, vec![2, 1, 3]),
             ),
             // Case 6: Large matrices
             (

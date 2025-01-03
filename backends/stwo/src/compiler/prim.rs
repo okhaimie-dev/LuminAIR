@@ -62,13 +62,13 @@ where
             .as_slice();
 
         // Create AirTensors
-        let a = AirTensor {
-            data: a_data.to_vec(), // TODO(@raphaelDkhn): avoid cloning
+        let a = AirTensor::Borrowed {
+            data: a_data,
             dims: inp[0].1.shape_usize(),
             stride: AirTensor::<D::Field>::compute_stride(&inp[0].1.shape_usize()),
         };
-        let b = AirTensor {
-            data: b_data.to_vec(), // TODO(@raphaelDkhn): avoid cloning
+        let b = AirTensor::Borrowed {
+            data: b_data,
             dims: inp[1].1.shape_usize(),
             stride: AirTensor::<D::Field>::compute_stride(&inp[1].1.shape_usize()),
         };
@@ -84,7 +84,7 @@ where
         let (_, result) = B::generate_trace(required_log_size, &a, &b);
 
         // Convert result back to Tensor
-        vec![Tensor::new(D::from_tensor_field(result.data))]
+        vec![Tensor::new(D::from_tensor_field(result.data().to_vec()))]
     }
 }
 

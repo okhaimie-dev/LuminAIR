@@ -19,62 +19,62 @@ use stwo_prover::core::{
 };
 
 pub trait TensorAddTracer<F: TensorField> {
-    fn generate_trace(
+    fn generate_trace<'a>(
         log_size: u32,
-        a: &AirTensor<F>,
-        b: &AirTensor<F>,
+        a: &'a AirTensor<'a, F>,
+        b: &'a AirTensor<'a, F>,
     ) -> (
         ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        AirTensor<F>,
+        AirTensor<'a, F>,
     )
     where
         Self: Backend;
 }
 
 impl TensorAddTracer<BaseField> for CpuBackend {
-    fn generate_trace(
+    fn generate_trace<'a>(
         log_size: u32,
-        a: &AirTensor<BaseField>,
-        b: &AirTensor<BaseField>,
+        a: &'a AirTensor<'a, BaseField>,
+        b: &'a AirTensor<'a, BaseField>,
     ) -> (
         ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        AirTensor<BaseField>,
+        AirTensor<'a, BaseField>,
     ) {
         generate_trace_cpu(log_size, a, b)
     }
 }
 
 impl TensorAddTracer<PackedBaseField> for SimdBackend {
-    fn generate_trace(
+    fn generate_trace<'a>(
         log_size: u32,
-        a: &AirTensor<PackedBaseField>,
-        b: &AirTensor<PackedBaseField>,
+        a: &'a AirTensor<'a, PackedBaseField>,
+        b: &'a AirTensor<'a, PackedBaseField>,
     ) -> (
         ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        AirTensor<PackedBaseField>,
+        AirTensor<'a, PackedBaseField>,
     ) {
         generate_trace_simd(log_size, a, b)
     }
 }
 
-fn generate_trace_cpu(
+fn generate_trace_cpu<'a>(
     _log_size: u32,
-    _a: &AirTensor<BaseField>,
-    _b: &AirTensor<BaseField>,
+    _a: &'a AirTensor<'a, BaseField>,
+    _b: &'a AirTensor<'a, BaseField>,
 ) -> (
     ColumnVec<CircleEvaluation<CpuBackend, BaseField, BitReversedOrder>>,
-    AirTensor<BaseField>,
+    AirTensor<'a, BaseField>,
 ) {
     todo!()
 }
 
-fn generate_trace_simd(
+fn generate_trace_simd<'a>(
     log_size: u32,
-    a: &AirTensor<PackedBaseField>,
-    b: &AirTensor<PackedBaseField>,
+    a: &'a AirTensor<'a, PackedBaseField>,
+    b: &'a AirTensor<'a, PackedBaseField>,
 ) -> (
     ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
-    AirTensor<PackedBaseField>,
+    AirTensor<'static, PackedBaseField>,
 ) {
     // Calculate required trace size
     let max_size = a.size().max(b.size());
@@ -143,7 +143,7 @@ fn generate_trace_simd(
     let c_data = Arc::try_unwrap(c_data).unwrap().into_inner();
 
     // Create output tensor C
-    let c = AirTensor {
+    let c = AirTensor::Owned {
         data: c_data,
         dims: if a.size() > b.size() {
             a.dims().to_vec()
@@ -186,43 +186,31 @@ mod tests {
 
     #[test]
     fn test_generate_trace_correctness() {
+        let binding_a_1 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 4];
+        let binding_b_1 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 4];
+        let binding_a_2 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(5))];
+        let binding_b_2 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6];
+        let binding_a_3 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 3];
+        let binding_b_3 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 6];
         let test_cases = vec![
             // Case 1: Simple 2x2 matrices
             (
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 4],
-                    vec![2, 2],
-                ),
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 4],
-                    vec![2, 2],
-                ),
+                AirTensor::new(&binding_a_1, vec![2, 2]),
+                AirTensor::new(&binding_b_1, vec![2, 2]),
                 vec![2, 2],
                 vec![3u32; 4], // Expected result: 1 + 2 = 3 for all elements
             ),
             // Case 2: Broadcasting scalar to matrix
             (
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(5))],
-                    vec![1],
-                ),
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6],
-                    vec![2, 3],
-                ),
+                AirTensor::new(&binding_a_2, vec![1]),
+                AirTensor::new(&binding_b_2, vec![2, 3]),
                 vec![2, 3],
                 vec![6u32; 6], // Expected result: 5 + 1 = 6 for all elements
             ),
             // Case 3: Broadcasting row to matrix
             (
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 3],
-                    vec![1, 3],
-                ),
-                AirTensor::new(
-                    vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 6],
-                    vec![2, 3],
-                ),
+                AirTensor::new(&binding_a_3, vec![1, 3]),
+                AirTensor::new(&binding_b_3, vec![2, 3]),
                 vec![2, 3],
                 vec![3u32; 6], // Expected result: 1 + 2 = 3 for all elements
             ),

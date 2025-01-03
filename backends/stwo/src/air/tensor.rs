@@ -27,28 +27,48 @@ impl TensorField for PackedBaseField {
 }
 
 #[derive(Clone, Debug)]
-pub struct AirTensor<F: TensorField> {
-    pub data: Vec<F>,
-    pub dims: Vec<usize>,
-    pub stride: Vec<usize>,
+pub enum AirTensor<'a, F: TensorField> {
+    Borrowed {
+        data: &'a [F],
+        dims: Vec<usize>,
+        stride: Vec<usize>,
+    },
+    Owned {
+        data: Vec<F>,
+        dims: Vec<usize>,
+        stride: Vec<usize>,
+    },
 }
-
-impl<F: TensorField> AirTensor<F> {
-    pub fn new(data: Vec<F>, dims: Vec<usize>) -> Self {
+impl<'a, F: TensorField> AirTensor<'a, F> {
+    pub fn new(data: &'a [F], dims: Vec<usize>) -> Self {
         let stride = Self::compute_stride(&dims);
-        Self { data, dims, stride }
+        Self::Borrowed { data, dims, stride }
+    }
+
+    pub fn from_vec(data: Vec<F>, dims: Vec<usize>) -> Self {
+        let stride = Self::compute_stride(&dims);
+        Self::Owned { data, dims, stride }
     }
 
     pub fn dims(&self) -> &[usize] {
-        &self.dims
+        match self {
+            Self::Borrowed { dims, .. } => dims,
+            Self::Owned { dims, .. } => dims,
+        }
     }
 
     pub fn stride(&self) -> &[usize] {
-        &self.stride
+        match self {
+            Self::Borrowed { stride, .. } => stride,
+            Self::Owned { stride, .. } => stride,
+        }
     }
 
     pub fn data(&self) -> &[F] {
-        &self.data
+        match self {
+            Self::Borrowed { data, .. } => data,
+            Self::Owned { data, .. } => data,
+        }
     }
 
     pub fn compute_stride(dims: &[usize]) -> Vec<usize> {
@@ -60,7 +80,7 @@ impl<F: TensorField> AirTensor<F> {
     }
 
     pub fn size(&self) -> usize {
-        self.dims.iter().product()
+        self.dims().iter().product()
     }
 }
 
@@ -109,9 +129,9 @@ impl TensorPacker for SimdBackend {
 }
 
 // Helper function to create tensors for specific backends
-impl<F: TensorField> AirTensor<F> {
+impl<F: TensorField> AirTensor<'_, F> {
     pub fn create<B: Backend + TensorPacker<Field = F>>(data: Vec<u32>, dims: Vec<usize>) -> Self {
         let packed_data = B::pack_data(data, &dims);
-        Self::new(packed_data, dims)
+        Self::from_vec(packed_data, dims)
     }
 }
