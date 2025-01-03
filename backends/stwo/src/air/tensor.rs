@@ -62,26 +62,6 @@ impl<F: TensorField> AirTensor<F> {
     pub fn size(&self) -> usize {
         self.dims.iter().product()
     }
-
-    pub fn is_broadcastable_with<G: TensorField>(&self, other: &AirTensor<G>) -> bool {
-        let max_dims = self.dims.len().max(other.dims.len());
-        let pad_self = max_dims - self.dims.len();
-        let pad_other = max_dims - other.dims.len();
-
-        (0..max_dims).all(|i| {
-            let dim_self = if i < pad_self {
-                1
-            } else {
-                self.dims[i - pad_self]
-            };
-            let dim_other = if i < pad_other {
-                1
-            } else {
-                other.dims[i - pad_other]
-            };
-            dim_self == dim_other || dim_self == 1 || dim_other == 1
-        })
-    }
 }
 
 pub trait TensorPacker {
@@ -133,23 +113,5 @@ impl<F: TensorField> AirTensor<F> {
     pub fn create<B: Backend + TensorPacker<Field = F>>(data: Vec<u32>, dims: Vec<usize>) -> Self {
         let packed_data = B::pack_data(data, &dims);
         Self::new(packed_data, dims)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_tensor_broadcasting() {
-        let a = AirTensor::new(
-            vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 2],
-            vec![2, 1],
-        );
-        let b = AirTensor::new(
-            vec![PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 3],
-            vec![1, 3],
-        );
-        assert!(a.is_broadcastable_with(&b));
     }
 }

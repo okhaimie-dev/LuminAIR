@@ -76,8 +76,6 @@ fn generate_trace_simd(
     ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     AirTensor<PackedBaseField>,
 ) {
-    assert!(a.is_broadcastable_with(b), "Tensors must be broadcastable");
-
     // Calculate required trace size
     let max_size = a.size().max(b.size());
     assert!(log_size >= LOG_N_LANES);
