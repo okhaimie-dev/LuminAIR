@@ -11,9 +11,7 @@ impl StwoData {
         &self.0
     }
 
-    // Convert Vec<f32> to Vec<PackedBaseField>
-    pub fn from_f32(data: Vec<f32>) -> Self {
-
+    pub fn from_f32(data: &[f32]) -> Self {
         let n_lanes = 1 << LOG_N_LANES;
         let n_packed = (data.len() + n_lanes - 1) / n_lanes;
 
@@ -23,11 +21,11 @@ impl StwoData {
                 let start = i * n_lanes;
                 let mut values = [0u32; 1 << LOG_N_LANES];
                 
-                // Fill SIMD lanes with values
+                // Fill SIMD lanes
                 for (j, val) in values.iter_mut().enumerate() {
                     let idx = start + j;
                     *val = if idx < data.len() {
-                        data[idx] as u32 // TODO (@raphaelDkn): Implement fixed point strategy
+                        data[idx] as u32  // TODO (@raphaelDkn): Implement fixed point strategy
                     } else {
                         0
                     };
@@ -39,8 +37,6 @@ impl StwoData {
             .collect::<Vec<_>>();
 
         StwoData(Arc::new(packed))
-
-
     }
 }
 
@@ -52,12 +48,5 @@ impl Data for StwoData {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
-    }
-}
-
-// Convert from Vec<f32> to StwoData
-impl From<Vec<f32>> for StwoData {
-    fn from(data: Vec<f32>) -> Self {
-        StwoData::from_f32(data)
     }
 }

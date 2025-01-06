@@ -27,26 +27,18 @@ impl Operator for StwoAdd {
         let (a_tensor, a_shape) = &inp[0];
         let (b_tensor, b_shape) = &inp[1];
 
-        // Convert inputs to StwoData
-        let a_data = if let Some(data) = a_tensor.borrowed().downcast_ref::<Vec<f32>>() {
-            println!("A as f32");
-            StwoData::from_f32(data.clone())
-        } else if let Some(data) = a_tensor.borrowed().downcast_ref::<StwoData>() {
-            println!("A as PackedBaseField");
-            data.clone()
-        } else {
-            panic!("Unsupported input type for StwoAdd");
+        let get_data = |tensor: &InputTensor| {
+            if let Some(data) = tensor.borrowed().downcast_ref::<Vec<f32>>() {
+                StwoData::from_f32(data)
+            } else if let Some(data) = tensor.borrowed().downcast_ref::<StwoData>() {
+                StwoData(Arc::clone(&data.0))
+            } else {
+                panic!("Unsupported input type for StwoAdd");
+            }
         };
 
-        let b_data = if let Some(data) = b_tensor.borrowed().downcast_ref::<Vec<f32>>() {
-            println!("B as f32");
-            StwoData::from_f32(data.clone())
-        } else if let Some(data) = b_tensor.borrowed().downcast_ref::<StwoData>() {
-            println!("B as PackedBaseField");
-            data.clone()
-        } else {
-            panic!("Unsupported input type for StwoAdd");
-        };
+        let a_data = get_data(a_tensor);
+        let b_data = get_data(b_tensor);
 
         // Create AirTensors
         let a = AirTensor::new(a_data.as_slice(), a_shape.shape_usize());
