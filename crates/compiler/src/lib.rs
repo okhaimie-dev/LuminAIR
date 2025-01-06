@@ -1,5 +1,6 @@
 pub mod data;
 pub mod prim;
+pub mod fixed_point;
 
 pub type StwoCompiler<'a> = (prim::PrimitiveCompiler,);
 
