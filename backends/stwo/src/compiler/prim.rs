@@ -1,90 +1,33 @@
+use std::any::{Any, TypeId};
+
 use luminal::prelude::*;
-use std::{
-    any::{Any, TypeId},
-    marker::PhantomData,
-};
-use stwo_prover::core::backend::{
-    simd::{m31::LOG_N_LANES, SimdBackend},
-    Backend,
-};
+use stwo_prover::core::backend::simd::SimdBackend;
 
-use crate::{
-    air::{add::trace::TensorAddTracer, tensor::AirTensor},
-    compiler::data::PackedData,
-};
-
-use super::data::{FromTensorField, TensorData};
+use crate::air::add::trace::TensorAddTracer;
 
 #[derive(Debug)]
 pub struct PrimitiveCompiler {}
 
-////////////// BINARY //////////////
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct StwoAdd<B: Backend + 'static, D> {
-    _phantom: PhantomData<(B, D)>,
-}
-
-impl<B, D> StwoAdd<B, D>
-where
-    B: Backend + 'static + TensorAddTracer<D::Field>,
-    D: TensorData + FromTensorField<D::Field>,
-{
-    pub fn new() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<B, D> Operator for StwoAdd<B, D>
-where
-    B: Backend + 'static + TensorAddTracer<D::Field>,
-    D: TensorData + FromTensorField<D::Field>,
-{
+// ====== BINARY ======
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StwoAdd;
+impl Operator for StwoAdd {
     fn process(&mut self, inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
         if inp.len() != 2 {
             panic!("Add operator requires exactly two input tensors.");
         }
 
-        // Get references to the data
-        let a_data = inp[0]
-            .0
-            .borrowed()
-            .downcast_ref::<D>()
-            .expect("Expected correct tensor data type")
-            .as_slice();
-        let b_data = inp[1]
-            .0
-            .borrowed()
-            .downcast_ref::<D>()
-            .expect("Expected correct tensor data type")
-            .as_slice();
+        // TODO:
+        // - convert inputs A and B into AirTensors for SIMD backend 
+        // - calculate log_size
 
-        // Create AirTensors
-        let a = AirTensor::Borrowed {
-            data: a_data,
-            dims: inp[0].1.shape_usize(),
-            stride: AirTensor::<D::Field>::compute_stride(&inp[0].1.shape_usize()),
-        };
-        let b = AirTensor::Borrowed {
-            data: b_data,
-            dims: inp[1].1.shape_usize(),
-            stride: AirTensor::<D::Field>::compute_stride(&inp[1].1.shape_usize()),
-        };
+        let (_trace, c) = SimdBackend::generate_trace(todo!(), todo!(), todo!());
 
-        // Calculate required log_size based on tensor dimensions
-        let max_size = a.size().max(b.size());
-        let required_log_size = ((max_size + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES)
-            .next_power_of_two()
-            .trailing_zeros()
-            + LOG_N_LANES;
+        // TODO: 
+        // - convert result C into luminal Tensor
+        // - return vec![c_tensor]
 
-        // Generate trace and get result
-        let (_, result) = B::generate_trace(required_log_size, &a, &b);
-
-        // Convert result back to Tensor
-        vec![Tensor::new(D::from_tensor_field(result.data().to_vec()))]
+        todo!()
     }
 }
 
@@ -101,8 +44,7 @@ impl Compiler for PrimitiveCompiler {
             let op_ref = graph.graph.node_weight_mut(id).unwrap();
 
             if is::<Add>(op) {
-                // TODO(@raphaelDkhn): make backend and data type configurable
-                *op_ref = Box::new(StwoAdd::<SimdBackend, PackedData>::new());
+                *op_ref = Box::new(StwoAdd)
             } else if is::<Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
             } else {

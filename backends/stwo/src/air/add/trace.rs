@@ -149,12 +149,7 @@ fn generate_trace_simd<'a>(
             a.dims().to_vec()
         } else {
             b.dims().to_vec()
-        },
-        stride: AirTensor::<PackedBaseField>::compute_stride(if a.size() > b.size() {
-            a.dims()
-        } else {
-            b.dims()
-        }),
+        }
     };
 
     let domain = CanonicCoset::new(log_size).circle_domain();

@@ -26,28 +26,26 @@ impl TensorField for PackedBaseField {
     }
 }
 
+pub type LuminairSlice<'a, F> = &'a [F];
+
 #[derive(Clone, Debug)]
 pub enum AirTensor<'a, F: TensorField> {
     Borrowed {
-        data: &'a [F],
+        data: LuminairSlice<'a, F>,
         dims: Vec<usize>,
-        stride: Vec<usize>,
     },
     Owned {
         data: Vec<F>,
         dims: Vec<usize>,
-        stride: Vec<usize>,
     },
 }
 impl<'a, F: TensorField> AirTensor<'a, F> {
     pub fn new(data: &'a [F], dims: Vec<usize>) -> Self {
-        let stride = Self::compute_stride(&dims);
-        Self::Borrowed { data, dims, stride }
+        Self::Borrowed { data, dims }
     }
 
     pub fn from_vec(data: Vec<F>, dims: Vec<usize>) -> Self {
-        let stride = Self::compute_stride(&dims);
-        Self::Owned { data, dims, stride }
+        Self::Owned { data, dims }
     }
 
     pub fn dims(&self) -> &[usize] {
@@ -57,26 +55,12 @@ impl<'a, F: TensorField> AirTensor<'a, F> {
         }
     }
 
-    pub fn stride(&self) -> &[usize] {
-        match self {
-            Self::Borrowed { stride, .. } => stride,
-            Self::Owned { stride, .. } => stride,
-        }
-    }
 
     pub fn data(&self) -> &[F] {
         match self {
             Self::Borrowed { data, .. } => data,
             Self::Owned { data, .. } => data,
         }
-    }
-
-    pub fn compute_stride(dims: &[usize]) -> Vec<usize> {
-        let mut stride = vec![1; dims.len()];
-        for i in (0..dims.len() - 1).rev() {
-            stride[i] = stride[i + 1] * dims[i + 1];
-        }
-        stride
     }
 
     pub fn size(&self) -> usize {
