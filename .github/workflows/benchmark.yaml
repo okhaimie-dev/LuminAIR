@@ -1,0 +1,180 @@
+name: Benchmark and Publish
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+# Add concurrency control
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-01-02
+
+      - name: Clean Previous Benchmark Data
+        run: |
+          if [ -d ./target/criterion ]; then
+            rm -rf ./target/criterion
+          fi
+
+      - name: Cache Benchmark Data
+        uses: actions/cache@v3
+        id: cache-bench
+        with:
+          path: ./target/criterion
+          key: ${{ runner.os }}-bench-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-bench-
+
+      - name: Run Benchmarks
+        run: cargo bench --bench tensor_ops
+
+      - name: Prepare Benchmark Results
+        run: |
+          # Create the benchmarks directory structure
+          mkdir -p processed_benchmarks/benchmarks
+          cp -r target/criterion/* processed_benchmarks/benchmarks/
+          # Rename long directories to shorter versions if needed
+          cd processed_benchmarks/benchmarks
+          if [ -d "TensorAdd_verification" ]; then
+            mv "TensorAdd_verification" "verify"
+          fi
+          if [ -d "TensorAdd_proving" ]; then
+            mv "TensorAdd_proving" "prove"
+          fi
+          if [ -d "TensorAdd_tracing" ]; then
+            mv "TensorAdd_tracing" "trace"
+          fi
+
+      - name: Create Custom Index Template
+        run: |
+          mkdir -p processed_benchmarks
+          cat > processed_benchmarks/index.html << 'EOL'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="utf-8">
+              <title>LuminAIR Benchmark, by Giza</title>
+              <style>
+                  .footer { display: none !important; }
+                  body { 
+                      font-family: Arial, sans-serif;
+                      max-width: 1200px;
+                      margin: 0 auto;
+                      padding: 20px;
+                  }
+                  h1 { 
+                      font-size: 2.5em; 
+                      text-align: center; 
+                      color: #333;
+                      margin-bottom: 0.5em;
+                  }
+                  .header { 
+                      text-align: center; 
+                      margin-bottom: 2em;
+                      border-bottom: 2px solid #eee;
+                      padding-bottom: 1em;
+                  }
+                  .content {
+                      margin-top: 2em;
+                  }
+                  .benchmark-list {
+                      list-style: none;
+                      padding: 0;
+                  }
+                  .benchmark-list li {
+                      margin: 1em 0;
+                      padding: 1em;
+                      background: #f8f9fa;
+                      border-radius: 4px;
+                  }
+                  .benchmark-list a {
+                      color: #0366d6;
+                      text-decoration: none;
+                      font-size: 1.1em;
+                  }
+                  .benchmark-list a:hover {
+                      text-decoration: underline;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <h1>Performance Metrics on Supported Operators</h1>
+                  <p>Performance benchmarks for tensor operators (stwo-backend support)</p>
+              </div>
+              <div class="content">
+                  <ul class="benchmark-list">
+                      {{#each benchmarks}}
+                      <li><a href="{{this.path}}">{{this.name}}</a></li>
+                      {{/each}}
+                  </ul>
+              </div>
+          </body>
+          </html>
+          EOL
+
+      - name: Process Benchmark Results
+        uses: joshua-auchincloss/criterion-pages@v1
+        with:
+          path: "./processed_benchmarks"
+          config: |
+            {
+              "title": "LuminAIR Benchmark, by Giza",
+              "template": {
+                "index": "index.html"
+              },
+              "css": {
+                "footer": {
+                  "display": "none"
+                },
+                "body": {
+                  "font-family": "Arial, sans-serif"
+                },
+                "h1": {
+                  "text-align": "center",
+                  "font-size": "2.5em",
+                  "color": "#333"
+                }
+              }
+            }
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v3
+
+      - name: Upload Benchmark Artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: "./processed_benchmarks"
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: benchmark
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy Benchmark Results
+        id: deployment
+        uses: actions/deploy-pages@v2

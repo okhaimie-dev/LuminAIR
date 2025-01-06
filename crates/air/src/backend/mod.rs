@@ -1,0 +1,3 @@
+// First focus is on SIMD backend.
+// But we should support more backends in the future: cpu, cuda, metal, ...
+pub mod simd;

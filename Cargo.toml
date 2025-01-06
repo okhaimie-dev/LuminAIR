@@ -1,15 +1,13 @@
 [workspace]
 resolver = "2"
-members = ["examples/cairo/*", "backends/cairo"]
+members = ["crates/air", "crates/compiler"]
 
 [workspace.package]
 version = "0.0.1"
 edition = "2021"
 repository = "https://github.com/raphaelDkhn/Luminair"
 license = "MIT"
-license-file = "LICENSE"
 
 [workspace.dependencies]
-luminal = { git = "https://github.com/jafioti/luminal.git", rev = "d311003" }
-luminal_cpu = { git = "https://github.com/jafioti/luminal.git", rev = "d311003" }
-luminal_nn = { git = "https://github.com/jafioti/luminal.git", rev = "d311003" }
+stwo-prover = { git = "https://github.com/starkware-libs/stwo.git", rev = "36b17ac" }
+rayon = "1.10.0"
