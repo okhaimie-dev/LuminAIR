@@ -1,6 +1,7 @@
 # LuminAIR - Unlocking AI Integrity
 
-LuminAIR is a **Machine Learning** framework that guarantees the integrity of graph-based models using **Zero-Knowledge Circle Stark proofs**. 
+LuminAIR is a **Machine Learning** framework that guarantees the integrity of graph-based models with **Zero-Knowledge Circle Stark proofs**.
+
 It enables a prover to cryptographically prove that the AI model's computations have been executed correctly. 
 Consequently, a verifier can verify these proofs much faster and with fewer resources than by naively re-running the model.
 

@@ -3,7 +3,7 @@ name: Benchmark and Publish
 on:
   push:
     branches:
-      - stwo-backend
+      - master
   workflow_dispatch:
 
 # Add concurrency control
