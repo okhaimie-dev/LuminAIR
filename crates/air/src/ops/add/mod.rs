@@ -1,6 +1,22 @@
-use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval};
+use crate::tensor::AirTensor;
+use stwo_prover::{
+    constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval},
+    core::{prover::StarkProof, vcs::ops::MerkleHasher},
+};
+
+pub mod simd;
 
 pub type TensorAddComponent = FrameworkComponent<TensorAddEval>;
+
+pub struct TensorAddProof<H: MerkleHasher> {
+    pub stark_proof: StarkProof<H>,
+}
+
+pub struct TensorAdd<'a, F> {
+    pub a: &'a AirTensor<'a, F>,
+    pub b: &'a AirTensor<'a, F>,
+    pub log_size: u32,
+}
 
 #[derive(Clone)]
 pub struct TensorAddEval {

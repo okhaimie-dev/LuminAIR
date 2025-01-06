@@ -7,7 +7,7 @@ use luminal::prelude::*;
 
 use crate::data::StwoData;
 use luminair_air::{
-    backend::simd::add::trace::generate_trace, tensor::AirTensor, utils::calculate_log_size,
+    ops::add::simd::trace::generate_trace, tensor::AirTensor, utils::calculate_log_size,
 };
 
 #[derive(Debug, Default)]

@@ -1,5 +1,3 @@
-use crate::{tensor::AirTensor, Circuit};
-use eval::{TensorAddComponent, TensorAddEval};
 use stwo_prover::{
     constraint_framework::{FrameworkComponent, TraceLocationAllocator},
     core::{
@@ -15,26 +13,19 @@ use stwo_prover::{
             circle::{CanonicCoset, CircleEvaluation, PolyOps},
             BitReversedOrder,
         },
-        prover::{prove, verify, StarkProof, VerificationError},
+        prover::{prove, verify, VerificationError},
         vcs::ops::MerkleHasher,
         ColumnVec,
     },
 };
 
-pub mod eval;
+use crate::Circuit;
+
+use super::{TensorAdd, TensorAddComponent, TensorAddEval, TensorAddProof};
+
 pub mod trace;
 
-pub struct TensorAddProof<H: MerkleHasher> {
-    pub stark_proof: StarkProof<H>,
-}
-
-pub struct TensorAdd<'a> {
-    pub a: &'a AirTensor<'a, PackedBaseField>,
-    pub b: &'a AirTensor<'a, PackedBaseField>,
-    pub log_size: u32,
-}
-
-impl<'t> Circuit<SimdBackend> for TensorAdd<'t>
+impl<'t> Circuit<SimdBackend> for TensorAdd<'t, PackedBaseField>
 where
     FrameworkComponent<TensorAddEval>: ComponentProver<SimdBackend>,
 {
@@ -130,6 +121,8 @@ where
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
+
+    use crate::tensor::AirTensor;
 
     use super::*;
     use stwo_prover::core::{

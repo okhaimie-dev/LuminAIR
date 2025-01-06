@@ -5,7 +5,7 @@ use stwo_prover::core::{
     vcs::ops::MerkleHasher,
 };
 
-pub mod backend;
+pub mod ops;
 pub mod tensor;
 pub mod utils;
 
