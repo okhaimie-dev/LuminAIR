@@ -1,7 +1,10 @@
 use luminal::prelude::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use stwo_prover::core::{backend::simd::m31::{PackedBaseField, LOG_N_LANES}, fields::m31::BaseField};
 use std::{fmt::Debug, sync::Arc};
+use stwo_prover::core::{
+    backend::simd::m31::{PackedBaseField, LOG_N_LANES},
+    fields::m31::BaseField,
+};
 
 #[derive(Clone, Debug)]
 pub struct StwoData(pub Arc<Vec<PackedBaseField>>);
@@ -20,17 +23,17 @@ impl StwoData {
             .map(|i| {
                 let start = i * n_lanes;
                 let mut values = [0u32; 1 << LOG_N_LANES];
-                
+
                 // Fill SIMD lanes
                 for (j, val) in values.iter_mut().enumerate() {
                     let idx = start + j;
                     *val = if idx < data.len() {
-                        data[idx] as u32  // TODO (@raphaelDkn): Implement fixed point strategy
+                        data[idx] as u32 // TODO (@raphaelDkn): Implement fixed point strategy
                     } else {
                         0
                     };
                 }
-                
+
                 // Convert array to PackedBaseField
                 PackedBaseField::from_array(values.map(|x| BaseField::from_u32_unchecked(x)))
             })
@@ -39,7 +42,6 @@ impl StwoData {
         StwoData(Arc::new(packed))
     }
 }
-
 
 impl Data for StwoData {
     fn as_any(&self) -> &dyn std::any::Any {

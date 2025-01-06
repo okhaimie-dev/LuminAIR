@@ -1,16 +1,20 @@
-use std::{any::{Any, TypeId}, sync::Arc};
+use std::{
+    any::{Any, TypeId},
+    sync::Arc,
+};
 
 use luminal::prelude::*;
 
-use luminair_air::{ backend::simd::add::trace::generate_trace, tensor::AirTensor, utils::calculate_log_size};
 use crate::data::StwoData;
+use luminair_air::{
+    backend::simd::add::trace::generate_trace, tensor::AirTensor, utils::calculate_log_size,
+};
 
 #[derive(Debug, Default)]
 pub struct PrimitiveCompiler {}
 impl PrimitiveCompiler {
     pub fn new() -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 
@@ -45,7 +49,7 @@ impl Operator for StwoAdd {
 
         // Calculate required trace size based on tensor dimensions
         let max_size = a.size().max(b.size());
-        let required_log_size= calculate_log_size(max_size);
+        let required_log_size = calculate_log_size(max_size);
 
         // Generate trace and get result tensor
         let (_trace, c) = generate_trace(required_log_size, &a, &b);
@@ -53,7 +57,6 @@ impl Operator for StwoAdd {
         let c = vec![Tensor::new(StwoData(Arc::new(c.data().to_vec())))];
         println!("Output: {:?}", c);
         c
-
     }
 }
 
@@ -73,12 +76,10 @@ impl Compiler for PrimitiveCompiler {
                 *op_ref = Box::new(StwoAdd)
             } else if is::<Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
-            }
-            else if is::<Function>(op) {
+            } else if is::<Function>(op) {
                 // Keep the Function operator as is
                 continue;
-            }
-            else {
+            } else {
                 panic!("Operator not implemented yet!")
             }
         }

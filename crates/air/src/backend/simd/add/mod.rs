@@ -1,9 +1,28 @@
+use crate::{tensor::AirTensor, Circuit};
 use eval::{TensorAddComponent, TensorAddEval};
-use stwo_prover::{constraint_framework::{FrameworkComponent, TraceLocationAllocator}, core::{air::{Component, ComponentProver}, backend::{simd::{m31::PackedBaseField, SimdBackend}, BackendForChannel}, channel::MerkleChannel, fields::m31::BaseField, pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig}, poly::{circle::{CanonicCoset, CircleEvaluation, PolyOps}, BitReversedOrder}, prover::{prove, verify, StarkProof, VerificationError}, vcs::ops::MerkleHasher, ColumnVec}};
-use crate::{ tensor::AirTensor, Circuit};
+use stwo_prover::{
+    constraint_framework::{FrameworkComponent, TraceLocationAllocator},
+    core::{
+        air::{Component, ComponentProver},
+        backend::{
+            simd::{m31::PackedBaseField, SimdBackend},
+            BackendForChannel,
+        },
+        channel::MerkleChannel,
+        fields::m31::BaseField,
+        pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
+        poly::{
+            circle::{CanonicCoset, CircleEvaluation, PolyOps},
+            BitReversedOrder,
+        },
+        prover::{prove, verify, StarkProof, VerificationError},
+        vcs::ops::MerkleHasher,
+        ColumnVec,
+    },
+};
 
-pub mod trace;
 pub mod eval;
+pub mod trace;
 
 pub struct TensorAddProof<H: MerkleHasher> {
     pub stark_proof: StarkProof<H>,
@@ -15,10 +34,9 @@ pub struct TensorAdd<'a> {
     pub log_size: u32,
 }
 
-impl<'t> Circuit<SimdBackend> for TensorAdd<'t> 
+impl<'t> Circuit<SimdBackend> for TensorAdd<'t>
 where
     FrameworkComponent<TensorAddEval>: ComponentProver<SimdBackend>,
-
 {
     type Component = TensorAddComponent;
     type Proof<'a, H: MerkleHasher> = TensorAddProof<H>;
@@ -35,8 +53,7 @@ where
         config: PcsConfig,
     ) -> (Vec<Self::Component>, Self::Proof<'a, MC::H>)
     where
-    SimdBackend: BackendForChannel<MC>,
-
+        SimdBackend: BackendForChannel<MC>,
     {
         // Precompute twiddles
         let twiddles = SimdBackend::precompute_twiddles(
@@ -47,7 +64,8 @@ where
 
         // Setup protocol
         let channel = &mut MC::C::default();
-        let mut commitment_scheme = CommitmentSchemeProver::<SimdBackend, MC>::new(config, &twiddles);
+        let mut commitment_scheme =
+            CommitmentSchemeProver::<SimdBackend, MC>::new(config, &twiddles);
 
         // Create component
         let component = TensorAddComponent::new(
@@ -79,7 +97,6 @@ where
         (vec![component], TensorAddProof { stark_proof })
     }
 
-
     fn verify<'a, MC: MerkleChannel>(
         components: Vec<Self::Component>,
         proof: Self::Proof<'a, MC::H>,
@@ -108,7 +125,6 @@ where
             proof.stark_proof,
         )
     }
-
 }
 
 #[cfg(test)]

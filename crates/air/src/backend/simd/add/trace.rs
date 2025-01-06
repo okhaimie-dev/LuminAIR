@@ -2,11 +2,24 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use stwo_prover::core::{backend::{simd::{m31::{PackedBaseField, LOG_N_LANES}, SimdBackend}, Col}, fields::m31::BaseField, poly::{circle::{CanonicCoset, CircleEvaluation}, BitReversedOrder}, ColumnVec};
 use stwo_prover::core::backend::Column;
+use stwo_prover::core::{
+    backend::{
+        simd::{
+            m31::{PackedBaseField, LOG_N_LANES},
+            SimdBackend,
+        },
+        Col,
+    },
+    fields::m31::BaseField,
+    poly::{
+        circle::{CanonicCoset, CircleEvaluation},
+        BitReversedOrder,
+    },
+    ColumnVec,
+};
 
 use crate::tensor::AirTensor;
-
 
 pub fn generate_trace<'a>(
     log_size: u32,
@@ -89,7 +102,7 @@ pub fn generate_trace<'a>(
             a.dims().to_vec()
         } else {
             b.dims().to_vec()
-        }
+        },
     };
 
     let domain = CanonicCoset::new(log_size).circle_domain();
@@ -102,7 +115,6 @@ pub fn generate_trace<'a>(
         c,
     )
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -170,8 +182,7 @@ mod tests {
                 + LOG_N_LANES;
 
             // Generate trace and get result tensor
-            let (trace, result) =
-                generate_trace(required_log_size, &tensor_a, &tensor_b);
+            let (trace, result) = generate_trace(required_log_size, &tensor_a, &tensor_b);
 
             // Check trace size
             assert_eq!(

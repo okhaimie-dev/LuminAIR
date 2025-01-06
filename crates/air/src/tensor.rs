@@ -10,7 +10,6 @@ use stwo_prover::core::{
     fields::m31::BaseField,
 };
 
-
 pub type LuminairSlice<'a, F> = &'a [F];
 
 #[derive(Clone, Debug)]
@@ -39,7 +38,6 @@ impl<'a, F> AirTensor<'a, F> {
             Self::Owned { dims, .. } => dims,
         }
     }
-
 
     pub fn data(&self) -> &[F] {
         match self {
