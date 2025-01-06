@@ -1,9 +1,8 @@
 use std::{any::{Any, TypeId}, sync::Arc};
 
 use luminal::prelude::*;
-use stwo_prover::core::backend::simd::m31::LOG_N_LANES;
 
-use luminair_air::{ backend::simd::add::trace::generate_trace, tensor::AirTensor};
+use luminair_air::{ backend::simd::add::trace::generate_trace, tensor::AirTensor, utils::calculate_log_size};
 use crate::data::StwoData;
 
 #[derive(Debug, Default)]
@@ -46,9 +45,7 @@ impl Operator for StwoAdd {
 
         // Calculate required trace size based on tensor dimensions
         let max_size = a.size().max(b.size());
-        let required_log_size = ((max_size + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES)
-            .next_power_of_two()
-            .trailing_zeros() + LOG_N_LANES;
+        let required_log_size= calculate_log_size(max_size);
 
         // Generate trace and get result tensor
         let (_trace, c) = generate_trace(required_log_size, &a, &b);
