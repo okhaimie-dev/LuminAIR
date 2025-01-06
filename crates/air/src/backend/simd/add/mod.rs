@@ -1,53 +1,32 @@
-use component::{TensorAddComponent, TensorAddEval};
-use stwo_prover::{
-    constraint_framework::{FrameworkComponent, TraceLocationAllocator},
-    core::{
-        air::{Component, ComponentProver},
-        backend::{Backend, BackendForChannel},
-        channel::MerkleChannel,
-        fields::m31::BaseField,
-        pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
-        poly::{
-            circle::{CanonicCoset, CircleEvaluation},
-            BitReversedOrder,
-        },
-        prover::{prove, verify, StarkProof, VerificationError},
-        vcs::ops::MerkleHasher,
-        ColumnVec,
-    },
-};
-use trace::TensorAddTracer;
+use eval::{TensorAddComponent, TensorAddEval};
+use stwo_prover::{constraint_framework::{FrameworkComponent, TraceLocationAllocator}, core::{air::{Component, ComponentProver}, backend::{simd::{m31::PackedBaseField, SimdBackend}, BackendForChannel}, channel::MerkleChannel, fields::m31::BaseField, pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig}, poly::{circle::{CanonicCoset, CircleEvaluation, PolyOps}, BitReversedOrder}, prover::{prove, verify, StarkProof, VerificationError}, vcs::ops::MerkleHasher, ColumnVec}};
+use crate::{ tensor::AirTensor, Circuit};
 
-use super::{
-    tensor::{AirTensor, TensorField},
-    Circuit,
-};
-
-pub mod component;
 pub mod trace;
+pub mod eval;
 
 pub struct TensorAddProof<H: MerkleHasher> {
     pub stark_proof: StarkProof<H>,
 }
 
-pub struct TensorAdd<'a, F: TensorField> {
-    pub a: &'a AirTensor<'a, F>,
-    pub b: &'a AirTensor<'a, F>,
+pub struct TensorAdd<'a> {
+    pub a: &'a AirTensor<'a, PackedBaseField>,
+    pub b: &'a AirTensor<'a, PackedBaseField>,
     pub log_size: u32,
 }
 
-impl<'t, F: TensorField, B: Backend + TensorAddTracer<F>> Circuit<B> for TensorAdd<'t, F>
+impl<'t> Circuit<SimdBackend> for TensorAdd<'t> 
 where
-    FrameworkComponent<TensorAddEval>: ComponentProver<B>,
+    FrameworkComponent<TensorAddEval>: ComponentProver<SimdBackend>,
+
 {
     type Component = TensorAddComponent;
     type Proof<'a, H: MerkleHasher> = TensorAddProof<H>;
     type Error = VerificationError;
-    type Trace = ColumnVec<CircleEvaluation<B, BaseField, BitReversedOrder>>;
+    type Trace = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
 
     fn generate_trace(&self) -> Self::Trace {
-        let (trace, _c) = B::generate_trace(self.log_size, self.a, self.b);
-
+        let (trace, _c) = trace::generate_trace(self.log_size, self.a, self.b);
         trace
     }
 
@@ -56,10 +35,11 @@ where
         config: PcsConfig,
     ) -> (Vec<Self::Component>, Self::Proof<'a, MC::H>)
     where
-        B: BackendForChannel<MC>,
+    SimdBackend: BackendForChannel<MC>,
+
     {
         // Precompute twiddles
-        let twiddles = B::precompute_twiddles(
+        let twiddles = SimdBackend::precompute_twiddles(
             CanonicCoset::new(trace[0].domain.log_size() + 1 + config.fri_config.log_blowup_factor)
                 .circle_domain()
                 .half_coset,
@@ -67,7 +47,7 @@ where
 
         // Setup protocol
         let channel = &mut MC::C::default();
-        let mut commitment_scheme = CommitmentSchemeProver::<B, MC>::new(config, &twiddles);
+        let mut commitment_scheme = CommitmentSchemeProver::<SimdBackend, MC>::new(config, &twiddles);
 
         // Create component
         let component = TensorAddComponent::new(
@@ -89,8 +69,8 @@ where
         tree_builder.commit(channel);
 
         // Generate proof
-        let stark_proof = prove::<B, MC>(
-            &[&component as &dyn stwo_prover::core::air::ComponentProver<B>],
+        let stark_proof = prove::<SimdBackend, MC>(
+            &[&component as &dyn stwo_prover::core::air::ComponentProver<SimdBackend>],
             channel,
             commitment_scheme,
         )
@@ -98,6 +78,7 @@ where
 
         (vec![component], TensorAddProof { stark_proof })
     }
+
 
     fn verify<'a, MC: MerkleChannel>(
         components: Vec<Self::Component>,
@@ -127,6 +108,7 @@ where
             proof.stark_proof,
         )
     }
+
 }
 
 #[cfg(test)]

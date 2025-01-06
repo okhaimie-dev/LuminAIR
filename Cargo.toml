@@ -7,7 +7,6 @@ version = "0.0.1"
 edition = "2021"
 repository = "https://github.com/raphaelDkhn/Luminair"
 license = "MIT"
-license-file = "LICENSE"
 
 [workspace.dependencies]
 stwo-prover = { git = "https://github.com/starkware-libs/stwo.git", rev = "36b17ac" }

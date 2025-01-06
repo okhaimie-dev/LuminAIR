@@ -1,9 +1,9 @@
 use std::{any::{Any, TypeId}, sync::Arc};
 
 use luminal::prelude::*;
-use stwo_prover::core::backend::simd::{m31::LOG_N_LANES, SimdBackend};
+use stwo_prover::core::backend::simd::m31::LOG_N_LANES;
 
-use luminair_air::{add::trace::TensorAddTracer, tensor::AirTensor};
+use luminair_air::{ backend::simd::add::trace::generate_trace, tensor::AirTensor};
 use crate::data::StwoData;
 
 #[derive(Debug, Default)]
@@ -59,7 +59,7 @@ impl Operator for StwoAdd {
             .trailing_zeros() + LOG_N_LANES;
 
         // Generate trace and get result tensor
-        let (_trace, c) = SimdBackend::generate_trace(required_log_size, &a, &b);
+        let (_trace, c) = generate_trace(required_log_size, &a, &b);
 
         let c = vec![Tensor::new(StwoData(Arc::new(c.data().to_vec())))];
         println!("Output: {:?}", c);

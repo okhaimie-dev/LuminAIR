@@ -1,74 +1,14 @@
 use std::sync::Arc;
 
-use crate::tensor::{AirTensor, TensorField};
 use parking_lot::Mutex;
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use stwo_prover::core::backend::simd::m31::PackedBaseField;
-use stwo_prover::core::backend::{Backend, Column, CpuBackend};
-use stwo_prover::core::{
-    backend::{
-        simd::{m31::LOG_N_LANES, SimdBackend},
-        Col,
-    },
-    fields::m31::BaseField,
-    poly::{
-        circle::{CanonicCoset, CircleEvaluation},
-        BitReversedOrder,
-    },
-    ColumnVec,
-};
+use stwo_prover::core::{backend::{simd::{m31::{PackedBaseField, LOG_N_LANES}, SimdBackend}, Col}, fields::m31::BaseField, poly::{circle::{CanonicCoset, CircleEvaluation}, BitReversedOrder}, ColumnVec};
+use stwo_prover::core::backend::Column;
 
-pub trait TensorAddTracer<F: TensorField> {
-    fn generate_trace<'a>(
-        log_size: u32,
-        a: &'a AirTensor<'a, F>,
-        b: &'a AirTensor<'a, F>,
-    ) -> (
-        ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        AirTensor<'a, F>,
-    )
-    where
-        Self: Backend;
-}
+use crate::tensor::AirTensor;
 
-impl TensorAddTracer<BaseField> for CpuBackend {
-    fn generate_trace<'a>(
-        log_size: u32,
-        a: &'a AirTensor<'a, BaseField>,
-        b: &'a AirTensor<'a, BaseField>,
-    ) -> (
-        ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        AirTensor<'a, BaseField>,
-    ) {
-        generate_trace_cpu(log_size, a, b)
-    }
-}
 
-impl TensorAddTracer<PackedBaseField> for SimdBackend {
-    fn generate_trace<'a>(
-        log_size: u32,
-        a: &'a AirTensor<'a, PackedBaseField>,
-        b: &'a AirTensor<'a, PackedBaseField>,
-    ) -> (
-        ColumnVec<CircleEvaluation<Self, BaseField, BitReversedOrder>>,
-        AirTensor<'a, PackedBaseField>,
-    ) {
-        generate_trace_simd(log_size, a, b)
-    }
-}
-
-fn generate_trace_cpu<'a>(
-    _log_size: u32,
-    _a: &'a AirTensor<'a, BaseField>,
-    _b: &'a AirTensor<'a, BaseField>,
-) -> (
-    ColumnVec<CircleEvaluation<CpuBackend, BaseField, BitReversedOrder>>,
-    AirTensor<'a, BaseField>,
-) {
-    todo!()
-}
-
-fn generate_trace_simd<'a>(
+pub fn generate_trace<'a>(
     log_size: u32,
     a: &'a AirTensor<'a, PackedBaseField>,
     b: &'a AirTensor<'a, PackedBaseField>,
@@ -163,6 +103,7 @@ fn generate_trace_simd<'a>(
     )
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,7 +171,7 @@ mod tests {
 
             // Generate trace and get result tensor
             let (trace, result) =
-                SimdBackend::generate_trace(required_log_size, &tensor_a, &tensor_b);
+                generate_trace(required_log_size, &tensor_a, &tensor_b);
 
             // Check trace size
             assert_eq!(

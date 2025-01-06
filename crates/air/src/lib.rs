@@ -5,7 +5,7 @@ use stwo_prover::core::{
     vcs::ops::MerkleHasher,
 };
 
-pub mod add;
+pub mod backend;
 pub mod tensor;
 
 pub trait Circuit<B: Backend> {
