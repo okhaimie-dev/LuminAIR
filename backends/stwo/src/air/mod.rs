@@ -7,7 +7,6 @@ use stwo_prover::core::{
 
 pub mod add;
 pub mod tensor;
-pub mod data;
 
 pub trait Circuit<B: Backend> {
     type Component;

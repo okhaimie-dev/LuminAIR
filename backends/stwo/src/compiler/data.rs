@@ -1,10 +1,22 @@
-use stwo_prover::core::backend::simd::m31::PackedBaseField;
 use luminal::prelude::*;
+use stwo_prover::core::backend::simd::m31::PackedBaseField;
+use std::{fmt::Debug, sync::Arc};
 
-// #[derive(Debug)]
-// pub struct StwoData(pub Vec<PackedBaseField>);
+#[derive(Clone, Debug)]
+pub struct StwoData(pub Arc<Vec<PackedBaseField>>);
 
+impl StwoData {
+    pub fn as_slice(&self) -> &[PackedBaseField] {
+        &self.0
+    }
+}
 
-// fn get_buffer_from_tensor<'a>(tensor: &'a InputTensor) -> &'a Vec<PackedBaseField> {
-//     &tensor.borrowed().downcast_ref::<StwoData>().unwrap().0
-// }
+impl Data for StwoData {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}

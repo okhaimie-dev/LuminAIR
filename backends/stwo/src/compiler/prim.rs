@@ -1,9 +1,9 @@
-use std::any::{Any, TypeId};
+use std::{any::{Any, TypeId}, sync::Arc};
 
 use luminal::prelude::*;
-use stwo_prover::core::backend::simd::SimdBackend;
+use stwo_prover::core::backend::simd::{m31::LOG_N_LANES, SimdBackend};
 
-use crate::air::add::trace::TensorAddTracer;
+use crate::{air::{add::trace::TensorAddTracer, tensor::AirTensor}, compiler::data::StwoData};
 
 #[derive(Debug)]
 pub struct PrimitiveCompiler {}
@@ -17,17 +17,27 @@ impl Operator for StwoAdd {
             panic!("Add operator requires exactly two input tensors.");
         }
 
-        // TODO:
-        // - convert inputs A and B into AirTensors for SIMD backend 
-        // - calculate log_size
+        let (a_tensor, a_shape) = &inp[0];
+        let (b_tensor, b_shape) = &inp[1];
 
-        let (_trace, c) = SimdBackend::generate_trace(todo!(), todo!(), todo!());
+        // Extract data from tensors
+        let a_data = a_tensor.borrowed().downcast_ref::<StwoData>().unwrap();
+        let b_data = b_tensor.borrowed().downcast_ref::<StwoData>().unwrap();
 
-        // TODO: 
-        // - convert result C into luminal Tensor
-        // - return vec![c_tensor]
+        // Create AirTensors
+        let a = AirTensor::new(a_data.as_slice(), a_shape.shape_usize());
+        let b = AirTensor::new(b_data.as_slice(), b_shape.shape_usize());
 
-        todo!()
+        // Calculate required trace size based on tensor dimensions
+        let max_size = a.size().max(b.size());
+        let required_log_size = ((max_size + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES)
+            .next_power_of_two()
+            .trailing_zeros() + LOG_N_LANES;
+
+        // Generate trace and get result tensor
+        let (_trace, c) = SimdBackend::generate_trace(required_log_size, &a, &b);
+
+        vec![Tensor::new(StwoData(Arc::new(c.data().to_vec())))]
     }
 }
 
