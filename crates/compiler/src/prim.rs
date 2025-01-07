@@ -1,5 +1,6 @@
 use std::{
     any::{Any, TypeId},
+    path::PathBuf,
     sync::Arc,
 };
 
@@ -7,20 +8,40 @@ use luminal::prelude::*;
 
 use crate::data::StwoData;
 use luminair_air::{
-    ops::add::simd::trace::generate_trace, tensor::AirTensor, utils::calculate_log_size,
+    ops::add::simd::trace::generate_trace, serde::SerializableTrace, tensor::AirTensor,
+    utils::calculate_log_size,
 };
 
 #[derive(Debug, Default)]
-pub struct PrimitiveCompiler {}
+pub struct PrimitiveCompiler {
+    config: Arc<Config>,
+}
 impl PrimitiveCompiler {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(config: Config) -> Self {
+        Self {
+            config: Arc::new(config),
+        }
     }
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub struct Config {
+    pub trace_registry: Option<PathBuf>,
 }
 
 // ====== BINARY ======
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct StwoAdd;
+pub struct StwoAdd {
+    node_id: usize,
+    config: Arc<Config>,
+}
+
+impl StwoAdd {
+    pub fn new(node_id: usize, config: Arc<Config>) -> Self {
+        Self { node_id, config }
+    }
+}
+
 impl Operator for StwoAdd {
     fn process(&mut self, inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
         if inp.len() != 2 {
@@ -52,7 +73,18 @@ impl Operator for StwoAdd {
         let required_log_size = calculate_log_size(max_size);
 
         // Generate trace and get result tensor
-        let (_trace, c) = generate_trace(required_log_size, &a, &b);
+        let (trace, c) = generate_trace(required_log_size, &a, &b);
+
+        // Save trace if trace_registry is present
+        if let Some(trace_registry) = &self.config.trace_registry {
+
+            let file_path = trace_registry.join(format!("{}_add.bin", self.node_id));
+
+            let serializable = SerializableTrace::from(&trace);
+            if let Err(err) = serializable.save(file_path) {
+                eprintln!("Failed to save trace: {:?}", err);
+            }
+        }
 
         let c = vec![Tensor::new(StwoData(Arc::new(c.into_data_vec())))];
         c
@@ -72,7 +104,7 @@ impl Compiler for PrimitiveCompiler {
             let op_ref = graph.graph.node_weight_mut(id).unwrap();
 
             if is::<Add>(op) {
-                *op_ref = Box::new(StwoAdd)
+                *op_ref = Box::new(StwoAdd::new(id.index(), Arc::clone(&self.config)))
             } else if is::<Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
             } else if is::<Function>(op) {
