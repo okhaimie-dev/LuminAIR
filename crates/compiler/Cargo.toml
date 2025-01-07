@@ -10,3 +10,11 @@ stwo-prover.workspace =true
 luminal = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
 rayon.workspace = true
 luminair_air = {path = "../air"}
+
+[dev-dependencies]
+luminal_cpu = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
+paste = "1.0.15"
+rand = "0.8.5"
+candle-core = "0.5.0"
+ctor = "0.2.8"
+# dfdx = { version = "0.13" }

@@ -40,10 +40,7 @@ pub struct OutputConverter {
 
 impl OutputConverter {
     pub fn new(data: StwoData, output_size: usize) -> Self {
-        Self { 
-            data,
-            output_size 
-        }
+        Self { data, output_size }
     }
 
     pub fn to_f32(&self) -> Vec<f32> {
@@ -54,11 +51,31 @@ impl OutputConverter {
 
 // Trait for converting graph output
 pub trait GraphOutputConverter {
-    fn get_final_output(&mut self, id: NodeIndex, output_size: usize) -> Vec<f32>;
+    fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32>;
 }
 
 impl GraphOutputConverter for Graph {
-    fn get_final_output(&mut self, id: NodeIndex, output_size: usize) -> Vec<f32> {
+    fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32> {
+        // Get the shape from the graph edges
+        let output_size = if let Some((_, shape)) = self.to_retrieve.get(&id) {
+            shape
+                .n_elements()
+                .to_usize()
+                .expect("Failed to get tensor size")
+        } else {
+            // Fallback to checking graph edges if not in to_retrieve
+            self.graph
+                .edges_directed(id, petgraph::Direction::Incoming)
+                .find_map(|e| e.weight().as_data())
+                .map(|(_, _, shape)| {
+                    shape
+                        .n_elements()
+                        .to_usize()
+                        .expect("Failed to get tensor size")
+                })
+                .expect("Could not determine tensor shape")
+        };
+
         if let Some(tensor) = self.tensors.remove(&(id, 0)) {
             if let Some(data) = tensor.downcast_ref::<StwoData>() {
                 let converter = OutputConverter::new(data.clone(), output_size);

@@ -55,7 +55,6 @@ impl Operator for StwoAdd {
         let (_trace, c) = generate_trace(required_log_size, &a, &b);
 
         let c = vec![Tensor::new(StwoData(Arc::new(c.into_data_vec())))];
-        println!("Output: {:?}", c);
         c
     }
 }
