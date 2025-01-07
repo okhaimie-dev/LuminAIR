@@ -31,3 +31,40 @@ impl Data for StwoData {
         self
     }
 }
+
+// Final output conversion handler
+pub struct OutputConverter {
+    data: StwoData,
+    output_size: usize,
+}
+
+impl OutputConverter {
+    pub fn new(data: StwoData, output_size: usize) -> Self {
+        Self { 
+            data,
+            output_size 
+        }
+    }
+
+    pub fn to_f32(&self) -> Vec<f32> {
+        // Convert only the final output from fixed point to f32
+        unpack_floats(&self.data.0, DEFAULT_SCALE, self.output_size)
+    }
+}
+
+// Trait for converting graph output
+pub trait GraphOutputConverter {
+    fn get_final_output(&mut self, id: NodeIndex, output_size: usize) -> Vec<f32>;
+}
+
+impl GraphOutputConverter for Graph {
+    fn get_final_output(&mut self, id: NodeIndex, output_size: usize) -> Vec<f32> {
+        if let Some(tensor) = self.tensors.remove(&(id, 0)) {
+            if let Some(data) = tensor.downcast_ref::<StwoData>() {
+                let converter = OutputConverter::new(data.clone(), output_size);
+                return converter.to_f32();
+            }
+        }
+        panic!("No StwoData found for final output conversion");
+    }
+}
