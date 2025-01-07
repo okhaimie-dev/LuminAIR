@@ -4,20 +4,22 @@ use stwo_prover::core::{
     pcs::PcsConfig,
     vcs::ops::MerkleHasher,
 };
+use tensor::AirTensor;
 
 pub mod ops;
+pub mod serde;
 pub mod tensor;
 pub mod utils;
-pub mod serde;
 
 pub trait Circuit<B: Backend> {
     type Component;
     type Proof<'a, H: MerkleHasher>;
     type Error;
     type Trace;
+    type Field;
 
-    /// Generates the execution trace for the circuit
-    fn generate_trace(&self) -> Self::Trace;
+    /// Generates the execution trace and output tensor for the circuit
+    fn generate_trace(&self) -> (Self::Trace, AirTensor<'static, Self::Field>);
 
     /// Creates proof for a given trace
     fn prove<'a, MC: MerkleChannel>(

@@ -8,8 +8,8 @@ use luminal::prelude::*;
 
 use crate::data::StwoData;
 use luminair_air::{
-    ops::add::simd::trace::generate_trace, serde::SerializableTrace, tensor::AirTensor,
-    utils::calculate_log_size,
+    ops::add::TensorAdd, serde::SerializableTrace, tensor::AirTensor, utils::calculate_log_size,
+    Circuit,
 };
 
 #[derive(Default)]
@@ -70,14 +70,19 @@ impl Operator for StwoAdd {
 
         // Calculate required trace size based on tensor dimensions
         let max_size = a.size().max(b.size());
-        let required_log_size = calculate_log_size(max_size);
+        let log_size = calculate_log_size(max_size);
+
+        let circuit = TensorAdd {
+            a: &a,
+            b: &b,
+            log_size,
+        };
 
         // Generate trace and get result tensor
-        let (trace, c) = generate_trace(required_log_size, &a, &b);
+        let (trace, c) = circuit.generate_trace();
 
         // Save trace if trace_registry is present
         if let Some(trace_registry) = &self.config.trace_registry {
-
             let file_path = trace_registry.join(format!("{}_add.bin", self.node_id));
 
             let serializable = SerializableTrace::from(&trace);

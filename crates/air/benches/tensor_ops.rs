@@ -87,7 +87,7 @@ fn bench_tensor_add(c: &mut Criterion) {
                 b: tensor_b,
                 log_size: *log_size,
             };
-            let trace = circuit.generate_trace();
+            let (trace, _c) = circuit.generate_trace();
 
             group.bench_with_input(BenchmarkId::from_parameter(name), &trace, |b, trace| {
                 b.iter(|| TensorAdd::prove::<Blake2sMerkleChannel>(trace, config));
@@ -105,7 +105,7 @@ fn bench_tensor_add(c: &mut Criterion) {
                 b: tensor_b,
                 log_size: *log_size,
             };
-            let trace = circuit.generate_trace();
+            let (trace, _c) = circuit.generate_trace();
 
             group.bench_with_input(BenchmarkId::from_parameter(name), &trace, |b, trace| {
                 b.iter_with_setup(

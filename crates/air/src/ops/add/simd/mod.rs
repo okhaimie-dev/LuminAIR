@@ -19,7 +19,7 @@ use stwo_prover::{
     },
 };
 
-use crate::Circuit;
+use crate::{tensor::AirTensor, Circuit};
 
 use super::{TensorAdd, TensorAddComponent, TensorAddEval, TensorAddProof};
 
@@ -33,10 +33,10 @@ where
     type Proof<'a, H: MerkleHasher> = TensorAddProof<H>;
     type Error = VerificationError;
     type Trace = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
+    type Field = PackedBaseField;
 
-    fn generate_trace(&self) -> Self::Trace {
-        let (trace, _c) = trace::generate_trace(self.log_size, self.a, self.b);
-        trace
+    fn generate_trace(&self) -> (Self::Trace, AirTensor<'static, Self::Field>) {
+        trace::generate_trace(self.log_size, self.a, self.b)
     }
 
     fn prove<'a, MC: MerkleChannel>(
@@ -205,7 +205,7 @@ mod tests {
 
             // Generate trace
             let start_trace = Instant::now();
-            let trace = circuit.generate_trace();
+            let (trace, _c) = circuit.generate_trace();
             let trace_time = start_trace.elapsed();
             println!("Trace generation time for case {}: {:?}", i + 1, trace_time);
 

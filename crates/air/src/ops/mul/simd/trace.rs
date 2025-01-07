@@ -21,7 +21,7 @@ use stwo_prover::core::{
 
 use crate::tensor::AirTensor;
 
-pub fn generate_trace<'a>(
+pub(super) fn generate_trace<'a>(
     log_size: u32,
     a: &'a AirTensor<'a, PackedBaseField>,
     b: &'a AirTensor<'a, PackedBaseField>,
