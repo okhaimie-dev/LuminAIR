@@ -12,7 +12,7 @@ use luminair_air::{
     utils::calculate_log_size,
 };
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct PrimitiveCompiler {
     config: Arc<Config>,
 }

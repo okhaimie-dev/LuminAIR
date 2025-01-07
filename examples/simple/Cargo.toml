@@ -1,0 +1,12 @@
+[package]
+name = "simple"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+stwo-prover.workspace = true
+luminal.workspace = true
+luminair_air = { path = "../../crates/air" }
+luminair_compiler = { path = "../../crates/compiler" }

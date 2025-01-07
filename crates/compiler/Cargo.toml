@@ -1,15 +1,15 @@
 [package]
-name = "compiler"
+name = "luminair_compiler"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
 license.workspace = true
 
 [dependencies]
-stwo-prover.workspace =true
-luminal = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
+stwo-prover.workspace = true
+luminal.workspace = true
 rayon.workspace = true
-luminair_air = {path = "../air"}
+luminair_air = { path = "../air" }
 
 [dev-dependencies]
 luminal_cpu = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
