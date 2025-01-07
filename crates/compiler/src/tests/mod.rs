@@ -47,7 +47,7 @@ macro_rules! single_binary_test {
 
 #[macro_export]
 macro_rules! binary_test {
-    ($func: expr , $dfdx_func: expr , $name: ident, $type: ty) => {
+    ($func: expr , $name: ident, $type: ty) => {
         $crate::single_binary_test!($func, $name, $type, 3);
         $crate::single_binary_test!($func, $name, $type, 50);
         $crate::single_binary_test!($func, $name, $type, 783);
