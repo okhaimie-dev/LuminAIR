@@ -3,6 +3,8 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use stwo_prover::core::backend::Column;
+use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::{
     backend::{
         simd::{
@@ -19,6 +21,7 @@ use stwo_prover::core::{
     ColumnVec,
 };
 
+use crate::ops::mul::{SCALE_FACTOR_INV, SCALE_FACTOR_RAW};
 use crate::tensor::AirTensor;
 
 pub(super) fn generate_trace<'a>(
@@ -72,13 +75,25 @@ pub(super) fn generate_trace<'a>(
                     let a_idx = vec_row % a_packed_size;
                     let b_idx = vec_row % b_packed_size;
 
-                    let mul = a.data()[a_idx] * b.data()[b_idx];
+                    // Get values from tensors
+                    let a_val = a.data()[a_idx];
+                    let b_val = b.data()[b_idx];
 
-                    trace[0].lock().data[vec_row] = a.data()[a_idx];
-                    trace[1].lock().data[vec_row] = b.data()[b_idx];
-                    trace[2].lock().data[vec_row] = mul;
+                    // Fixed point multiplication:
+                    // To get the correct scaling, we need to:
+                    // 1. Multiply a * b
+                    // 2. Divide by scale factor (2^DEFAULT_SCALE)
+                    let scaled_mul = {
+                        let ab = a_val * b_val;
+                        ab * PackedBaseField::broadcast(*SCALE_FACTOR_INV)
+                    };
 
-                    local_c_data.push(mul);
+                    // Store values in trace
+                    trace[0].lock().data[vec_row] = a_val;
+                    trace[1].lock().data[vec_row] = b_val;
+                    trace[2].lock().data[vec_row] = scaled_mul;
+
+                    local_c_data.push(scaled_mul);
                 }
             }
 

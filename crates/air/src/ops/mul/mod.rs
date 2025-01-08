@@ -1,7 +1,8 @@
 use crate::tensor::AirTensor;
+use lazy_static::lazy_static;
 use stwo_prover::{
     constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval},
-    core::{prover::StarkProof, vcs::ops::MerkleHasher},
+    core::{fields::m31::M31, prover::StarkProof, vcs::ops::MerkleHasher},
 };
 
 pub mod simd;
@@ -23,6 +24,22 @@ pub struct TensorMulEval {
     pub log_size: u32,
 }
 
+pub type Scale = u32;
+pub const DEFAULT_SCALE: Scale = 12;
+pub const MAX_SCALE: Scale = 20; // Leaves ~10 bits for integer part
+
+// Constants computed at compile time
+const SCALE_FACTOR_RAW: u32 = 1u32 << DEFAULT_SCALE;
+const MAX_VAL_RAW: u32 = (1u32 << (MAX_SCALE - 1)) - 1;
+
+lazy_static! {
+    // Lazily computed field elements that are reused
+    static ref SCALE_FACTOR: M31 = M31::from_u32_unchecked(SCALE_FACTOR_RAW);
+    static ref SCALE_FACTOR_INV: M31 = SCALE_FACTOR.inverse();
+    static ref MAX_VAL: M31 = M31::from_u32_unchecked(MAX_VAL_RAW);
+    static ref MIN_VAL: M31 = -(*MAX_VAL);
+}
+
 impl FrameworkEval for TensorMulEval {
     fn log_size(&self) -> u32 {
         self.log_size
@@ -38,8 +55,17 @@ impl FrameworkEval for TensorMulEval {
         let b = eval.next_trace_mask();
         let c = eval.next_trace_mask();
 
-        // Mul constraint: c = a * b
-        eval.add_constraint(c - (a * b));
+        // For fixed point multiplication we need to:
+        // 1. Multiply the values
+        // 2. Divide by the scale factor to get back to the right fixed point
+
+        // Handle the division by implementing:
+        // c * 2^SCALE = a * b
+
+        // Main constraint: c * scale = a * b
+        eval.add_constraint(c.clone() * E::F::from(*SCALE_FACTOR) - (a.clone() * b.clone()));
+
+        // TODO (@raphaeDkhn): Range checks to enforce min_val ≤ x ≤ max_val
 
         eval
     }
