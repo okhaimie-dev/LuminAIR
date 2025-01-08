@@ -1,14 +1,7 @@
-use std::sync::Arc;
-
-use parking_lot::Mutex;
-use rayon::iter::{ParallelBridge, ParallelIterator};
 use stwo_prover::core::backend::Column;
 use stwo_prover::core::{
     backend::{
-        simd::{
-            m31::{PackedBaseField, LOG_N_LANES},
-            SimdBackend,
-        },
+        simd::{m31::PackedBaseField, SimdBackend},
         Col,
     },
     fields::m31::BaseField,
@@ -18,7 +11,7 @@ use stwo_prover::core::{
     },
     ColumnVec,
 };
-
+use num_traits::identities::Zero;
 use crate::tensor::AirTensor;
 
 pub(super) fn generate_trace<'a>(
@@ -29,73 +22,43 @@ pub(super) fn generate_trace<'a>(
     ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     AirTensor<'static, PackedBaseField>,
 ) {
-    // Calculate required trace size
-    let max_size = a.size().max(b.size());
-    assert!(log_size >= LOG_N_LANES);
-
-    // Initialize trace columns
+    // Calculate trace size and initialize columns
     let trace_size = 1 << log_size;
     let mut trace = Vec::with_capacity(3);
     for _ in 0..3 {
         trace.push(Col::<SimdBackend, BaseField>::zeros(trace_size));
     }
 
-    let trace = Arc::new(
-        trace
-            .into_iter()
-            .map(|col| Mutex::new(col))
-            .collect::<Vec<_>>(),
-    );
+    // Calculate actual size needed
+    let size = a.size().max(b.size());
 
-    let c_data = Arc::new(Mutex::new(Vec::with_capacity(
-        (max_size + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES,
-    )));
+    // Prepare output data
+    let mut c_data = Vec::with_capacity(size);
 
-    // Calculate number of SIMD-packed rows needed for each tensor
-    let n_rows = 1 << (log_size - LOG_N_LANES);
-    let a_packed_size = (a.size() + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
-    let b_packed_size = (b.size() + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
+    // Fill trace and generate output data
+    for i in 0..trace_size {
+        if i < size {
+            // Get values with broadcasting
+            let a_val = a.data()[i % a.data().len()];
+            let b_val = b.data()[i % b.data().len()];
+            let sum = a_val + b_val;
 
-    // Fill trace with tensor data
-    // Process chunks in parallel
-    const CHUNK_SIZE: usize = 256;
-    (0..n_rows)
-        .into_iter()
-        .step_by(CHUNK_SIZE)
-        .par_bridge()
-        .for_each(|chunk| {
-            let end = (chunk + CHUNK_SIZE).min(n_rows);
-            let mut local_c_data = Vec::with_capacity(CHUNK_SIZE);
+            trace[0].set(i, a_val.to_array()[0]);
+            trace[1].set(i, b_val.to_array()[0]);
+            trace[2].set(i, sum.to_array()[0]);
 
-            for vec_row in chunk..end {
-                if vec_row < max_size {
-                    let a_idx = vec_row % a_packed_size;
-                    let b_idx = vec_row % b_packed_size;
-
-                    let sum = a.data()[a_idx] + b.data()[b_idx];
-
-                    trace[0].lock().data[vec_row] = a.data()[a_idx];
-                    trace[1].lock().data[vec_row] = b.data()[b_idx];
-                    trace[2].lock().data[vec_row] = sum;
-
-                    local_c_data.push(sum);
-                }
+            if i < size {
+                c_data.push(sum);
             }
+        } else {
+            // Pad remaining trace with zeros
+            trace[0].set(i, BaseField::zero());
+            trace[1].set(i, BaseField::zero());
+            trace[2].set(i, BaseField::zero());
+        }
+    }
 
-            // Append local results to global c_data
-            let mut c_data = c_data.lock();
-            c_data.extend(local_c_data);
-        });
-
-    let trace = Arc::try_unwrap(trace)
-        .unwrap()
-        .into_iter()
-        .map(|mutex| mutex.into_inner())
-        .collect::<Vec<_>>();
-
-    let c_data = Arc::try_unwrap(c_data).unwrap().into_inner();
-
-    // Create output tensor C
+    // Create output tensor
     let c = AirTensor::Owned {
         data: c_data,
         dims: if a.size() > b.size() {
@@ -119,7 +82,7 @@ pub(super) fn generate_trace<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stwo_prover::core::backend::simd::m31::PackedBaseField;
+    use stwo_prover::core::backend::simd::m31::{PackedBaseField, LOG_N_LANES};
     use stwo_prover::core::fields::m31::BaseField;
 
     fn unpack_tensor(tensor: &AirTensor<PackedBaseField>) -> Vec<u32> {

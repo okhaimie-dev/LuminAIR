@@ -7,3 +7,4 @@ license.workspace = true
 
 [dependencies]
 stwo-prover.workspace = true
+num-traits = "0.2.17"
