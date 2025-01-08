@@ -1,5 +1,6 @@
 use crate::tensor::AirTensor;
 use lazy_static::lazy_static;
+use numerair::fixed_points::{DEFAULT_SCALE, MAX_SCALE};
 use stwo_prover::{
     constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval},
     core::{fields::m31::M31, prover::StarkProof, vcs::ops::MerkleHasher},
@@ -23,10 +24,6 @@ pub struct TensorMul<'a, F> {
 pub struct TensorMulEval {
     pub log_size: u32,
 }
-
-pub type Scale = u32;
-pub const DEFAULT_SCALE: Scale = 12;
-pub const MAX_SCALE: Scale = 20; // Leaves ~10 bits for integer part
 
 // Constants computed at compile time
 const SCALE_FACTOR_RAW: u32 = 1u32 << DEFAULT_SCALE;

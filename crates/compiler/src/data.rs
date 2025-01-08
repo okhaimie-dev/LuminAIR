@@ -1,8 +1,7 @@
 use luminal::prelude::*;
+use numerair::fixed_points::{pack_floats, unpack_floats, DEFAULT_SCALE};
 use std::{fmt::Debug, sync::Arc};
 use stwo_prover::core::backend::simd::m31::PackedBaseField;
-
-use crate::fixed_point::{pack_floats, unpack_floats, DEFAULT_SCALE};
 
 #[derive(Clone, Debug)]
 pub struct StwoData(pub Arc<Vec<PackedBaseField>>);

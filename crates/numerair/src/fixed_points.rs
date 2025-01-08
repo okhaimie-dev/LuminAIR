@@ -1,40 +1,17 @@
 use stwo_prover::core::{
     backend::simd::m31::{PackedBaseField, N_LANES},
-    fields::m31::{M31, P},
+    fields::m31::M31,
 };
 
-/// Integer representation of a value before conversion to field element.
-pub type IntegerRep = i32;
+use crate::felt_utils::{felt_to_integer_rep, IntegerRep, P_HALF};
 
 /// The scale (number of fractional bits) in fixed point representation
 pub type Scale = u32;
-
-// Constants for M31 field arithmetic
-const P_HALF: u32 = P >> 1;
 
 // Constants for fixed-point arithmetic
 pub const DEFAULT_SCALE: Scale = 12;
 pub const MAX_SCALE: Scale = 20; // Leaves ~10 bits for integer part
 pub const MIN_SCALE: Scale = 0;
-
-/// Converts an IntegerRep to a PrimeField element
-pub fn integer_rep_to_felt(x: IntegerRep) -> M31 {
-    if x >= 0 {
-        M31::from_u32_unchecked(x as u32)
-    } else {
-        -M31::from_u32_unchecked((-x) as u32)
-    }
-}
-
-/// Converts a PrimeField element to an IntegerRep
-pub fn felt_to_integer_rep(x: M31) -> IntegerRep {
-    let val = x.0;
-    if val > P_HALF {
-        -((P - val) as IntegerRep)
-    } else {
-        val as IntegerRep
-    }
-}
 
 /// Converts scale to a fixed point multiplier
 #[inline]
@@ -65,7 +42,7 @@ pub fn quantize_float(elem: &f32, shift: f32, scale: Scale) -> Result<IntegerRep
 }
 
 /// Dequantizes a field element back to f64
-pub fn dequantize_float(felt: M31, scale: Scale, shift: f32) -> f32 {
+pub fn dequantize_to_float(felt: M31, scale: Scale, shift: f32) -> f32 {
     let int_rep = felt_to_integer_rep(felt);
     let multiplier = scale_to_multiplier(scale);
     (int_rep as f32) / multiplier - shift
@@ -100,24 +77,15 @@ pub fn unpack_floats(packed: &[PackedBaseField], scale: Scale, shift: f32, len: 
         .iter()
         .flat_map(|p| p.to_array())
         .take(len)
-        .map(|x| dequantize_float(x, scale, shift))
+        .map(|x| dequantize_to_float(x, scale, shift))
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::felt_utils::integer_rep_to_felt;
+
     use super::*;
-
-    #[test]
-    fn test_integer_conversion() {
-        let x = 42;
-        let felt = integer_rep_to_felt(x);
-        assert_eq!(felt_to_integer_rep(felt), x);
-
-        let x = -42;
-        let felt = integer_rep_to_felt(x);
-        assert_eq!(felt_to_integer_rep(felt), x);
-    }
 
     #[test]
     fn test_quantize_dequantize() {
@@ -127,7 +95,7 @@ mod tests {
 
         let quantized = quantize_float(&value, shift, scale).unwrap();
         let felt = integer_rep_to_felt(quantized);
-        let dequantized = dequantize_float(felt, scale, shift);
+        let dequantized = dequantize_to_float(felt, scale, shift);
 
         assert!((value - dequantized).abs() < 0.001);
     }
@@ -230,7 +198,7 @@ mod tests {
         let tiny_negative = -0.0000001f32;
         let quantized = quantize_float(&tiny_negative, shift, scale).unwrap();
         let felt = integer_rep_to_felt(quantized);
-        let dequantized = dequantize_float(felt, scale, shift);
+        let dequantized = dequantize_to_float(felt, scale, shift);
         assert_eq!(dequantized, 0.0);
 
         // Test values close to zero from both sides
@@ -238,7 +206,7 @@ mod tests {
         for value in near_zero_cases {
             let quantized = quantize_float(&value, shift, scale).unwrap();
             let felt = integer_rep_to_felt(quantized);
-            let dequantized = dequantize_float(felt, scale, shift);
+            let dequantized = dequantize_to_float(felt, scale, shift);
 
             println!(
                 "Testing value: {}, quantized: {}, dequantized: {}, precision: {}",
@@ -321,8 +289,8 @@ mod tests {
             let neg_quantized = quantize_float(&neg, shift, scale).unwrap();
             let neg_felt = integer_rep_to_felt(neg_quantized);
 
-            let pos_dequantized = dequantize_float(pos_felt, scale, shift);
-            let neg_dequantized = dequantize_float(neg_felt, scale, shift);
+            let pos_dequantized = dequantize_to_float(pos_felt, scale, shift);
+            let neg_dequantized = dequantize_to_float(neg_felt, scale, shift);
 
             // Check that positive and negative values maintain their magnitude relationship
             assert!(
@@ -360,7 +328,7 @@ mod tests {
         for value in test_values {
             let quantized = quantize_float(&value, shift, scale).unwrap();
             let felt = integer_rep_to_felt(quantized);
-            let dequantized = dequantize_float(felt, scale, shift);
+            let dequantized = dequantize_to_float(felt, scale, shift);
 
             println!(
                 "Testing value: {}, shifted: {}, quantized: {}, dequantized: {}, precision: {}",

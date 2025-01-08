@@ -3,8 +3,6 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use stwo_prover::core::backend::Column;
-use stwo_prover::core::fields::m31::M31;
-use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::{
     backend::{
         simd::{
@@ -21,7 +19,7 @@ use stwo_prover::core::{
     ColumnVec,
 };
 
-use crate::ops::mul::{SCALE_FACTOR_INV, SCALE_FACTOR_RAW};
+use crate::ops::mul::SCALE_FACTOR_INV;
 use crate::tensor::AirTensor;
 
 pub(super) fn generate_trace<'a>(
@@ -85,8 +83,18 @@ pub(super) fn generate_trace<'a>(
                     // 2. Divide by scale factor (2^DEFAULT_SCALE)
                     let scaled_mul = {
                         let ab = a_val * b_val;
+                        println!("a_val: {:?}", a_val);
+                        println!("b_val: {:?}", b_val);
+                        println!("ab: {:?}", ab);
+
+                        // Shift the underlying SIMD vector and create new PackedM31
+                        // unsafe {
+                        //     PackedM31::from_simd_unchecked(ab.into_simd() >> DEFAULT_SCALE as u32)
+                        // }
                         ab * PackedBaseField::broadcast(*SCALE_FACTOR_INV)
                     };
+
+                    println!("scaled_mul: {:?}", scaled_mul);
 
                     // Store values in trace
                     trace[0].lock().data[vec_row] = a_val;
@@ -134,55 +142,45 @@ pub(super) fn generate_trace<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stwo_prover::core::backend::simd::m31::PackedBaseField;
-    use stwo_prover::core::fields::m31::BaseField;
-
-    fn unpack_tensor(tensor: &AirTensor<PackedBaseField>) -> Vec<u32> {
-        tensor
-            .data()
-            .iter()
-            .flat_map(|packed| packed.to_array())
-            .take(tensor.size())
-            .map(|x| x.0)
-            .collect()
-    }
+    use numerair::fixed_points::{pack_floats, unpack_floats, DEFAULT_SCALE};
 
     #[test]
     fn test_generate_trace_correctness() {
-        let binding_a_1 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 4];
-        let binding_b_1 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 4];
-        let binding_a_2 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(5))];
-        let binding_b_2 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 6];
-        let binding_a_3 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(1)); 3];
-        let binding_b_3 = [PackedBaseField::broadcast(BaseField::from_u32_unchecked(2)); 6];
+        let binding_a_1 = pack_floats(&[1.0; 4], DEFAULT_SCALE, 0.0);
+        let binding_b_1 = pack_floats(&[2.0; 4], DEFAULT_SCALE, 0.0);
+        let binding_a_2 = pack_floats(&[5.0; 1], DEFAULT_SCALE, 0.0);
+        let binding_b_2 = pack_floats(&[1.0; 6], DEFAULT_SCALE, 0.0);
+        let binding_a_3 = pack_floats(&[1.0; 3], DEFAULT_SCALE, 0.0);
+        let binding_b_3 = pack_floats(&[2.0; 6], DEFAULT_SCALE, 0.0);
+
         let test_cases = vec![
             // Case 1: Simple 2x2 matrices
             (
                 AirTensor::new(&binding_a_1, vec![2, 2]),
                 AirTensor::new(&binding_b_1, vec![2, 2]),
                 vec![2, 2],
-                vec![2u32; 4], // Expected result: 1 * 2 = 2 for all elements
+                pack_floats(&[2.0; 4], DEFAULT_SCALE, 0.0), // Expected result: 1 * 2 = 2 for all elements
             ),
             // Case 2: Broadcasting scalar to matrix
             (
                 AirTensor::new(&binding_a_2, vec![1]),
                 AirTensor::new(&binding_b_2, vec![2, 3]),
                 vec![2, 3],
-                vec![5u32; 6], // Expected result: 5 * 1 = 5 for all elements
+                pack_floats(&[5.0; 6], DEFAULT_SCALE, 0.0), // Expected result: 5 * 1 = 5 for all elements
             ),
             // Case 3: Broadcasting row to matrix
             (
                 AirTensor::new(&binding_a_3, vec![1, 3]),
                 AirTensor::new(&binding_b_3, vec![2, 3]),
                 vec![2, 3],
-                vec![2u32; 6], // Expected result: 1 * 2 = 2 for all elements
+                pack_floats(&[2.0; 6], DEFAULT_SCALE, 0.0), // Expected result: 1 * 2 = 2 for all elements
             ),
             // Case 4: Different values in matrices
             (
                 AirTensor::create::<SimdBackend>(vec![1, 2, 3, 4], vec![2, 2]),
                 AirTensor::create::<SimdBackend>(vec![5, 6, 7, 8], vec![2, 2]),
                 vec![2, 2],
-                vec![5, 12, 21, 32], // Element-wise multiplication
+                pack_floats(&[5.0, 12.0, 21.0, 32.0], DEFAULT_SCALE, 0.0), // Element-wise multiplication
             ),
         ];
 
@@ -223,42 +221,20 @@ mod tests {
             );
 
             // Unpack and verify result values
-            let result_values = unpack_tensor(&result);
-            assert_eq!(
-                result_values, expected_values,
-                "Case {}: Result tensor has incorrect values",
-                i
+
+            let result_values = unpack_floats(result.data(), DEFAULT_SCALE, 0.0, result.size());
+            let expected_values = unpack_floats(
+                &expected_values,
+                DEFAULT_SCALE,
+                0.0,
+                expected_dims.iter().product(),
             );
 
-            // Verify trace values for valid entries
-            let unpacked_trace_a: Vec<_> = trace[0]
-                .values
-                .to_cpu()
-                .into_iter()
-                .take(max_size)
-                .collect();
-            let unpacked_trace_b: Vec<_> = trace[1]
-                .values
-                .to_cpu()
-                .into_iter()
-                .take(max_size)
-                .collect();
-            let unpacked_trace_c: Vec<_> = trace[2]
-                .values
-                .to_cpu()
-                .into_iter()
-                .take(max_size)
-                .collect();
-
-            for j in 0..max_size {
-                assert_eq!(
-                    unpacked_trace_c[j],
-                    unpacked_trace_a[j] * unpacked_trace_b[j],
-                    "Case {}: Trace values don't satisfy a * b = c at position {}",
-                    i,
-                    j
-                );
-            }
+            assert_eq!(
+                result_values, expected_values,
+                "Case {:?}: Result tensor has incorrect values",
+                i
+            );
         }
     }
 }

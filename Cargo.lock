@@ -1181,6 +1181,7 @@ dependencies = [
  "itertools 0.12.1",
  "lazy_static",
  "num-traits",
+ "numerair",
  "parking_lot",
  "rayon",
  "serde",
@@ -1196,6 +1197,7 @@ dependencies = [
  "luminair_air",
  "luminal",
  "luminal_cpu",
+ "numerair",
  "paste",
  "rand",
  "rayon",
@@ -1340,6 +1342,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.95",
+]
+
+[[package]]
+name = "numerair"
+version = "0.0.1"
+dependencies = [
+ "stwo-prover",
 ]
 
 [[package]]
