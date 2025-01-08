@@ -13,12 +13,12 @@ impl StwoData {
     }
 
     pub fn from_f32(data: &[f32]) -> Self {
-        let packed = pack_floats(data, DEFAULT_SCALE);
+        let packed = pack_floats(data, DEFAULT_SCALE, 0.0);
         StwoData(Arc::new(packed))
     }
 
     pub fn to_f32(&self, len: usize) -> Vec<f32> {
-        unpack_floats(&self.0, DEFAULT_SCALE, len)
+        unpack_floats(&self.0, DEFAULT_SCALE, 0.0, len)
     }
 }
 
@@ -45,7 +45,7 @@ impl OutputConverter {
 
     pub fn to_f32(&self) -> Vec<f32> {
         // Convert only the final output from fixed point to f32
-        unpack_floats(&self.data.0, DEFAULT_SCALE, self.output_size)
+        unpack_floats(&self.data.0, DEFAULT_SCALE, 0.0, self.output_size)
     }
 }
 
