@@ -5,7 +5,7 @@ use stwo_prover::core::{backend::simd::m31::PackedBaseField, fields::m31::M31};
 pub type Scale = u32;
 
 // Constants for fixed-point arithmetic
-pub const DEFAULT_SCALE: Scale = 12;
+pub const DEFAULT_SCALE: Scale = 5;
 pub const MAX_SCALE: Scale = 20; // Leaves ~10 bits for integer part
 pub const MIN_SCALE: Scale = 0;
 

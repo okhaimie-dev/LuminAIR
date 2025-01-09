@@ -31,12 +31,11 @@ const MAX_VAL_RAW: u32 = (1u32 << (MAX_SCALE - 1)) - 1;
 
 lazy_static! {
     // Lazily computed field elements that are reused
-    static ref SCALE_FACTOR: M31 = M31::from_u32_unchecked(SCALE_FACTOR_RAW);
-    static ref SCALE_FACTOR_INV: M31 = SCALE_FACTOR.inverse();
-    static ref MAX_VAL: M31 = M31::from_u32_unchecked(MAX_VAL_RAW);
-    static ref MIN_VAL: M31 = -(*MAX_VAL);
+    pub static ref SCALE_FACTOR: M31 = M31::from_u32_unchecked(SCALE_FACTOR_RAW);
+    pub static ref SCALE_FACTOR_INV: M31 = SCALE_FACTOR.inverse();
+    pub static ref MAX_VAL: M31 = M31::from_u32_unchecked(MAX_VAL_RAW);
+    pub static ref MIN_VAL: M31 = -(*MAX_VAL);
 }
-
 impl FrameworkEval for TensorMulEval {
     fn log_size(&self) -> u32 {
         self.log_size

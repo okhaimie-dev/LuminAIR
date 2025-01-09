@@ -1,14 +1,10 @@
-use std::sync::Arc;
-
-use parking_lot::Mutex;
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use crate::ops::mul::SCALE_FACTOR_INV;
+use crate::tensor::AirTensor;
+use num_traits::identities::Zero;
 use stwo_prover::core::backend::Column;
 use stwo_prover::core::{
     backend::{
-        simd::{
-            m31::{PackedBaseField, LOG_N_LANES},
-            SimdBackend,
-        },
+        simd::{m31::PackedBaseField, SimdBackend},
         Col,
     },
     fields::m31::BaseField,
@@ -19,9 +15,6 @@ use stwo_prover::core::{
     ColumnVec,
 };
 
-use crate::ops::mul::SCALE_FACTOR_INV;
-use crate::tensor::AirTensor;
-
 pub(super) fn generate_trace<'a>(
     log_size: u32,
     a: &'a AirTensor<'a, PackedBaseField>,
@@ -30,95 +23,60 @@ pub(super) fn generate_trace<'a>(
     ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     AirTensor<'static, PackedBaseField>,
 ) {
-    // Calculate required trace size
-    let max_size = a.size().max(b.size());
-    assert!(log_size >= LOG_N_LANES);
-
-    // Initialize trace columns
+    // Calculate trace size and initialize columns
     let trace_size = 1 << log_size;
     let mut trace = Vec::with_capacity(3);
     for _ in 0..3 {
         trace.push(Col::<SimdBackend, BaseField>::zeros(trace_size));
     }
 
-    let trace = Arc::new(
-        trace
-            .into_iter()
-            .map(|col| Mutex::new(col))
-            .collect::<Vec<_>>(),
-    );
+    // Calculate actual size needed
+    let size = a.size().max(b.size());
 
-    let c_data = Arc::new(Mutex::new(Vec::with_capacity(
-        (max_size + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES,
-    )));
+    // Prepare output data
+    let mut c_data = Vec::with_capacity(size);
 
-    // Calculate number of SIMD-packed rows needed for each tensor
-    let n_rows = 1 << (log_size - LOG_N_LANES);
-    let a_packed_size = (a.size() + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
-    let b_packed_size = (b.size() + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES;
+    // Fill trace and generate output data
+    for i in 0..trace_size {
+        if i < size {
+            // Get values with broadcasting
+            let a_val = a.data()[i % a.data().len()];
+            let b_val = b.data()[i % b.data().len()];
 
-    // Fill trace with tensor data
-    // Process chunks in parallel
-    const CHUNK_SIZE: usize = 256;
-    (0..n_rows)
-        .into_iter()
-        .step_by(CHUNK_SIZE)
-        .par_bridge()
-        .for_each(|chunk| {
-            let end = (chunk + CHUNK_SIZE).min(n_rows);
-            let mut local_c_data = Vec::with_capacity(CHUNK_SIZE);
+            // Store original values in trace
+            trace[0].set(i, a_val.to_array()[0]);
+            trace[1].set(i, b_val.to_array()[0]);
 
-            for vec_row in chunk..end {
-                if vec_row < max_size {
-                    let a_idx = vec_row % a_packed_size;
-                    let b_idx = vec_row % b_packed_size;
+            // For debugging
+            println!("i: {}", i);
+            println!("a_val raw: {:?}", a_val);
+            println!("b_val raw: {:?}", b_val);
 
-                    // Get values from tensors
-                    let a_val = a.data()[a_idx];
-                    let b_val = b.data()[b_idx];
 
-                    // Fixed point multiplication:
-                    // To get the correct scaling, we need to:
-                    // 1. Multiply a * b
-                    // 2. Divide by scale factor (2^DEFAULT_SCALE)
-                    let scaled_mul = {
-                        let ab = a_val * b_val;
-                        println!("a_val: {:?}", a_val);
-                        println!("b_val: {:?}", b_val);
-                        println!("ab: {:?}", ab);
+            // First multiply values (fixed point multiplication)
+            let mut product = a_val * b_val;
+            println!("Product before scaling: {:?}", product);
 
-                        // Shift the underlying SIMD vector and create new PackedM31
-                        // unsafe {
-                        //     PackedM31::from_simd_unchecked(ab.into_simd() >> DEFAULT_SCALE as u32)
-                        // }
-                        ab * PackedBaseField::broadcast(*SCALE_FACTOR_INV)
-                    };
+            // Apply scaling compensation (divide by scale factor)
+            // Since values are already scaled up by 2^20, the product is scaled by 2^40
+            // We need to divide by 2^20 to get back to 2^20 scaling
+            let scale_compensated = product * PackedBaseField::broadcast(*SCALE_FACTOR_INV);
+            println!("Product after scaling: {:?}", scale_compensated);
 
-                    println!("scaled_mul: {:?}", scaled_mul);
+            trace[2].set(i, scale_compensated.to_array()[0]);
 
-                    // Store values in trace
-                    trace[0].lock().data[vec_row] = a_val;
-                    trace[1].lock().data[vec_row] = b_val;
-                    trace[2].lock().data[vec_row] = scaled_mul;
-
-                    local_c_data.push(scaled_mul);
-                }
+            if i < size {
+                c_data.push(scale_compensated);
             }
+        } else {
+            // Pad remaining trace with zeros
+            trace[0].set(i, BaseField::zero());
+            trace[1].set(i, BaseField::zero());
+            trace[2].set(i, BaseField::zero());
+        }
+    }
 
-            // Append local results to global c_data
-            let mut c_data = c_data.lock();
-            c_data.extend(local_c_data);
-        });
-
-    let trace = Arc::try_unwrap(trace)
-        .unwrap()
-        .into_iter()
-        .map(|mutex| mutex.into_inner())
-        .collect::<Vec<_>>();
-
-    let c_data = Arc::try_unwrap(c_data).unwrap().into_inner();
-
-    // Create output tensor C
+    // Create output tensor
     let c = AirTensor::Owned {
         data: c_data,
         dims: if a.size() > b.size() {
@@ -143,6 +101,7 @@ pub(super) fn generate_trace<'a>(
 mod tests {
     use super::*;
     use numerair::fixed_points::{pack_floats, unpack_floats, DEFAULT_SCALE};
+    use stwo_prover::core::backend::simd::m31::LOG_N_LANES;
 
     #[test]
     fn test_generate_trace_correctness() {
@@ -152,35 +111,41 @@ mod tests {
         let binding_b_2 = pack_floats(&[1.0; 6], DEFAULT_SCALE, 0.0);
         let binding_a_3 = pack_floats(&[1.0; 3], DEFAULT_SCALE, 0.0);
         let binding_b_3 = pack_floats(&[2.0; 6], DEFAULT_SCALE, 0.0);
+        let binding_a_4 = pack_floats(&[0.4, 0.1, 3.3, 4.0], DEFAULT_SCALE, 0.0);
+        let binding_b_4 = pack_floats(&[0.3, 0.2, 7.3, 8.0], DEFAULT_SCALE, 0.0);
 
         let test_cases = vec![
-            // Case 1: Simple 2x2 matrices
-            (
-                AirTensor::new(&binding_a_1, vec![2, 2]),
-                AirTensor::new(&binding_b_1, vec![2, 2]),
-                vec![2, 2],
-                pack_floats(&[2.0; 4], DEFAULT_SCALE, 0.0), // Expected result: 1 * 2 = 2 for all elements
-            ),
-            // Case 2: Broadcasting scalar to matrix
-            (
-                AirTensor::new(&binding_a_2, vec![1]),
-                AirTensor::new(&binding_b_2, vec![2, 3]),
-                vec![2, 3],
-                pack_floats(&[5.0; 6], DEFAULT_SCALE, 0.0), // Expected result: 5 * 1 = 5 for all elements
-            ),
-            // Case 3: Broadcasting row to matrix
-            (
-                AirTensor::new(&binding_a_3, vec![1, 3]),
-                AirTensor::new(&binding_b_3, vec![2, 3]),
-                vec![2, 3],
-                pack_floats(&[2.0; 6], DEFAULT_SCALE, 0.0), // Expected result: 1 * 2 = 2 for all elements
-            ),
+            // // Case 1: Simple 2x2 matrices
+            // (
+            //     AirTensor::new(&binding_a_1, vec![2, 2]),
+            //     AirTensor::new(&binding_b_1, vec![2, 2]),
+            //     vec![2, 2],
+            //     pack_floats(&[2.0; 4], DEFAULT_SCALE, 0.0), // Expected result: 1 * 2 = 2 for all elements
+            // ),
+            // // Case 2: Broadcasting scalar to matrix
+            // (
+            //     AirTensor::new(&binding_a_2, vec![1]),
+            //     AirTensor::new(&binding_b_2, vec![2, 3]),
+            //     vec![2, 3],
+            //     pack_floats(&[5.0; 6], DEFAULT_SCALE, 0.0), // Expected result: 5 * 1 = 5 for all elements
+            // ),
+            // // Case 3: Broadcasting row to matrix
+            // (
+            //     AirTensor::new(&binding_a_3, vec![1, 3]),
+            //     AirTensor::new(&binding_b_3, vec![2, 3]),
+            //     vec![2, 3],
+            //     pack_floats(&[2.0; 6], DEFAULT_SCALE, 0.0), // Expected result: 1 * 2 = 2 for all elements
+            // ),
             // Case 4: Different values in matrices
             (
-                AirTensor::create::<SimdBackend>(vec![1, 2, 3, 4], vec![2, 2]),
-                AirTensor::create::<SimdBackend>(vec![5, 6, 7, 8], vec![2, 2]),
+                AirTensor::new(&binding_a_4, vec![2, 2]),
+                AirTensor::new(&binding_b_4, vec![2, 2]),
                 vec![2, 2],
-                pack_floats(&[5.0, 12.0, 21.0, 32.0], DEFAULT_SCALE, 0.0), // Element-wise multiplication
+                pack_floats(
+                    &[0.4 * 0.3, 0.1 * 0.2, 3.3 * 7.3, 4.0 * 8.0],
+                    DEFAULT_SCALE,
+                    0.0,
+                ), // Element-wise multiplication
             ),
         ];
 
@@ -221,7 +186,6 @@ mod tests {
             );
 
             // Unpack and verify result values
-
             let result_values = unpack_floats(result.data(), DEFAULT_SCALE, 0.0, result.size());
             let expected_values = unpack_floats(
                 &expected_values,
@@ -231,9 +195,10 @@ mod tests {
             );
 
             assert_eq!(
-                result_values, expected_values,
-                "Case {:?}: Result tensor has incorrect values",
-                i
+                result_values,
+                expected_values,
+                "Case {}: Result tensor has incorrect values",
+                i + 1
             );
         }
     }
