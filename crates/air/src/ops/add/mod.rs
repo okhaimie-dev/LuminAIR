@@ -1,4 +1,5 @@
 use crate::tensor::AirTensor;
+use numerair::eval::eval_add;
 use stwo_prover::{
     constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval},
     core::{prover::StarkProof, vcs::ops::MerkleHasher},
@@ -39,7 +40,7 @@ impl FrameworkEval for TensorAddEval {
         let c = eval.next_trace_mask();
 
         // Add constraint: c = a + b
-        eval.add_constraint(c - (a + b));
+        eval_add(&mut eval, a, b, c);
 
         eval
     }

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use luminal::prelude::GenericCompiler;
 use prim::PrimitiveCompiler;
 
+pub mod utils;
 pub mod data;
 pub mod prim;
 

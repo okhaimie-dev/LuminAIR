@@ -9,8 +9,8 @@ license.workspace = true
 stwo-prover.workspace = true
 luminal.workspace = true
 rayon.workspace = true
+numerair.workspace = true
 luminair_air = { path = "../air" }
-numerair = { path = "../numerair" }
 
 [dev-dependencies]
 luminal_cpu = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
