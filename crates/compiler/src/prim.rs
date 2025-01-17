@@ -9,7 +9,8 @@ use luminal::prelude::*;
 use crate::data::StwoData;
 use luminair_air::{
     ops::{
-        add::TensorAdd, //mul::TensorMul
+        add::TensorAdd,
+        mul::TensorMul, //mul::TensorMul
     },
     serde::SerializableTrace,
     tensor::AirTensor,
@@ -101,71 +102,71 @@ impl Operator for StwoAdd {
     }
 }
 
-// #[derive(Debug, Clone, Default, PartialEq)]
-// pub struct StwoMul {
-//     node_id: usize,
-//     config: Arc<Config>,
-// }
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StwoMul {
+    node_id: usize,
+    config: Arc<Config>,
+}
 
-// impl StwoMul {
-//     pub fn new(node_id: usize, config: Arc<Config>) -> Self {
-//         Self { node_id, config }
-//     }
-// }
+impl StwoMul {
+    pub fn new(node_id: usize, config: Arc<Config>) -> Self {
+        Self { node_id, config }
+    }
+}
 
-// impl Operator for StwoMul {
-//     fn process(&mut self, inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-//         if inp.len() != 2 {
-//             panic!("Mul operator requires exactly two input tensors.");
-//         }
+impl Operator for StwoMul {
+    fn process(&mut self, inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        if inp.len() != 2 {
+            panic!("Mul operator requires exactly two input tensors.");
+        }
 
-//         let (a_tensor, a_shape) = &inp[0];
-//         let (b_tensor, b_shape) = &inp[1];
+        let (a_tensor, a_shape) = &inp[0];
+        let (b_tensor, b_shape) = &inp[1];
 
-//         let get_data = |tensor: &InputTensor| {
-//             if let Some(data) = tensor.borrowed().downcast_ref::<Vec<f32>>() {
-//                 StwoData::from_f32(data)
-//             } else if let Some(data) = tensor.borrowed().downcast_ref::<StwoData>() {
-//                 StwoData(Arc::clone(&data.0))
-//             } else {
-//                 panic!("Unsupported input type for StwoMul");
-//             }
-//         };
+        let get_data = |tensor: &InputTensor| {
+            if let Some(data) = tensor.borrowed().downcast_ref::<Vec<f32>>() {
+                StwoData::from_f32(data)
+            } else if let Some(data) = tensor.borrowed().downcast_ref::<StwoData>() {
+                StwoData(Arc::clone(&data.0))
+            } else {
+                panic!("Unsupported input type for StwoMul");
+            }
+        };
 
-//         let a_data = get_data(a_tensor);
-//         let b_data = get_data(b_tensor);
+        let a_data = get_data(a_tensor);
+        let b_data = get_data(b_tensor);
 
-//         // Create AirTensors
-//         let a = AirTensor::new(a_data.as_slice(), a_shape.shape_usize());
-//         let b = AirTensor::new(b_data.as_slice(), b_shape.shape_usize());
+        // Create AirTensors
+        let a = AirTensor::new(a_data.as_slice(), a_shape.shape_usize());
+        let b = AirTensor::new(b_data.as_slice(), b_shape.shape_usize());
 
-//         // Calculate required trace size based on tensor dimensions
-//         let max_size = a.size().max(b.size());
-//         let log_size = calculate_log_size(max_size);
+        // Calculate required trace size based on tensor dimensions
+        let max_size = a.size().max(b.size());
+        let log_size = calculate_log_size(max_size);
 
-//         let circuit = TensorAdd {
-//             a: &a,
-//             b: &b,
-//             log_size,
-//         };
+        let circuit = TensorMul {
+            a: &a,
+            b: &b,
+            log_size,
+        };
 
-//         // Generate trace and get result tensor
-//         let (trace, c) = circuit.generate_trace();
+        // Generate trace and get result tensor
+        let (trace, c) = circuit.generate_trace();
 
-//         // Save trace if trace_registry is present
-//         if let Some(trace_registry) = &self.config.trace_registry {
-//             let file_path = trace_registry.join(format!("{}_mul.bin", self.node_id));
+        // Save trace if trace_registry is present
+        if let Some(trace_registry) = &self.config.trace_registry {
+            let file_path = trace_registry.join(format!("{}_mul.bin", self.node_id));
 
-//             let serializable = SerializableTrace::from(&trace);
-//             if let Err(err) = serializable.save(file_path) {
-//                 eprintln!("Failed to save trace: {:?}", err);
-//             }
-//         }
+            let serializable = SerializableTrace::from(&trace);
+            if let Err(err) = serializable.save(file_path) {
+                eprintln!("Failed to save trace: {:?}", err);
+            }
+        }
 
-//         let c = vec![Tensor::new(StwoData(Arc::new(c.into_data_vec())))];
-//         c
-//     }
-// }
+        let c = vec![Tensor::new(StwoData(Arc::new(c.into_data_vec())))];
+        c
+    }
+}
 
 impl Compiler for PrimitiveCompiler {
     type Output = ();
@@ -181,11 +182,9 @@ impl Compiler for PrimitiveCompiler {
 
             if is::<Add>(op) {
                 *op_ref = Box::new(StwoAdd::new(id.index(), Arc::clone(&self.config)))
-            }
-            // else if is::<Mul>(op) {
-            //     *op_ref = Box::new(StwoMul::new(id.index(), Arc::clone(&self.config)))
-            // }
-            else if is::<Contiguous>(op) {
+            } else if is::<Mul>(op) {
+                *op_ref = Box::new(StwoMul::new(id.index(), Arc::clone(&self.config)))
+            } else if is::<Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
             } else if is::<Function>(op) {
                 // Keep the Function operator as is
