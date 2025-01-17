@@ -1,3 +1,6 @@
+use crate::tensor::AirTensor;
+use num_traits::identities::Zero;
+use numerair::FixedPoint;
 use stwo_prover::core::backend::Column;
 use stwo_prover::core::{
     backend::{
@@ -11,8 +14,6 @@ use stwo_prover::core::{
     },
     ColumnVec,
 };
-use num_traits::identities::Zero;
-use crate::tensor::AirTensor;
 
 pub(super) fn generate_trace<'a>(
     log_size: u32,
@@ -41,7 +42,7 @@ pub(super) fn generate_trace<'a>(
             // Get values with broadcasting
             let a_val = a.data()[i % a.data().len()];
             let b_val = b.data()[i % b.data().len()];
-            let sum = a_val + b_val;
+            let sum = a_val.fixed_add(b_val);
 
             trace[0].set(i, a_val.to_array()[0]);
             trace[1].set(i, b_val.to_array()[0]);

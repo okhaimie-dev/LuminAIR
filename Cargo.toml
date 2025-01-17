@@ -11,5 +11,5 @@ license = "MIT"
 [workspace.dependencies]
 stwo-prover = { git = "https://github.com/starkware-libs/stwo.git", rev = "36b17ac" }
 luminal = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
-numerair = { git = "https://github.com/gizatechxyz/NumerAir.git", rev = "7c50563" }
+numerair = { git = "https://github.com/gizatechxyz/NumerAir.git", rev = "3d9a9b9" }
 rayon = "1.10.0"

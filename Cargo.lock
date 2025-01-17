@@ -1347,7 +1347,7 @@ dependencies = [
 [[package]]
 name = "numerair"
 version = "0.1.0"
-source = "git+https://github.com/gizatechxyz/NumerAir.git?rev=7c50563#7c50563aed9a218e47126bef5a4c5e00d45fabd5"
+source = "git+https://github.com/gizatechxyz/NumerAir.git?rev=3d9a9b9#3d9a9b98507493330f22e0f01a9589ddd5c5c012"
 dependencies = [
  "num-traits",
  "rayon",
