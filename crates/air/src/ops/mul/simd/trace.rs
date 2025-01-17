@@ -25,8 +25,8 @@ pub(super) fn generate_trace<'a>(
 ) {
     // Calculate trace size and initialize columns
     let trace_size = 1 << log_size;
-    let mut trace = Vec::with_capacity(3);
-    for _ in 0..3 {
+    let mut trace = Vec::with_capacity(4);
+    for _ in 0..4 {
         trace.push(Col::<SimdBackend, BaseField>::zeros(trace_size));
     }
 
@@ -42,20 +42,22 @@ pub(super) fn generate_trace<'a>(
             // Get values with broadcasting
             let a_val = a.data()[i % a.data().len()];
             let b_val = b.data()[i % b.data().len()];
-            let sum = a_val.fixed_add(b_val);
+            let (out, rem) = a_val.fixed_mul_rem(b_val);
 
             trace[0].set(i, a_val.to_array()[0]);
             trace[1].set(i, b_val.to_array()[0]);
-            trace[2].set(i, sum.to_array()[0]);
+            trace[2].set(i, out.to_array()[0]);
+            trace[3].set(i, rem.to_array()[0]);
 
             if i < size {
-                c_data.push(sum);
+                c_data.push(out);
             }
         } else {
             // Pad remaining trace with zeros
             trace[0].set(i, BaseField::zero());
             trace[1].set(i, BaseField::zero());
             trace[2].set(i, BaseField::zero());
+            trace[3].set(i, BaseField::zero());
         }
     }
 
@@ -113,21 +115,21 @@ mod tests {
                 AirTensor::new(&binding_a_1, vec![2, 2]),
                 AirTensor::new(&binding_b_1, vec![2, 2]),
                 vec![2, 2],
-                vec![3.; 4], // Expected result: 1 + 2 = 3 for all elements
+                vec![2.; 4], // Expected result: 1 * 2 = 2 for all elements
             ),
             // Case 2: Broadcasting scalar to matrix
             (
                 AirTensor::new(&binding_a_2, vec![1]),
                 AirTensor::new(&binding_b_2, vec![2, 3]),
                 vec![2, 3],
-                vec![6.; 6], // Expected result: 5 + 1 = 6 for all elements
+                vec![5.; 6], // Expected result: 5 * 1 = 5 for all elements
             ),
             // Case 3: Broadcasting row to matrix
             (
                 AirTensor::new(&binding_a_3, vec![1, 3]),
                 AirTensor::new(&binding_b_3, vec![2, 3]),
                 vec![2, 3],
-                vec![3.; 6], // Expected result: 1 + 2 = 3 for all elements
+                vec![2.; 6], // Expected result: 1 * 2 = 2 for all elements
             ),
         ];
 
@@ -147,8 +149,8 @@ mod tests {
             // Check trace size
             assert_eq!(
                 trace.len(),
-                3,
-                "Case {}: Trace should have 3 columns (a, b, c)",
+                4,
+                "Case {}: Trace should have 4 columns (lhs, rhs, out, rem)",
                 i
             );
             assert_eq!(
