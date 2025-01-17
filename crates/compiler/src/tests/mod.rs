@@ -27,6 +27,8 @@ macro_rules! single_binary_test {
                 // Retrieve data from `c`
                 let stwo_output = cx.get_final_output(c.id);
 
+                println!("stwo_output: {:?}", stwo_output);
+
                 // CPUCompiler comparison
                 let mut cx_cpu = Graph::new();
                 let a_cpu = cx_cpu.tensor($size).set(a_data.clone());

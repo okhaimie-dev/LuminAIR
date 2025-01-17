@@ -1,5 +1,5 @@
 use crate::tensor::AirTensor;
-use numerair::eval::EvalFixedPoint;
+use numerair::{eval::EvalFixedPoint, SCALE_FACTOR};
 use stwo_prover::{
     constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval},
     core::{prover::StarkProof, vcs::ops::MerkleHasher},
@@ -7,24 +7,24 @@ use stwo_prover::{
 
 pub mod simd;
 
-pub type TensorAddComponent = FrameworkComponent<TensorAddEval>;
+pub type TensorMulComponent = FrameworkComponent<TensorMulEval>;
 
-pub struct TensorAddProof<H: MerkleHasher> {
+pub struct TensorMulProof<H: MerkleHasher> {
     pub stark_proof: StarkProof<H>,
 }
 
-pub struct TensorAdd<'a, F> {
+pub struct TensorMul<'a, F> {
     pub a: &'a AirTensor<'a, F>,
     pub b: &'a AirTensor<'a, F>,
     pub log_size: u32,
 }
 
 #[derive(Clone)]
-pub struct TensorAddEval {
+pub struct TensorMulEval {
     pub log_size: u32,
 }
 
-impl FrameworkEval for TensorAddEval {
+impl FrameworkEval for TensorMulEval {
     fn log_size(&self) -> u32 {
         self.log_size
     }
@@ -38,8 +38,9 @@ impl FrameworkEval for TensorAddEval {
         let lhs = eval.next_trace_mask();
         let rhs = eval.next_trace_mask();
         let out = eval.next_trace_mask();
+        let rem = eval.next_trace_mask();
 
-        eval.eval_fixed_add(lhs, rhs, out);
+        eval.eval_fixed_mul(lhs, rhs, SCALE_FACTOR.into(), out, rem);
 
         eval
     }

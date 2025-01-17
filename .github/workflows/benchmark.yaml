@@ -6,7 +6,6 @@ on:
       - master
   workflow_dispatch:
 
-# Add concurrency control
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -53,85 +52,29 @@ jobs:
           # Create the benchmarks directory structure
           mkdir -p processed_benchmarks/benchmarks
           cp -r target/criterion/* processed_benchmarks/benchmarks/
-          # Rename long directories to shorter versions if needed
+
+          # Rename directories for TensorAdd benchmarks
           cd processed_benchmarks/benchmarks
-          if [ -d "TensorAdd_verification" ]; then
-            mv "TensorAdd_verification" "verify"
+          if [ -d "TensorAdd/tracing" ]; then
+            mv "TensorAdd/tracing" "tensor_add_trace"
           fi
-          if [ -d "TensorAdd_proving" ]; then
-            mv "TensorAdd_proving" "prove"
+          if [ -d "TensorAdd/proving" ]; then
+            mv "TensorAdd/proving" "tensor_add_prove"
           fi
-          if [ -d "TensorAdd_tracing" ]; then
-            mv "TensorAdd_tracing" "trace"
+          if [ -d "TensorAdd/verification" ]; then
+            mv "TensorAdd/verification" "tensor_add_verify"
           fi
 
-      - name: Create Custom Index Template
-        run: |
-          mkdir -p processed_benchmarks
-          cat > processed_benchmarks/index.html << 'EOL'
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <meta charset="utf-8">
-              <title>LuminAIR Benchmark, by Giza</title>
-              <style>
-                  .footer { display: none !important; }
-                  body { 
-                      font-family: Arial, sans-serif;
-                      max-width: 1200px;
-                      margin: 0 auto;
-                      padding: 20px;
-                  }
-                  h1 { 
-                      font-size: 2.5em; 
-                      text-align: center; 
-                      color: #333;
-                      margin-bottom: 0.5em;
-                  }
-                  .header { 
-                      text-align: center; 
-                      margin-bottom: 2em;
-                      border-bottom: 2px solid #eee;
-                      padding-bottom: 1em;
-                  }
-                  .content {
-                      margin-top: 2em;
-                  }
-                  .benchmark-list {
-                      list-style: none;
-                      padding: 0;
-                  }
-                  .benchmark-list li {
-                      margin: 1em 0;
-                      padding: 1em;
-                      background: #f8f9fa;
-                      border-radius: 4px;
-                  }
-                  .benchmark-list a {
-                      color: #0366d6;
-                      text-decoration: none;
-                      font-size: 1.1em;
-                  }
-                  .benchmark-list a:hover {
-                      text-decoration: underline;
-                  }
-              </style>
-          </head>
-          <body>
-              <div class="header">
-                  <h1>Performance Metrics on Supported Operators</h1>
-                  <p>Performance benchmarks for tensor operators (stwo-backend support)</p>
-              </div>
-              <div class="content">
-                  <ul class="benchmark-list">
-                      {{#each benchmarks}}
-                      <li><a href="{{this.path}}">{{this.name}}</a></li>
-                      {{/each}}
-                  </ul>
-              </div>
-          </body>
-          </html>
-          EOL
+          # Rename directories for TensorMul benchmarks
+          if [ -d "TensorMul/tracing" ]; then
+            mv "TensorMul/tracing" "tensor_mul_trace"
+          fi
+          if [ -d "TensorMul/proving" ]; then
+            mv "TensorMul/proving" "tensor_mul_prove"
+          fi
+          if [ -d "TensorMul/verification" ]; then
+            mv "TensorMul/verification" "tensor_mul_verify"
+          fi
 
       - name: Process Benchmark Results
         uses: joshua-auchincloss/criterion-pages@v1
@@ -139,9 +82,17 @@ jobs:
           path: "./processed_benchmarks"
           config: |
             {
-              "title": "LuminAIR Benchmark, by Giza",
+              "title": "LuminAIR Tensor Operations Benchmark Results",
               "template": {
                 "index": "index.html"
+              },
+              "groups": {
+                "tensor_add_trace": "TensorAdd Tracing Performance",
+                "tensor_add_prove": "TensorAdd Proving Performance",
+                "tensor_add_verify": "TensorAdd Verification Performance",
+                "tensor_mul_trace": "TensorMul Tracing Performance",
+                "tensor_mul_prove": "TensorMul Proving Performance",
+                "tensor_mul_verify": "TensorMul Verification Performance"
               },
               "css": {
                 "footer": {

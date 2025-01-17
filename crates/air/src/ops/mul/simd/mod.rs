@@ -21,16 +21,16 @@ use stwo_prover::{
 
 use crate::{tensor::AirTensor, Circuit};
 
-use super::{TensorAdd, TensorAddComponent, TensorAddEval, TensorAddProof};
+use super::{TensorMul, TensorMulComponent, TensorMulEval, TensorMulProof};
 
 pub mod trace;
 
-impl<'t> Circuit<SimdBackend> for TensorAdd<'t, PackedBaseField>
+impl<'t> Circuit<SimdBackend> for TensorMul<'t, PackedBaseField>
 where
-    FrameworkComponent<TensorAddEval>: ComponentProver<SimdBackend>,
+    FrameworkComponent<TensorMulEval>: ComponentProver<SimdBackend>,
 {
-    type Component = TensorAddComponent;
-    type Proof<'a, H: MerkleHasher> = TensorAddProof<H>;
+    type Component = TensorMulComponent;
+    type Proof<'a, H: MerkleHasher> = TensorMulProof<H>;
     type Error = VerificationError;
     type Trace = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
     type Field = PackedBaseField;
@@ -59,9 +59,9 @@ where
             CommitmentSchemeProver::<SimdBackend, MC>::new(config, &twiddles);
 
         // Create component
-        let component = TensorAddComponent::new(
+        let component = TensorMulComponent::new(
             &mut TraceLocationAllocator::default(),
-            TensorAddEval {
+            TensorMulEval {
                 log_size: trace[0].domain.log_size(),
             },
             (Default::default(), None),
@@ -85,7 +85,7 @@ where
         )
         .unwrap();
 
-        (vec![component], TensorAddProof { stark_proof })
+        (vec![component], TensorMulProof { stark_proof })
     }
 
     fn verify<'a, MC: MerkleChannel>(
@@ -135,7 +135,7 @@ mod tests {
     };
 
     #[test]
-    fn test_tensor_add_e2e() {
+    fn test_tensor_mul_e2e() {
         let config = PcsConfig::default();
 
         // Test cases with different shapes
@@ -197,7 +197,7 @@ mod tests {
                 + LOG_N_LANES;
 
             // Create circuit instance
-            let circuit = TensorAdd {
+            let circuit = TensorMul {
                 a: &tensor_a,
                 b: &tensor_b,
                 log_size: required_log_size,
@@ -211,13 +211,13 @@ mod tests {
 
             // Generate proof
             let start_prove = Instant::now();
-            let (components, proof) = TensorAdd::prove::<Blake2sMerkleChannel>(&trace, config);
+            let (components, proof) = TensorMul::prove::<Blake2sMerkleChannel>(&trace, config);
             let prove_time = start_prove.elapsed();
             println!("Proving time for case {}: {:?}", i + 1, prove_time);
 
             // Verify proof
             let start_verify = Instant::now();
-            TensorAdd::verify::<Blake2sMerkleChannel>(components, proof, config)
+            TensorMul::verify::<Blake2sMerkleChannel>(components, proof, config)
                 .unwrap_or_else(|_| panic!("Verification failed for test case {}", i + 1));
             let verify_time = start_verify.elapsed();
             println!("Verifying time for case {}: {:?}", i + 1, verify_time);

@@ -1179,7 +1179,9 @@ dependencies = [
  "bincode",
  "criterion",
  "itertools 0.12.1",
+ "lazy_static",
  "num-traits",
+ "numerair",
  "parking_lot",
  "rayon",
  "serde",
@@ -1195,6 +1197,7 @@ dependencies = [
  "luminair_air",
  "luminal",
  "luminal_cpu",
+ "numerair",
  "paste",
  "rand",
  "rayon",
@@ -1339,6 +1342,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.95",
+]
+
+[[package]]
+name = "numerair"
+version = "0.1.0"
+source = "git+https://github.com/gizatechxyz/NumerAir.git?rev=3d9a9b9#3d9a9b98507493330f22e0f01a9589ddd5c5c012"
+dependencies = [
+ "num-traits",
+ "rayon",
+ "stwo-prover",
 ]
 
 [[package]]
