@@ -8,5 +8,5 @@ license.workspace = true
 [dependencies]
 stwo-prover.workspace = true
 luminal.workspace = true
-luminair_air = { path = "../../crates/air" }
+# luminair_air = { path = "../../crates/air" }
 luminair_compiler = { path = "../../crates/compiler" }
