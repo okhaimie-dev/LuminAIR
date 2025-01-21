@@ -1,3 +1,4 @@
+use crate::op::HasProcessTrace;
 use luminal::prelude::*;
 
 pub trait LuminairGraph {
@@ -5,9 +6,7 @@ pub trait LuminairGraph {
 }
 
 impl LuminairGraph for Graph {
-    /// Execute the graph and generate trace.
     fn gen_trace(&mut self) {
-        // Track the number of views pointing to each tensor so we know when to clear
         if self.linearized_graph.is_none() {
             self.toposort();
         }
@@ -27,10 +26,16 @@ impl LuminairGraph for Graph {
                 st.resolve_global_dyn_dims_stack(&self.dyn_map, &mut dim_stack);
             }
 
-            // Execute
-            let tensors = self.graph.node_weight_mut(*node).unwrap().process(srcs);
+            let node_op = &mut *self.graph.node_weight_mut(*node).unwrap();
 
-            // TODO: add trace to global trace.
+            let tensors = if node_op.has_process_trace() {
+                println!("Found operator with process_trace: {:?}", node_op);
+                let (tensors, _trace) = node_op.call_process_trace(srcs).unwrap();
+                tensors
+            } else {
+                println!("Using regular process: {:?}", node_op);
+                node_op.process(srcs)
+            };
 
             for (i, tensor) in tensors.into_iter().enumerate() {
                 self.tensors.insert((*node, i as u8), tensor);

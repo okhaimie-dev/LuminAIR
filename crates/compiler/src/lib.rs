@@ -1,9 +1,10 @@
 pub mod data;
-pub mod prim;
-pub mod utils;
 pub mod graph;
+pub mod utils;
+
+pub mod op;
 
 #[cfg(test)]
 mod tests;
 
-pub type StwoCompiler = (prim::PrimitiveCompiler,);
+pub type StwoCompiler = (op::prim::PrimitiveCompiler,);
