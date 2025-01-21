@@ -77,39 +77,9 @@ impl LuminairOperator for LuminairAdd {
 }
 
 impl Operator for LuminairAdd {
-    fn process(&mut self, inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        if inp.len() != 2 {
-            panic!("Add operator requires exactly two input tensors.");
-        }
-
-        println!("Hello from process");
-
-        // Get data
-        let (a_tensor, _a_shape) = &inp[0];
-        let (b_tensor, _b_shape) = &inp[1];
-
-        let get_data = |tensor: &InputTensor| {
-            if let Some(data) = tensor.borrowed().downcast_ref::<Vec<f32>>() {
-                StwoData::from_f32(data)
-            } else if let Some(data) = tensor.borrowed().downcast_ref::<StwoData>() {
-                StwoData(Arc::clone(&data.0))
-            } else {
-                panic!("Unsupported input type for Add");
-            }
-        };
-
-        let a = get_data(a_tensor);
-        let b = get_data(b_tensor);
-
-        // Calculate required trace size based on tensor dimensions
-        let max_size = a.0.len().max(b.0.len());
-        let log_size = calculate_log_size(max_size);
-
-        // Generate trace and get result tensor
-        let (_trace, c) = gen_add_trace(log_size, &a.0, &b.0);
-
-        let c = vec![Tensor::new(StwoData(Arc::new(c)))];
-        c
+    fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        // We don't need to implement process as we implement process_trace for this op.
+        unimplemented!()
     }
 }
 
