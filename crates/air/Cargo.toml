@@ -1,0 +1,11 @@
+[package]
+name = "luminair_air"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+stwo-prover.workspace = true
+itertools = "0.12.0"
+num-traits = "0.2.17"

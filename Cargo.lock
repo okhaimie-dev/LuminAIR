@@ -1041,11 +1041,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
+name = "luminair_air"
+version = "0.0.1"
+dependencies = [
+ "itertools 0.12.1",
+ "num-traits",
+ "stwo-prover",
+]
+
+[[package]]
 name = "luminair_compiler"
 version = "0.0.1"
 dependencies = [
  "candle-core",
  "ctor",
+ "luminair_air",
  "luminal",
  "luminal_cpu",
  "numerair",
