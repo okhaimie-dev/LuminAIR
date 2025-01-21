@@ -45,8 +45,6 @@ impl LuminairOperator for LuminairAdd {
     ) -> (Vec<Tensor>, luminair_air::Trace) {
         if inp.len() != 2 {}
 
-        println!("Hello from process_trace");
-
         // Get data
         let (a_tensor, _a_shape) = &inp[0];
         let (b_tensor, _b_shape) = &inp[1];
