@@ -1,5 +1,6 @@
 use crate::op::HasProcessTrace;
 use luminal::prelude::*;
+use stwo_prover::core::ColumnVec;
 
 pub trait LuminairGraph {
     fn gen_trace(&mut self);
@@ -14,6 +15,9 @@ impl LuminairGraph for Graph {
         }
         let mut consumers = self.consumers_map.as_ref().unwrap().clone();
         let mut dim_stack = Vec::new();
+
+        // Create a ColumnVec to store all traces
+        let mut global_trace = ColumnVec::new();
 
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
@@ -32,9 +36,9 @@ impl LuminairGraph for Graph {
             let node_op = &mut *self.graph.node_weight_mut(*node).unwrap();
             let tensors = if node_op.has_process_trace() {
                 println!("Found operator with process_trace: {:?}", node_op);
-                let (tensors, _trace) = node_op.call_process_trace(srcs).unwrap();
+                let (tensors, trace) = node_op.call_process_trace(srcs).unwrap();
 
-                // TODO: add trace to the global trace.
+                global_trace.extend(trace);
 
                 tensors
             } else {
