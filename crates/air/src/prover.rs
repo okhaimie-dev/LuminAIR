@@ -30,7 +30,7 @@ const LOG_MAX_ROWS: u32 = 14;
 ///
 /// Ideally, we should cover all possible log sizes, between
 /// 1 and `LOG_MAX_ROW`
-const IS_FIRST_LOG_SIZES: [u32; 12] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
+pub(crate) const IS_FIRST_LOG_SIZES: [u32; 12] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
 
 pub fn prove_graph(traces: Vec<(TraceEval, Claim)>) {
     // ┌──────────────────────────┐
@@ -83,4 +83,15 @@ pub fn prove_graph(traces: Vec<(TraceEval, Claim)>) {
 
     // Commit the main trace.
     tree_builder.commit(channel);
+
+    // ┌───────────────────────────────────────────────┐
+    // │    Interaction Phase 2 - Interaction Trace    │
+    // └───────────────────────────────────────────────┘
+
+    // No interection trace with the components for the moment.
+
+    // ┌──────────────────────────┐
+    // │     Proof Generation     │
+    // └──────────────────────────┘
+    tracing::info!("Proof Generation");
 }

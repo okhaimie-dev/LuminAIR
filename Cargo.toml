@@ -19,3 +19,5 @@ numerair = { git = "https://github.com/gizatechxyz/NumerAir.git", rev = "3d9a9b9
 rayon = "1.10.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"

@@ -8,5 +8,7 @@ license.workspace = true
 [dependencies]
 stwo-prover.workspace = true
 tracing.workspace = true
+numerair.workspace = true
+serde.workspace = true
 itertools = "0.12.0"
 num-traits = "0.2.17"
