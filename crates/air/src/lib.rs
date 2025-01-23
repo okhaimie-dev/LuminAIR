@@ -1,15 +1,12 @@
-use components::{
-    add::{
-        components::{AddComponent, AddEval},
-        trace::AddClaim,
-    },
-    Claim,
+use components::add::{
+    components::{AddComponent, AddEval},
+    trace::AddClaim,
 };
 use prover::IS_FIRST_LOG_SIZES;
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::{preprocessed_columns::PreprocessedColumn, TraceLocationAllocator},
-    core::channel::Channel,
+    core::{air::ComponentProver, backend::simd::SimdBackend, channel::Channel},
 };
 
 pub mod components;
@@ -24,12 +21,15 @@ pub mod utils;
 /// - Interaction Trace (Phase 2)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairClaim {
-    pub add: AddClaim,
+    pub add: Vec<AddClaim>,
 }
 
 impl LuminairClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        self.add.mix_into(channel);
+        // Mix all Add claims
+        for claim in &self.add {
+            claim.mix_into(channel);
+        }
     }
 }
 
@@ -38,11 +38,10 @@ impl LuminairClaim {
 /// Components are used by the prover as a `ComponentProver`,
 /// and by the verifier as a `Component`.
 pub struct LuminairComponents {
-    add: AddComponent,
+    add: Vec<AddComponent>,
 }
 
 impl LuminairComponents {
-    /// Initilizes all luminair components from the claims generated from the trace.
     pub fn new(claim: &LuminairClaim) -> Self {
         let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
             &IS_FIRST_LOG_SIZES
@@ -52,12 +51,30 @@ impl LuminairComponents {
                 .collect::<Vec<_>>(),
         );
 
-        let add = AddComponent::new(
-            tree_span_provider,
-            AddEval::new(&claim.add),
-            (Default::default(), None),
-        );
+        // Create a component for each Add claim
+        let add = claim
+            .add
+            .iter()
+            .map(|add_claim| {
+                AddComponent::new(
+                    tree_span_provider,
+                    AddEval::new(add_claim),
+                    (Default::default(), None),
+                )
+            })
+            .collect();
 
         Self { add }
+    }
+
+    /// Returns the `ComponentProver` of each components, used by the prover.
+    pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
+        // Collect all component provers into a single vector
+        let mut provers = Vec::new();
+        // Add each Add component prover
+        for add in &self.add {
+            provers.push(add as &dyn ComponentProver<SimdBackend>);
+        }
+        provers
     }
 }

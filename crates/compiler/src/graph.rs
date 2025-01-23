@@ -59,7 +59,7 @@ impl LuminairGraph for Graph {
             }
         }
 
-        prove_graph(global_trace);
+        prove_graph(global_trace).unwrap();
 
         self.reset();
     }

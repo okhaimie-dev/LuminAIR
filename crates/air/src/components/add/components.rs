@@ -35,7 +35,7 @@ impl FrameworkEval for AddEval {
     ///
     /// Returns the ilog2 (upper) bound of the constraint degree for the component.
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        todo!()
+        self.log_size + 1
     }
 
     /// Defines the AIR for the Add component.
