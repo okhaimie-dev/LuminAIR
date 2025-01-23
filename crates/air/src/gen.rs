@@ -3,7 +3,7 @@ use stwo_prover::core::backend::simd::m31::{PackedBaseField, LOG_N_LANES};
 use stwo_prover::core::backend::Column;
 use stwo_prover::core::{
     backend::{simd::SimdBackend, Col},
-    fields::m31::{BaseField, M31},
+    fields::m31::BaseField,
     poly::{
         circle::{CanonicCoset, CircleEvaluation},
         BitReversedOrder,
@@ -11,13 +11,19 @@ use stwo_prover::core::{
     ColumnVec,
 };
 
-pub type Trace = ColumnVec<CircleEvaluation<SimdBackend, M31, BitReversedOrder>>;
+use crate::Claim;
+
+/// Type for trace evaluation to be used in Stwo.
+pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
+
+/// Claim for the Program trace.
+pub type AddClaim = Claim;
 
 pub fn gen_add_trace(
     log_size: u32,
     a: &[PackedBaseField],
     b: &[PackedBaseField],
-) -> (Trace, Vec<PackedBaseField>) {
+) -> (TraceEval, AddClaim, Vec<PackedBaseField>) {
     // Calculate trace size and initialize columns
     let trace_size = 1 << log_size;
     let mut trace = Vec::with_capacity(3);
@@ -62,6 +68,7 @@ pub fn gen_add_trace(
             .into_iter()
             .map(|eval| CircleEvaluation::new(domain, eval))
             .collect(),
+        AddClaim { log_size },
         c_data,
     )
 }
