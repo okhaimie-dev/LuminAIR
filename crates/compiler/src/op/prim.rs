@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use luminair_air::{calculate_log_size, gen_add_trace};
+use luminair_air::gen::{calculate_log_size, gen_add_trace};
 use luminal::prelude::*;
 
 use crate::{data::StwoData, op::IntoOperator};
@@ -42,7 +42,7 @@ impl LuminairOperator for LuminairAdd {
     fn process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-    ) -> (Vec<Tensor>, luminair_air::Trace) {
+    ) -> (Vec<Tensor>, luminair_air::gen::Trace) {
         if inp.len() != 2 {}
 
         // Get data

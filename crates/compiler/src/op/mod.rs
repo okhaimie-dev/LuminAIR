@@ -1,4 +1,4 @@
-use luminair_air::Trace;
+use luminair_air::gen::Trace;
 use luminal::prelude::*;
 
 pub mod prim;
