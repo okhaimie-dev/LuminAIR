@@ -1,6 +1,8 @@
 use crate::op::HasProcessTrace;
 use luminair_air::{
-    components::add::trace::AddColumn, prover::prover, LuminairClaim, LuminairTrace,
+    components::add::trace::AddColumn,
+    prover::{prover, verifier},
+    LuminairClaim, LuminairTrace,
 };
 use luminal::prelude::*;
 
@@ -71,7 +73,9 @@ impl LuminairGraph for Graph {
             claims: LuminairClaim { add: add_claims },
         };
 
-        prover(luminair_trace).unwrap();
+        let proof = prover(luminair_trace).unwrap();
+
+        let _ = verifier(proof);
 
         self.reset();
     }

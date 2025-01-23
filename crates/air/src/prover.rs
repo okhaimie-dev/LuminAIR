@@ -1,12 +1,14 @@
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
-    constraint_framework::preprocessed_columns::gen_is_first,
+    constraint_framework::{
+        preprocessed_columns::gen_is_first, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX,
+    },
     core::{
         backend::simd::SimdBackend,
         channel::Blake2sChannel,
         pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
         poly::circle::{CanonicCoset, PolyOps},
-        prover::{prove, ProvingError, StarkProof, VerificationError},
+        prover::{prove, verify, ProvingError, StarkProof, VerificationError},
         vcs::{
             blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
             ops::MerkleHasher,
@@ -132,5 +134,37 @@ pub fn verifier(
         &mut CommitmentSchemeVerifier::<Blake2sMerkleChannel>::new(config);
     let log_sizes = &claim.log_sizes();
 
-    todo!()
+    // ┌───────────────────────────────────────────────┐
+    // │   Interaction Phase 0 - Preprocessed Trace    │
+    // └───────────────────────────────────────────────┘
+
+    commitment_scheme_verifier.commit(
+        proof.commitments[PREPROCESSED_TRACE_IDX],
+        &log_sizes[PREPROCESSED_TRACE_IDX],
+        channel,
+    );
+
+    // ┌───────────────────────────────────────┐
+    // │    Interaction Phase 1 - Main Trace   │
+    // └───────────────────────────────────────┘
+    claim.mix_into(channel);
+    commitment_scheme_verifier.commit(
+        proof.commitments[ORIGINAL_TRACE_IDX],
+        &log_sizes[ORIGINAL_TRACE_IDX],
+        channel,
+    );
+
+    // ┌───────────────────────────────────────────────┐
+    // │    Interaction Phase 2 - Interaction Trace    │
+    // └───────────────────────────────────────────────┘
+
+    // No interaction trace for the moment
+
+    // ┌──────────────────────────┐
+    // │    Proof Verification    │
+    // └──────────────────────────┘
+    let component_builder = LuminairComponents::new(&claim);
+    let components = component_builder.components();
+
+    verify(&components, channel, commitment_scheme_verifier, proof)
 }

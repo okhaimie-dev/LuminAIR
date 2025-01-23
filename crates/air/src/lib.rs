@@ -1,3 +1,5 @@
+#![feature(trait_upcasting)]
+
 use components::{
     add::components::{AddComponent, AddEval},
     AddClaim, TraceEval,
@@ -8,7 +10,12 @@ use stwo_prover::{
     constraint_framework::{
         preprocessed_columns::PreprocessedColumn, TraceLocationAllocator, PREPROCESSED_TRACE_IDX,
     },
-    core::{air::ComponentProver, backend::simd::SimdBackend, channel::Channel, pcs::TreeVec},
+    core::{
+        air::{Component, ComponentProver},
+        backend::simd::SimdBackend,
+        channel::Channel,
+        pcs::TreeVec,
+    },
 };
 
 pub mod components;
@@ -88,6 +95,14 @@ impl LuminairComponents {
             provers.push(add as &dyn ComponentProver<SimdBackend>);
         }
         provers
+    }
+
+    /// Returns the `Component` of each components, used by the verifier.
+    pub fn components(&self) -> Vec<&dyn Component> {
+        self.provers()
+            .into_iter()
+            .map(|component| component as &dyn Component)
+            .collect()
     }
 }
 
