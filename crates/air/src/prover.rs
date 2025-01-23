@@ -2,18 +2,18 @@ use stwo_prover::{
     constraint_framework::preprocessed_columns::gen_is_first,
     core::{
         backend::simd::SimdBackend,
-        channel::{Blake2sChannel, Channel},
+        channel::Blake2sChannel,
         pcs::{CommitmentSchemeProver, PcsConfig},
         poly::circle::{CanonicCoset, PolyOps},
         vcs::blake2_merkle::Blake2sMerkleChannel,
     },
 };
 
-use crate::{gen::TraceEval, Claim};
+use crate::components::{Claim, TraceEval};
 
 /// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
 ///
-/// Means that Luminair does not accept programs inducing a component with more than 2^LOG_MAX_ROWS steps 
+/// Means that Luminair does not accept programs inducing a component with more than 2^LOG_MAX_ROWS steps
 const LOG_MAX_ROWS: u32 = 14;
 
 /// Log sizes of the preprocessed columns
@@ -78,7 +78,7 @@ pub fn prove_graph(traces: Vec<(TraceEval, Claim)>) {
         tree_builder.extend_evals(trace.0);
 
         // Mix the claim into the Fiat-Shamir channel.
-        channel.mix_u64(trace.1.log_size as u64);
+        trace.1.mix_into(channel);
     }
 
     // Commit the main trace.

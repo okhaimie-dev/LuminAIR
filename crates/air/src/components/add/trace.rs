@@ -1,24 +1,18 @@
 use num_traits::identities::Zero;
-use stwo_prover::core::backend::simd::m31::{PackedBaseField, LOG_N_LANES};
+use stwo_prover::core::backend::simd::m31::PackedBaseField;
 use stwo_prover::core::backend::Column;
 use stwo_prover::core::{
     backend::{simd::SimdBackend, Col},
     fields::m31::BaseField,
-    poly::{
-        circle::{CanonicCoset, CircleEvaluation},
-        BitReversedOrder,
-    },
-    ColumnVec,
+    poly::circle::{CanonicCoset, CircleEvaluation},
 };
 
-use crate::Claim;
-
-/// Type for trace evaluation to be used in Stwo.
-pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
+use crate::components::{Claim, TraceEval};
 
 /// Claim for the Program trace.
 pub type AddClaim = Claim;
 
+/// Generate trace for element-wise addition of two vectors.
 pub fn gen_add_trace(
     log_size: u32,
     a: &[PackedBaseField],
@@ -71,11 +65,4 @@ pub fn gen_add_trace(
         AddClaim { log_size },
         c_data,
     )
-}
-
-pub fn calculate_log_size(max_size: usize) -> u32 {
-    ((max_size + (1 << LOG_N_LANES) - 1) >> LOG_N_LANES)
-        .next_power_of_two()
-        .trailing_zeros()
-        + LOG_N_LANES
 }

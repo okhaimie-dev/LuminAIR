@@ -1,4 +1,4 @@
-use luminair_air::{gen::TraceEval, Claim};
+use luminair_air::components::{Claim, TraceEval};
 use luminal::prelude::*;
 
 pub mod prim;

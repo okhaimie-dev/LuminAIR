@@ -1,5 +1,8 @@
 use crate::op::HasProcessTrace;
-use luminair_air::{gen::TraceEval, prover::prove_graph, Claim};
+use luminair_air::{
+    components::{Claim, TraceEval},
+    prover::prove_graph,
+};
 use luminal::prelude::*;
 
 pub trait LuminairGraph {

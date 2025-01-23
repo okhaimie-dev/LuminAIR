@@ -4,8 +4,8 @@ use std::{
 };
 
 use luminair_air::{
-    gen::{calculate_log_size, gen_add_trace},
-    Claim,
+    components::{add::trace::gen_add_trace, Claim, TraceEval},
+    utils::calculate_log_size,
 };
 use luminal::prelude::*;
 
@@ -45,7 +45,7 @@ impl LuminairOperator for LuminairAdd {
     fn process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-    ) -> (Vec<Tensor>, Claim, luminair_air::gen::TraceEval) {
+    ) -> (Vec<Tensor>, Claim, TraceEval) {
         if inp.len() != 2 {}
 
         // Get data
