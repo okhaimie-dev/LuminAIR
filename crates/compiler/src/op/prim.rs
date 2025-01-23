@@ -4,7 +4,10 @@ use std::{
 };
 
 use luminair_air::{
-    components::{add::trace::gen_add_trace, Claim, TraceEval},
+    components::{
+        add::trace::{gen_add_trace, AddColumn},
+        Claim, TraceEval,
+    },
     utils::calculate_log_size,
 };
 use luminal::prelude::*;
@@ -41,11 +44,11 @@ impl LuminairAdd {
     }
 }
 
-impl LuminairOperator for LuminairAdd {
+impl LuminairOperator<AddColumn> for LuminairAdd {
     fn process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-    ) -> (Vec<Tensor>, Claim, TraceEval) {
+    ) -> (Vec<Tensor>, Claim<AddColumn>, TraceEval) {
         if inp.len() != 2 {}
 
         // Get data

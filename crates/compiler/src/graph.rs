@@ -1,7 +1,6 @@
 use crate::op::HasProcessTrace;
 use luminair_air::{
-    components::{Claim, TraceEval},
-    prover::prove_graph,
+    components::add::trace::AddColumn, prover::prover, LuminairClaim, LuminairTrace,
 };
 use luminal::prelude::*;
 
@@ -19,8 +18,10 @@ impl LuminairGraph for Graph {
         let mut consumers = self.consumers_map.as_ref().unwrap().clone();
         let mut dim_stack = Vec::new();
 
-        // Create a ColumnVec to store all traces
-        let mut global_trace: Vec<(TraceEval, Claim)> = Vec::new();
+        // Store all add traces
+        let mut add_traces = Vec::new();
+        // Store all add claims
+        let mut add_claims = Vec::new();
 
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
@@ -37,17 +38,23 @@ impl LuminairGraph for Graph {
 
             // Get operator and try to use process_trace if available
             let node_op = &mut *self.graph.node_weight_mut(*node).unwrap();
-            let tensors = if node_op.has_process_trace() {
-                println!("Found operator with process_trace: {:?}", node_op);
-                let (tensors, claim, trace) = node_op.call_process_trace(srcs).unwrap();
+            let tensors =
+                if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
+                    println!("Found operator with process_trace: {:?}", node_op);
+                    let (tensors, claim, trace) =
+                        <Box<dyn Operator> as HasProcessTrace<AddColumn>>::call_process_trace(
+                            node_op, srcs,
+                        )
+                        .unwrap();
 
-                global_trace.push((trace, claim));
+                    add_traces.push(trace);
+                    add_claims.push(claim);
 
-                tensors
-            } else {
-                println!("Using regular process: {:?}", node_op);
-                node_op.process(srcs)
-            };
+                    tensors
+                } else {
+                    println!("Using regular process: {:?}", node_op);
+                    node_op.process(srcs)
+                };
 
             for (i, tensor) in tensors.into_iter().enumerate() {
                 self.tensors.insert((*node, i as u8), tensor);
@@ -59,7 +66,12 @@ impl LuminairGraph for Graph {
             }
         }
 
-        prove_graph(global_trace).unwrap();
+        let luminair_trace = LuminairTrace {
+            traces: add_traces,
+            claims: LuminairClaim { add: add_claims },
+        };
+
+        prover(luminair_trace).unwrap();
 
         self.reset();
     }

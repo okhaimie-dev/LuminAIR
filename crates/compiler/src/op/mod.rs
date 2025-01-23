@@ -1,38 +1,39 @@
-use luminair_air::components::{Claim, TraceEval};
+use luminair_air::components::{Claim, TraceColumn, TraceEval};
 use luminal::prelude::*;
+use std::fmt::Debug;
 
 pub mod prim;
 
-pub trait LuminairOperator: Operator {
+pub trait LuminairOperator<C: TraceColumn + Debug + 'static>: Operator {
     fn process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-    ) -> (Vec<Tensor>, Claim, TraceEval);
+    ) -> (Vec<Tensor>, Claim<C>, TraceEval);
 }
 
-pub trait HasProcessTrace {
+pub trait HasProcessTrace<C: TraceColumn + Debug + 'static> {
     fn has_process_trace(&self) -> bool {
         false
     }
     fn call_process_trace(
         &mut self,
         _inp: Vec<(InputTensor, ShapeTracker)>,
-    ) -> Option<(Vec<Tensor>, Claim, TraceEval)> {
+    ) -> Option<(Vec<Tensor>, Claim<C>, TraceEval)> {
         None
     }
 }
 
 #[derive(Debug)]
-pub struct LuminairWrapper(pub Box<dyn LuminairOperator>);
+pub struct LuminairWrapper<C: TraceColumn + Debug + 'static>(pub Box<dyn LuminairOperator<C>>);
 
-impl Operator for LuminairWrapper {
+impl<C: TraceColumn + Debug + 'static> Operator for LuminairWrapper<C> {
     fn process(&mut self, inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
         println!("Wrapper process called");
         self.0.process(inp)
     }
 }
 
-impl HasProcessTrace for LuminairWrapper {
+impl<C: TraceColumn + Debug + 'static> HasProcessTrace<C> for LuminairWrapper<C> {
     fn has_process_trace(&self) -> bool {
         true
     }
@@ -40,14 +41,14 @@ impl HasProcessTrace for LuminairWrapper {
     fn call_process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-    ) -> Option<(Vec<Tensor>, Claim, TraceEval)> {
+    ) -> Option<(Vec<Tensor>, Claim<C>, TraceEval)> {
         Some(self.0.process_trace(inp))
     }
 }
 
-impl HasProcessTrace for Box<dyn Operator> {
+impl<C: TraceColumn + Debug + 'static> HasProcessTrace<C> for Box<dyn Operator> {
     fn has_process_trace(&self) -> bool {
-        if let Some(wrapper) = (**self).as_any().downcast_ref::<LuminairWrapper>() {
+        if let Some(wrapper) = (**self).as_any().downcast_ref::<LuminairWrapper<C>>() {
             wrapper.has_process_trace()
         } else {
             false
@@ -57,8 +58,8 @@ impl HasProcessTrace for Box<dyn Operator> {
     fn call_process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-    ) -> Option<(Vec<Tensor>, Claim, TraceEval)> {
-        if let Some(wrapper) = (**self).as_any_mut().downcast_mut::<LuminairWrapper>() {
+    ) -> Option<(Vec<Tensor>, Claim<C>, TraceEval)> {
+        if let Some(wrapper) = (**self).as_any_mut().downcast_mut::<LuminairWrapper<C>>() {
             wrapper.call_process_trace(inp)
         } else {
             None
@@ -66,11 +67,15 @@ impl HasProcessTrace for Box<dyn Operator> {
     }
 }
 
-pub trait IntoOperator {
+pub trait IntoOperator<C: TraceColumn + Debug + 'static> {
     fn into_operator(self) -> Box<dyn Operator>;
 }
 
-impl<T: LuminairOperator + 'static> IntoOperator for T {
+impl<T, C> IntoOperator<C> for T
+where
+    T: LuminairOperator<C> + 'static,
+    C: TraceColumn + Debug + 'static,
+{
     fn into_operator(self) -> Box<dyn Operator> {
         println!("Converting LuminairOperator to Operator");
         Box::new(LuminairWrapper(Box::new(self)))

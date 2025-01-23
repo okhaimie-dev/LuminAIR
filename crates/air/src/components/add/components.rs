@@ -1,7 +1,7 @@
 use numerair::eval::EvalFixedPoint;
 use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval};
 
-use super::trace::AddClaim;
+use crate::components::AddClaim;
 
 /// Implementation of `Component` and `ComponentProver` for the Add component.
 /// It targets the `SimdBackend` from the Stwo constraint framework, with a fallback

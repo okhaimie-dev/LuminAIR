@@ -1,12 +1,14 @@
-use components::add::{
-    components::{AddComponent, AddEval},
-    trace::AddClaim,
+use components::{
+    add::components::{AddComponent, AddEval},
+    AddClaim, TraceEval,
 };
 use prover::IS_FIRST_LOG_SIZES;
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
-    constraint_framework::{preprocessed_columns::PreprocessedColumn, TraceLocationAllocator},
-    core::{air::ComponentProver, backend::simd::SimdBackend, channel::Channel},
+    constraint_framework::{
+        preprocessed_columns::PreprocessedColumn, TraceLocationAllocator, PREPROCESSED_TRACE_IDX,
+    },
+    core::{air::ComponentProver, backend::simd::SimdBackend, channel::Channel, pcs::TreeVec},
 };
 
 pub mod components;
@@ -30,6 +32,16 @@ impl LuminairClaim {
         for claim in &self.add {
             claim.mix_into(channel);
         }
+    }
+
+    pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
+        // Combine log sizes from all components, both adds and muls
+        let mut log_sizes = TreeVec::concat_cols(self.add.iter().map(|claim| claim.log_sizes()));
+
+        // Overwrite preprocessed column claim
+        log_sizes[PREPROCESSED_TRACE_IDX] = IS_FIRST_LOG_SIZES.to_vec();
+
+        log_sizes
     }
 }
 
@@ -77,4 +89,9 @@ impl LuminairComponents {
         }
         provers
     }
+}
+
+pub struct LuminairTrace {
+    pub traces: Vec<TraceEval>,
+    pub claims: LuminairClaim,
 }

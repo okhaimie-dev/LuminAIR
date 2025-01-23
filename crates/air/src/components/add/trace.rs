@@ -7,10 +7,7 @@ use stwo_prover::core::{
     poly::circle::{CanonicCoset, CircleEvaluation},
 };
 
-use crate::components::{Claim, TraceEval};
-
-/// Claim for the Program trace.
-pub type AddClaim = Claim;
+use crate::components::{AddClaim, TraceColumn, TraceEval};
 
 /// Generate trace for element-wise addition of two vectors.
 pub fn gen_add_trace(
@@ -62,7 +59,27 @@ pub fn gen_add_trace(
             .into_iter()
             .map(|eval| CircleEvaluation::new(domain, eval))
             .collect(),
-        AddClaim { log_size },
+        AddClaim {
+            log_size,
+            _marker: std::marker::PhantomData,
+        },
         c_data,
     )
+}
+
+/// Enum representing the column indices in the Add trace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddColumn {
+    /// Index of the `lhs` register column in the Add trace.
+    Lhs,
+    /// Index of the `rhs` register column in the Add trace.
+    Rhs,
+    /// Index of the `res` register column in the Add trace.
+    Res,
+}
+
+impl TraceColumn for AddColumn {
+    fn count() -> (usize, usize) {
+        (3, 0)
+    }
 }
