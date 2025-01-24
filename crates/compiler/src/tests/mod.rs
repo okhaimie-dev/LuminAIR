@@ -22,12 +22,10 @@ macro_rules! single_binary_test {
 
                 // Compilation and execution using StwoCompiler
                 let _ = cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut c);
-                cx.execute();
+                cx.gen_trace();
 
                 // Retrieve data from `c`
                 let stwo_output = cx.get_final_output(c.id);
-
-                println!("stwo_output: {:?}", stwo_output);
 
                 // CPUCompiler comparison
                 let mut cx_cpu = Graph::new();

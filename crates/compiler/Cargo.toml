@@ -13,7 +13,7 @@ numerair.workspace = true
 luminair_air = { path = "../air" }
 
 [dev-dependencies]
-luminal_cpu = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "0309ea4" }
+luminal_cpu = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "9f13081" }
 paste = "1.0.15"
 rand = "0.8.5"
 candle-core = "0.5.0"
