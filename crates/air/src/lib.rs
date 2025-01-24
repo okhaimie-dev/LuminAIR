@@ -42,8 +42,15 @@ impl LuminairClaim {
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        // Combine log sizes from all components, both adds and muls
-        let mut log_sizes = TreeVec::concat_cols(self.add.iter().map(|claim| claim.log_sizes()));
+        // Combine log sizes from all components
+        let mut log_sizes = TreeVec::concat_cols(
+            self.add
+                .iter()
+                .chain(
+                    [], // We will chain other ops here. E.g; `self.mul.iter()`
+                )
+                .map(|claim| claim.log_sizes()),
+        );
 
         // Overwrite preprocessed column claim
         log_sizes[PREPROCESSED_TRACE_IDX] = IS_FIRST_LOG_SIZES.to_vec();

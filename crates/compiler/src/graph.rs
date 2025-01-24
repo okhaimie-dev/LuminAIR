@@ -1,4 +1,7 @@
-use crate::{data::{OutputConverter, StwoData}, op::HasProcessTrace};
+use crate::{
+    data::{OutputConverter, StwoData},
+    op::HasProcessTrace,
+};
 use luminair_air::{
     components::add::trace::AddColumn,
     prover::{prover, verifier, LuminairProof},
@@ -30,9 +33,8 @@ impl LuminairGraph for Graph {
         let mut consumers = self.consumers_map.as_ref().unwrap().clone();
         let mut dim_stack = Vec::new();
 
-        // Store all add traces
+        // Initialize trace collectors for different operators
         let mut add_traces = Vec::new();
-        // Store all add claims
         let mut add_claims = Vec::new();
 
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
@@ -50,6 +52,7 @@ impl LuminairGraph for Graph {
 
             // Get operator and try to use process_trace if available
             let node_op = &mut *self.graph.node_weight_mut(*node).unwrap();
+
             let tensors =
                 if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
                     let (tensors, claim, trace) =
@@ -57,12 +60,20 @@ impl LuminairGraph for Graph {
                             node_op, srcs,
                         )
                         .unwrap();
-
                     add_traces.push(trace);
                     add_claims.push(claim);
-
                     tensors
-                } else {
+                }
+                // else if <Box<dyn Operator> as HasProcessTrace<MulColumn>>::has_process_trace(node_op) {
+                //     let (tensors, claim, trace) =
+                //         <Box<dyn Operator> as HasProcessTrace<MulColumn>>::call_process_trace(node_op, srcs)
+                //         .unwrap();
+                //     mul_traces.push(trace);
+                //     mul_claims.push(claim);
+                //     tensors
+                // }
+                else {
+                    // Handle other operators or fallback
                     node_op.process(srcs)
                 };
 
@@ -79,7 +90,7 @@ impl LuminairGraph for Graph {
         self.reset();
 
         let luminair_trace = LuminairTrace {
-            traces: add_traces,
+            traces: [add_traces].concat(),
             claims: LuminairClaim { add: add_claims },
         };
 
