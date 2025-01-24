@@ -1,6 +1,6 @@
 # LuminAIR - Unlocking AI Integrity
 
-LuminAIR is a Machine Learning framework that leverages [Circle Stark Proofs](https://eprint.iacr.org/2024/278) to ensure the integrity of computational graphs. It allows a prover to cryptographically demonstrate that a computational graph has been executed correctly. A verifier can then validate this proof efficiently, without needing to re-execute the graph.
+LuminAIR is a Machine Learning framework that leverages [Circle Stark Proofs](https://eprint.iacr.org/2024/278) to ensure the integrity of computational graphs. It allows a prover to cryptographically demonstrate that a computational graph has been executed correctly. A verifier can then validate this proof using fewer resources than re-executing the graph.
 
 > **⚠️ Disclaimer:** LuminAIR is currently under development 🏗️.
 
@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Compile the computation graph
     cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
 
-    // Exectute and generate a trace of the computation graph
+    // Execute and generate a trace of the computation graph
     let trace = cx.gen_trace();
 
     // Generate proof and verify
