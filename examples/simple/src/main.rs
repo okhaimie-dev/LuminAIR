@@ -1,92 +1,60 @@
-use std::{fs, path::PathBuf};
-
-use luminair_air::{ops::add::TensorAdd, serde::SerializableTrace, Circuit};
-use luminair_compiler::{data::GraphOutputConverter, init_compiler};
+use luminair_compiler::{graph::LuminairGraph, StwoCompiler};
 use luminal::prelude::*;
-use stwo_prover::core::{backend::simd::SimdBackend, vcs::blake2_merkle::Blake2sMerkleChannel};
 
 // =============== Example Overview ===============
 // This example demonstrates how to:
 // 1. Build a computation graph with tensor operations.
-// 2. Compile and execute the graph while generating execution traces.
-// 3. Generate ZK proofs from those traces with Stwo prover.
-// 4. Verify the proofs to ensure computation integrity.
+// 2. Compile and execute the graph, generating execution traces.
+// 3. Generate a CStark proof of the computational graph.
+// 4. Verify the proof to ensure computation integrity.
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // =============== Step 1: Building the Graph ===============
-    // Create a new computation graph that will hold our tensor operations
+    // =============== Step 1: Building the Computation Graph ===============
+    // Create a new computation graph to hold tensor operations.
     let mut cx = Graph::new();
 
-    // Create three 2x2 tensors initialized with test data
-    // In a real application, these could be input features, weights, etc.
-    let a = cx.tensor((2, 2)).set(vec![1., 2., 3., 4.]);
-    let b = cx.tensor((2, 2)).set(vec![10., 20., 30., 40.]);
-    let w = cx.tensor((2, 2)).set(vec![-1., -1., -1., -1.]);
+    // Define three 2x2 tensors with sample data.
+    // In a real-world scenario, these could be input features, weights, etc.
+    let a = cx.tensor((2, 2)).set(vec![1.0, 2.0, 3.0, 4.0]);
+    let b = cx.tensor((2, 2)).set(vec![10.0, 20.0, 30.0, 40.0]);
+    let w = cx.tensor((2, 2)).set(vec![-1.0, -1.0, -1.0, -1.0]);
 
-    // Define the computation operations:
-    // 1. First add tensors a and b
+    // Define computation operations on tensors:
     let c = a + b;
-    // 2. Add tensor w to the result and mark it for retrieval
     let mut d = (c + w).retrieve();
 
-    // Note: No computation happens yet! We've only built a graph of operations.
-    // This lazy execution model allows for optimization before running.
+    // At this point, no computation has occurred. We have just defined the computation graph.
+    // The operations will be executed only when the trace is generated.
 
     // =============== Step 2: Compilation & Execution ===============
-    // Set up a directory to store execution traces
-    let trace_registry = PathBuf::from("./traces");
+    // Compile the computation graph to transform the operations and prepare for execution.
+    println!("Compiling computation graph...");
+    cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
+    println!("Graph compiled successfully. ✅");
 
-    // Initialize LuminAIR's StwoCompiler with the trace registry
-    // This compiler will transform our high-level operations into
-    // a format suitable for generating trace of executions.
-    let compiler = init_compiler(Some(trace_registry.clone()));
-
-    // Compile the graph - this transforms operations and prepares for execution
-    cx.compile(compiler, &mut d);
-
-    // Optional: Visualize the computation graph
+    // Optionally, visualize the computation graph (useful for debugging or optimization).
     // cx.display();
 
-    // Execute the graph - this is where actual computation happens
-    // During execution, traces will be generated and stored for each operation
-    cx.execute();
+    // Execute and generate a trace of the computation graph.
+    // This is when the actual computation happens.
+    println!("Executing graph and generating execution trace...");
+    let trace = cx.gen_trace();
+    println!("Execution trace generated successfully. ✅");
 
-    // Retrieve the final result as f32 values
+    // Retrieve and display the final result.
     let result = cx.get_final_output(d.id);
-    println!("result: {:?}", result);
+    println!("Final result: {:?}", result);
 
-    // =============== Step 3: Proving & Verification ===============
-    // For each trace file generated during execution:
-    // 1. Load the trace
-    // 2. Generate a ZK proof
-    // 3. Verify the proof
-    //
-    // Note: Currently we prove and verify traces independently.
-    // Future versions will use proof recursion to combine them.
-    for entry in fs::read_dir(trace_registry)? {
-        let entry = entry?;
-        let path = entry.path();
+    // =============== Step 3: Generating Proof & Verification ===============
+    // Generate a CStark proof for the trace.
+    println!("Generating proof for execution trace...");
+    let proof = cx.prove(trace)?;
+    println!("Proof generated successfully. ✅");
 
-        if path.is_file() && path.extension().map_or(false, |ext| ext == "bin") {
-            // Load and convert the trace to SIMD format.
-            let loaded = SerializableTrace::load(path.to_str().unwrap())?;
-            let trace = loaded.to_trace::<SimdBackend>();
-
-            let config = Default::default();
-            println!("==================");
-
-            // Generate a proof for this trace
-            println!("Proving trace file: {:?} 🏗️", path);
-            let (components, proof) = TensorAdd::prove::<Blake2sMerkleChannel>(&trace, config);
-            println!("Proving was successful ✅");
-
-            // Verify the proof to ensure computation integrity
-            println!("Verifying proof 🕵️");
-            TensorAdd::verify::<Blake2sMerkleChannel>(components, proof, config)
-                .unwrap_or_else(|_| panic!("Verification failed for trace {:?}", path));
-            println!("Verication was successful 🎉");
-        }
-    }
+    // Verify the generated proof to ensure the integrity of the computation.
+    println!("Verifying proof...");
+    cx.verify(proof)?;
+    println!("Proof verified successfully. Computation integrity ensured. 🎉");
 
     Ok(())
 }

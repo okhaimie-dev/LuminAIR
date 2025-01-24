@@ -3,7 +3,7 @@ resolver = "2"
 members = [ 
     "crates/air",
     "crates/compiler",
-    # "examples/simple"
+    "examples/simple"
 ]
 
 [workspace.package]

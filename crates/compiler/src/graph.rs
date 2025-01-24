@@ -1,18 +1,28 @@
-use crate::op::HasProcessTrace;
+use crate::{data::{OutputConverter, StwoData}, op::HasProcessTrace};
 use luminair_air::{
     components::add::trace::AddColumn,
-    prover::{prover, verifier},
+    prover::{prover, verifier, LuminairProof},
     LuminairClaim, LuminairTrace,
 };
 use luminal::prelude::*;
+use stwo_prover::core::{
+    prover::{ProvingError, VerificationError},
+    vcs::blake2_merkle::Blake2sMerkleHasher,
+};
 
 pub trait LuminairGraph {
-    fn gen_trace(&mut self);
+    fn gen_trace(&mut self) -> LuminairTrace;
+    fn prove(
+        &self,
+        trace: LuminairTrace,
+    ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError>;
+    fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError>;
+    fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32>;
 }
 
 impl LuminairGraph for Graph {
     /// Execute the graph and generate trace.
-    fn gen_trace(&mut self) {
+    fn gen_trace(&mut self) -> LuminairTrace {
         // Track the number of views pointing to each tensor so we know when to clear
         if self.linearized_graph.is_none() {
             self.toposort();
@@ -42,7 +52,6 @@ impl LuminairGraph for Graph {
             let node_op = &mut *self.graph.node_weight_mut(*node).unwrap();
             let tensors =
                 if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
-                    println!("Found operator with process_trace: {:?}", node_op);
                     let (tensors, claim, trace) =
                         <Box<dyn Operator> as HasProcessTrace<AddColumn>>::call_process_trace(
                             node_op, srcs,
@@ -54,7 +63,6 @@ impl LuminairGraph for Graph {
 
                     tensors
                 } else {
-                    println!("Using regular process: {:?}", node_op);
                     node_op.process(srcs)
                 };
 
@@ -68,15 +76,54 @@ impl LuminairGraph for Graph {
             }
         }
 
+        self.reset();
+
         let luminair_trace = LuminairTrace {
             traces: add_traces,
             claims: LuminairClaim { add: add_claims },
         };
 
-        let proof = prover(luminair_trace).unwrap();
+        luminair_trace
+    }
 
-        let _ = verifier(proof);
+    fn prove(
+        &self,
+        trace: LuminairTrace,
+    ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
+        prover(trace)
+    }
 
-        self.reset();
+    fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError> {
+        verifier(proof)
+    }
+
+    fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32> {
+        // Get the shape from the graph edges
+        let output_size = if let Some((_, shape)) = self.to_retrieve.get(&id) {
+            shape
+                .n_elements()
+                .to_usize()
+                .expect("Failed to get tensor size")
+        } else {
+            // Fallback to checking graph edges if not in to_retrieve
+            self.graph
+                .edges_directed(id, petgraph::Direction::Incoming)
+                .find_map(|e| e.weight().as_data())
+                .map(|(_, _, shape)| {
+                    shape
+                        .n_elements()
+                        .to_usize()
+                        .expect("Failed to get tensor size")
+                })
+                .expect("Could not determine tensor shape")
+        };
+
+        if let Some(tensor) = self.tensors.remove(&(id, 0)) {
+            if let Some(data) = tensor.downcast_ref::<StwoData>() {
+                let converter = OutputConverter::new(data.clone(), output_size);
+                return converter.to_f32();
+            }
+        }
+        panic!("No StwoData found for final output conversion");
     }
 }

@@ -1,6 +1,5 @@
 use super::{assert_close, random_vec_rng};
 use crate::binary_test;
-use crate::data::GraphOutputConverter;
 use crate::graph::LuminairGraph;
 use crate::StwoCompiler;
 use luminal::prelude::*;
