@@ -12,8 +12,8 @@ use crate::components::{AddClaim, TraceColumn, TraceEval};
 /// Generate trace for element-wise addition of two vectors.
 pub fn gen_add_trace(
     log_size: u32,
-    a: &[PackedBaseField],
-    b: &[PackedBaseField],
+    lhs: &[PackedBaseField],
+    rhs: &[PackedBaseField],
 ) -> (TraceEval, AddClaim, Vec<PackedBaseField>) {
     // Calculate trace size and initialize columns
     let trace_size = 1 << log_size;
@@ -23,7 +23,7 @@ pub fn gen_add_trace(
     }
 
     // Calculate actual size needed
-    let size = a.len().max(b.len());
+    let size = lhs.len().max(rhs.len());
 
     // Prepare output data
     let mut c_data = Vec::with_capacity(size);
@@ -32,16 +32,16 @@ pub fn gen_add_trace(
     for i in 0..trace_size {
         if i < size {
             // Get values with broadcasting
-            let a_val = a[i % a.len()];
-            let b_val = b[i % b.len()];
-            let sum = a_val + b_val;
+            let lhs = lhs[i % lhs.len()];
+            let rhs = rhs[i % rhs.len()];
+            let out = lhs + rhs;
 
-            trace[0].set(i, a_val.to_array()[0]);
-            trace[1].set(i, b_val.to_array()[0]);
-            trace[2].set(i, sum.to_array()[0]);
+            trace[0].set(i, lhs.to_array()[0]);
+            trace[1].set(i, rhs.to_array()[0]);
+            trace[2].set(i, out.to_array()[0]);
 
             if i < size {
-                c_data.push(sum);
+                c_data.push(out);
             }
         } else {
             // Pad remaining trace with zeros
