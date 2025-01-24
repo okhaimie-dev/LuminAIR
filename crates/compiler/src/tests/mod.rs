@@ -22,7 +22,10 @@ macro_rules! single_binary_test {
 
                 // Compilation and execution using StwoCompiler
                 let _ = cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut c);
-                cx.gen_trace();
+                let trace = cx.gen_trace();
+                let proof = cx.prove(trace).expect("Proof generation failed");
+                cx.verify(proof).expect("Proof verification failed");
+
 
                 // Retrieve data from `c`
                 let stwo_output = cx.get_final_output(c.id);
