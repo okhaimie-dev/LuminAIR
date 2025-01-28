@@ -1,14 +1,15 @@
 #![feature(trait_upcasting)]
 
+use ::serde::{Deserialize, Serialize};
 use components::{
     add::{
         components::{AddComponent, AddEval},
         trace::AddElements,
     },
-    AddClaim, TraceEval,
+    TraceEval,
 };
+use pie::ClaimType;
 use prover::IS_FIRST_LOG_SIZES;
-use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::{
         preprocessed_columns::PreprocessedColumn, TraceLocationAllocator, PREPROCESSED_TRACE_IDX,
@@ -22,7 +23,9 @@ use stwo_prover::{
 };
 
 pub mod components;
+pub mod pie;
 pub mod prover;
+pub mod serde;
 pub mod utils;
 
 /// A claim over the log sizes for each component of the system.
@@ -33,27 +36,20 @@ pub mod utils;
 /// - Interaction Trace (Phase 2)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairClaim {
-    pub add: Vec<AddClaim>,
+    pub claims: Vec<ClaimType>,
 }
 
 impl LuminairClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         // Mix all Add claims
-        for claim in &self.add {
+        for claim in &self.claims {
             claim.mix_into(channel);
         }
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         // Combine log sizes from all components
-        let mut log_sizes = TreeVec::concat_cols(
-            self.add
-                .iter()
-                .chain(
-                    [], // We will chain other ops here. E.g; `self.mul.iter()`
-                )
-                .map(|claim| claim.log_sizes()),
-        );
+        let mut log_sizes = TreeVec::concat_cols(self.claims.iter().map(|claim| claim.log_size()));
 
         // Overwrite preprocessed column claim
         log_sizes[PREPROCESSED_TRACE_IDX] = IS_FIRST_LOG_SIZES.to_vec();
@@ -88,7 +84,7 @@ pub struct LuminairComponents {
 }
 
 impl LuminairComponents {
-    pub fn new(claim: &LuminairClaim) -> Self {
+    pub fn new(claims: &Vec<ClaimType>) -> Self {
         let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
             &IS_FIRST_LOG_SIZES
                 .iter()
@@ -97,20 +93,20 @@ impl LuminairComponents {
                 .collect::<Vec<_>>(),
         );
 
-        // Create a component for each Add claim
-        let add = claim
-            .add
+        // Create a component for each claim
+
+        let components = claims
             .iter()
-            .map(|add_claim| {
-                AddComponent::new(
+            .map(|claim| match claim {
+                ClaimType::Add(c) => AddComponent::new(
                     tree_span_provider,
-                    AddEval::new(add_claim),
+                    AddEval::new(c),
                     (Default::default(), None),
-                )
+                ),
             })
             .collect();
 
-        Self { add }
+        Self { add: components }
     }
 
     /// Returns the `ComponentProver` of each components, used by the prover.

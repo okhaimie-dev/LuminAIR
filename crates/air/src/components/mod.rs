@@ -18,7 +18,7 @@ pub type AddClaim = Claim<AddColumn>;
 pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
 
 /// Represents a claim.
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Claim<T: TraceColumn> {
     /// Logarithmic size (`log2`) of the evaluated trace.
     pub log_size: u32,

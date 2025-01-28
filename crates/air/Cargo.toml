@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 stwo-prover.workspace = true
+luminal.workspace = true
 tracing.workspace = true
 numerair.workspace = true
 serde.workspace = true

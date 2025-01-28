@@ -1045,6 +1045,7 @@ name = "luminair_air"
 version = "0.0.1"
 dependencies = [
  "itertools 0.12.1",
+ "luminal",
  "num-traits",
  "numerair",
  "serde",

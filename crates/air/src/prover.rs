@@ -16,7 +16,7 @@ use stwo_prover::{
     },
 };
 
-use crate::{LuminairClaim, LuminairComponents, LuminairInteractionElements, LuminairTrace};
+use crate::{pie::LuminairPie, LuminairClaim, LuminairComponents, LuminairInteractionElements};
 
 /// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
 ///
@@ -49,9 +49,7 @@ pub struct LuminairProof<H: MerkleHasher> {
 pub(crate) const IS_FIRST_LOG_SIZES: [u32; 12] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
 
 /// Generate a STARK proof of the given Luminair computational graph.
-pub fn prover(
-    luminair_trace: LuminairTrace,
-) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
+pub fn prover(pie: LuminairPie) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
     // ┌──────────────────────────┐
     // │     Protocol Setup       │
     // └──────────────────────────┘
@@ -92,11 +90,17 @@ pub fn prover(
     tracing::info!("Main Trace");
     let mut tree_builder = commitment_scheme.tree_builder();
 
-    // Add the components' trace evaluation to the commit tree.
-    for trace in luminair_trace.traces {
-        tree_builder.extend_evals(trace);
+    let mut claims = Vec::new();
+    for trace in pie.traces {
+        // Add the components' trace evaluation to the commit tree.
+        tree_builder.extend_evals(trace.1.phase_1.trace.to_trace());
+        claims.push(trace.1.phase_1.claim)
     }
-    luminair_trace.claims.mix_into(channel);
+
+    // Mix the claim into the Fiat-Shamir channel.
+    for claim in claims.clone() {
+        claim.mix_into(channel);
+    }
 
     // Commit the main trace.
     tree_builder.commit(channel);
@@ -112,20 +116,16 @@ pub fn prover(
     // Generate the interaction trace from the main trace, and compute the logUp sum.
     let mut tree_builder = commitment_scheme.tree_builder();
 
-    
-
-
-
     // ┌──────────────────────────┐
     // │     Proof Generation     │
     // └──────────────────────────┘
     tracing::info!("Proof Generation");
-    let component_builder = LuminairComponents::new(&luminair_trace.claims);
+    let component_builder = LuminairComponents::new(&claims);
     let components = component_builder.provers();
     let proof = prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
 
     Ok(LuminairProof {
-        claim: luminair_trace.claims,
+        claim: LuminairClaim { claims },
         proof,
     })
 }
@@ -172,7 +172,7 @@ pub fn verifier(
     // ┌──────────────────────────┐
     // │    Proof Verification    │
     // └──────────────────────────┘
-    let component_builder = LuminairComponents::new(&claim);
+    let component_builder = LuminairComponents::new(&claim.claims);
     let components = component_builder.components();
 
     verify(&components, channel, commitment_scheme_verifier, proof)

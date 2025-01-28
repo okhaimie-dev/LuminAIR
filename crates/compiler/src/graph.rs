@@ -1,11 +1,14 @@
+use std::collections::HashMap;
+
 use crate::{
     data::{OutputConverter, StwoData},
     op::HasProcessTrace,
 };
 use luminair_air::{
     components::add::trace::AddColumn,
+    pie::{ClaimType, LuminairPie, Phase1, Trace},
     prover::{prover, verifier, LuminairProof},
-    LuminairClaim, LuminairTrace,
+    serde::SerializableTrace,
 };
 use luminal::prelude::*;
 use stwo_prover::core::{
@@ -14,18 +17,15 @@ use stwo_prover::core::{
 };
 
 pub trait LuminairGraph {
-    fn gen_trace(&mut self) -> LuminairTrace;
-    fn prove(
-        &self,
-        trace: LuminairTrace,
-    ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError>;
+    fn gen_trace(&mut self) -> LuminairPie;
+    fn prove(&self, pie: LuminairPie) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError>;
     fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError>;
     fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32>;
 }
 
 impl LuminairGraph for Graph {
     /// Execute the graph and generate trace.
-    fn gen_trace(&mut self) -> LuminairTrace {
+    fn gen_trace(&mut self) -> LuminairPie {
         // Track the number of views pointing to each tensor so we know when to clear
         if self.linearized_graph.is_none() {
             self.toposort();
@@ -34,8 +34,7 @@ impl LuminairGraph for Graph {
         let mut dim_stack = Vec::new();
 
         // Initialize trace collectors for different operators
-        let mut add_traces = Vec::new();
-        let mut add_claims = Vec::new();
+        let mut traces: HashMap<usize, Trace> = HashMap::new();
 
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
@@ -60,8 +59,20 @@ impl LuminairGraph for Graph {
                             node_op, srcs,
                         )
                         .unwrap();
-                    add_traces.push(trace);
-                    add_claims.push(claim);
+
+                    let phase_1 = Phase1 {
+                        trace: SerializableTrace::from(&trace),
+                        claim: ClaimType::Add(claim),
+                    };
+
+                    traces.insert(
+                        node.index(),
+                        Trace {
+                            phase_1,
+                            phase_2: None,
+                        },
+                    );
+
                     tensors
                 }
                 // else if <Box<dyn Operator> as HasProcessTrace<MulColumn>>::has_process_trace(node_op) {
@@ -89,19 +100,14 @@ impl LuminairGraph for Graph {
 
         self.reset();
 
-        let luminair_trace = LuminairTrace {
-            traces: [add_traces].concat(),
-            claims: LuminairClaim { add: add_claims },
-        };
-
-        luminair_trace
+        LuminairPie {
+            execution_resources: None,
+            traces,
+        }
     }
 
-    fn prove(
-        &self,
-        trace: LuminairTrace,
-    ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
-        prover(trace)
+    fn prove(&self, pie: LuminairPie) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
+        prover(pie)
     }
 
     fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError> {

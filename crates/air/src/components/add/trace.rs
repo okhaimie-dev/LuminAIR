@@ -1,4 +1,5 @@
 use num_traits::identities::Zero;
+use serde::{Deserialize, Serialize};
 use stwo_prover::constraint_framework::logup::LookupElements;
 use stwo_prover::core::backend::simd::m31::PackedBaseField;
 use stwo_prover::core::backend::Column;
@@ -70,7 +71,7 @@ pub fn gen_add_trace(
 }
 
 /// Enum representing the column indices in the Add trace.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AddColumn {
     /// Index of the `lhs` register column in the Add trace.
     Lhs,
