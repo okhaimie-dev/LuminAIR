@@ -1,7 +1,8 @@
-use num_traits::identities::Zero;
+use num_traits::identities::{One, Zero};
 use serde::{Deserialize, Serialize};
-use stwo_prover::constraint_framework::logup::LookupElements;
-use stwo_prover::core::backend::simd::m31::PackedBaseField;
+use stwo_prover::constraint_framework::logup::{LogupTraceGenerator, LookupElements};
+use stwo_prover::core::backend::simd::m31::{PackedBaseField, LOG_N_LANES};
+use stwo_prover::core::backend::simd::qm31::PackedSecureField;
 use stwo_prover::core::backend::Column;
 use stwo_prover::core::channel::Channel;
 use stwo_prover::core::{
@@ -9,8 +10,9 @@ use stwo_prover::core::{
     fields::m31::BaseField,
     poly::circle::{CanonicCoset, CircleEvaluation},
 };
+use thiserror::Error;
 
-use crate::components::{AddClaim, TraceColumn, TraceEval};
+use crate::components::{AddClaim, InteractionClaim, TraceColumn, TraceEval};
 
 /// Generate trace for element-wise addition of two vectors.
 pub fn gen_add_trace(
@@ -81,6 +83,17 @@ pub enum AddColumn {
     Res,
 }
 
+impl AddColumn {
+    /// Returns the index of the column in the Memory trace.
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Lhs => 0,
+            Self::Rhs => 1,
+            Self::Res => 2,
+        }
+    }
+}
+
 impl TraceColumn for AddColumn {
     fn count() -> (usize, usize) {
         (3, 1)
@@ -111,4 +124,52 @@ impl AddElements {
     pub fn draw(channel: &mut impl Channel) -> Self {
         Self(LookupElements::draw(channel))
     }
+}
+
+/// Creates the interaction trace from the main trace evaluation
+/// and the interaction elements for the Add component.
+pub fn interaction_trace_evaluation(
+    main_trace_eval: &TraceEval,
+    lookup_elements: &AddElements,
+) -> Result<(TraceEval, InteractionClaim), TraceError> {
+    if main_trace_eval.is_empty() {
+        return Err(TraceError::EmptyTrace);
+    }
+
+    let log_size = main_trace_eval[0].domain.log_size();
+
+    let mut logup_gen = LogupTraceGenerator::new(log_size);
+    let mut col_gen = logup_gen.new_col();
+
+    let lhs_col = &main_trace_eval[AddColumn::Lhs.index()].data;
+    let rhs_col = &main_trace_eval[AddColumn::Rhs.index()].data;
+    let res_col = &main_trace_eval[AddColumn::Res.index()].data;
+
+    // Generate the interaction trace for each row
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let lhs = lhs_col[vec_row];
+        let rhs = rhs_col[vec_row];
+        let res = res_col[vec_row];
+
+        // For addition, we want to verify that lhs + rhs = res
+        // Create a fraction for the logUp protocol
+        let num = PackedSecureField::one();
+        let denom: PackedSecureField = lookup_elements.0.combine(&[lhs, rhs, res]);
+
+        col_gen.write_frac(vec_row, num, denom);
+    }
+
+    col_gen.finalize_col();
+
+    let (trace, claimed_sum) = logup_gen.finalize_last();
+
+    Ok((trace, InteractionClaim { claimed_sum }))
+}
+
+/// Custom error type for the Trace.
+#[derive(Debug, Error, Eq, PartialEq)]
+pub enum TraceError {
+    /// The component trace is empty.
+    #[error("The trace is empty.")]
+    EmptyTrace,
 }
