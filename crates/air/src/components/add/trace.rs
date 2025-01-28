@@ -1,6 +1,8 @@
 use num_traits::identities::Zero;
+use stwo_prover::constraint_framework::logup::LookupElements;
 use stwo_prover::core::backend::simd::m31::PackedBaseField;
 use stwo_prover::core::backend::Column;
+use stwo_prover::core::channel::Channel;
 use stwo_prover::core::{
     backend::{simd::SimdBackend, Col},
     fields::m31::BaseField,
@@ -80,6 +82,32 @@ pub enum AddColumn {
 
 impl TraceColumn for AddColumn {
     fn count() -> (usize, usize) {
-        (3, 0)
+        (3, 1)
+    }
+}
+
+/// The number of random elements necessary for the Add lookup argument.
+const ADD_LOOKUP_ELEMENTS: usize = 3;
+
+/// The interaction elements are drawn for the extension column of the Add component.
+///
+/// The logUp protocol uses these elements to combine the values of the different
+/// registers of the main trace to create a random linear combination
+/// of them, and use it in the denominator of the fractions in the logUp protocol.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AddElements(LookupElements<ADD_LOOKUP_ELEMENTS>);
+
+impl AddElements {
+    /// Provides dummy lookup elements.
+    pub fn dummy() -> Self {
+        Self(LookupElements::dummy())
+    }
+
+    /// Draw random elements from the Fiat-Shamir [`Channel`].
+    ///
+    /// These elements are randomly secured, and will be use
+    /// to generate the interaction trace with the logUp protocol.
+    pub fn draw(channel: &mut impl Channel) -> Self {
+        Self(LookupElements::draw(channel))
     }
 }

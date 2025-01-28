@@ -1,7 +1,10 @@
 #![feature(trait_upcasting)]
 
 use components::{
-    add::components::{AddComponent, AddEval},
+    add::{
+        components::{AddComponent, AddEval},
+        trace::AddElements,
+    },
     AddClaim, TraceEval,
 };
 use prover::IS_FIRST_LOG_SIZES;
@@ -56,6 +59,23 @@ impl LuminairClaim {
         log_sizes[PREPROCESSED_TRACE_IDX] = IS_FIRST_LOG_SIZES.to_vec();
 
         log_sizes
+    }
+}
+
+/// All the interaction elements required by the components during the interaction phase 2.
+///
+/// The elements are drawn from a Fiat-Shamir [`Channel`], currently using the BLAKE2 hash.
+pub struct LuminairInteractionElements {
+    pub add_lookup_elements: AddElements,
+}
+
+impl LuminairInteractionElements {
+    /// Draw all the interaction elements needed for
+    /// all the components of the system.
+    pub fn draw(channel: &mut impl Channel) -> Self {
+        Self {
+            add_lookup_elements: AddElements::draw(channel),
+        }
     }
 }
 

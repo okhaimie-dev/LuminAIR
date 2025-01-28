@@ -16,7 +16,7 @@ use stwo_prover::{
     },
 };
 
-use crate::{LuminairClaim, LuminairComponents, LuminairTrace};
+use crate::{LuminairClaim, LuminairComponents, LuminairInteractionElements, LuminairTrace};
 
 /// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
 ///
@@ -105,7 +105,16 @@ pub fn prover(
     // │    Interaction Phase 2 - Interaction Trace    │
     // └───────────────────────────────────────────────┘
 
-    // No interection trace with the components for the moment.
+    tracing::info!("Interaction Trace");
+    // Draw interaction elements
+    let interaction_elements = LuminairInteractionElements::draw(channel);
+
+    // Generate the interaction trace from the main trace, and compute the logUp sum.
+    let mut tree_builder = commitment_scheme.tree_builder();
+
+    
+
+
 
     // ┌──────────────────────────┐
     // │     Proof Generation     │
