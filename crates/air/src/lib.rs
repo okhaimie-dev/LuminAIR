@@ -1,32 +1,25 @@
 #![feature(trait_upcasting)]
 
 use ::serde::{Deserialize, Serialize};
-use components::{
-    add::{
-        components::{AddComponent, AddEval},
-        trace::AddElements,
-    },
-    TraceEval,
-};
-use pie::ClaimType;
-use prover::IS_FIRST_LOG_SIZES;
-use stwo_prover::{
-    constraint_framework::{
-        preprocessed_columns::PreprocessedColumn, TraceLocationAllocator, PREPROCESSED_TRACE_IDX,
-    },
-    core::{
-        air::{Component, ComponentProver},
-        backend::simd::SimdBackend,
-        channel::Channel,
-        pcs::TreeVec,
-    },
+use components::AddClaim;
+use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
+use stwo_prover::core::{
+    channel::Channel, pcs::TreeVec, prover::StarkProof, vcs::ops::MerkleHasher,
 };
 
 pub mod components;
 pub mod pie;
-pub mod prover;
 pub mod serde;
 pub mod utils;
+
+/// The STARK proof of the execution of a given Luminair Graph.
+///
+/// It includes the proof as well as the claims during the various phases of the proof generation.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LuminairProof<H: MerkleHasher> {
+    pub claim: LuminairClaim,
+    pub proof: StarkProof<H>,
+}
 
 /// A claim over the log sizes for each component of the system.
 ///
@@ -36,100 +29,52 @@ pub mod utils;
 /// - Interaction Trace (Phase 2)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairClaim {
-    pub claims: Vec<ClaimType>,
+    pub add: Vec<AddClaim>,
 }
 
 impl LuminairClaim {
+    pub fn init() -> LuminairClaim {
+        LuminairClaim { add: vec![] }
+    }
+
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        // Mix all Add claims
-        for claim in &self.claims {
-            claim.mix_into(channel);
-        }
+        self.add.iter().for_each(|c| c.mix_into(channel));
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        // Combine log sizes from all components
-        let mut log_sizes = TreeVec::concat_cols(self.claims.iter().map(|claim| claim.log_size()));
+        let mut log_sizes = TreeVec::concat_cols(
+            self.add
+                .iter()
+                .map(|c| c.log_sizes())
+                .collect::<Vec<_>>()
+                .into_iter(),
+        );
 
-        // Overwrite preprocessed column claim
+        // We overwrite the preprocessed column claim to have all possible log sizes
+        // in the merkle root for the verification.
         log_sizes[PREPROCESSED_TRACE_IDX] = IS_FIRST_LOG_SIZES.to_vec();
 
         log_sizes
     }
 }
 
-/// All the interaction elements required by the components during the interaction phase 2.
+/// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
 ///
-/// The elements are drawn from a Fiat-Shamir [`Channel`], currently using the BLAKE2 hash.
-pub struct LuminairInteractionElements {
-    pub add_lookup_elements: AddElements,
-}
+/// Means that Luminair does not accept programs inducing a component with more than 2^LOG_MAX_ROWS steps
+pub const LOG_MAX_ROWS: u32 = 14;
 
-impl LuminairInteractionElements {
-    /// Draw all the interaction elements needed for
-    /// all the components of the system.
-    pub fn draw(channel: &mut impl Channel) -> Self {
-        Self {
-            add_lookup_elements: AddElements::draw(channel),
-        }
-    }
-}
-
-/// All the components that constitute Luminair.
+/// Log sizes of the preprocessed columns
+/// used for enforcing boundary constraints.
 ///
-/// Components are used by the prover as a `ComponentProver`,
-/// and by the verifier as a `Component`.
-pub struct LuminairComponents {
-    add: Vec<AddComponent>,
-}
-
-impl LuminairComponents {
-    pub fn new(claims: &Vec<ClaimType>) -> Self {
-        let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
-            &IS_FIRST_LOG_SIZES
-                .iter()
-                .copied()
-                .map(PreprocessedColumn::IsFirst)
-                .collect::<Vec<_>>(),
-        );
-
-        // Create a component for each claim
-
-        let components = claims
-            .iter()
-            .map(|claim| match claim {
-                ClaimType::Add(c) => AddComponent::new(
-                    tree_span_provider,
-                    AddEval::new(c),
-                    (Default::default(), None),
-                ),
-            })
-            .collect();
-
-        Self { add: components }
-    }
-
-    /// Returns the `ComponentProver` of each components, used by the prover.
-    pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-        // Collect all component provers into a single vector
-        let mut provers = Vec::new();
-        // Add each Add component prover
-        for add in &self.add {
-            provers.push(add as &dyn ComponentProver<SimdBackend>);
-        }
-        provers
-    }
-
-    /// Returns the `Component` of each components, used by the verifier.
-    pub fn components(&self) -> Vec<&dyn Component> {
-        self.provers()
-            .into_iter()
-            .map(|component| component as &dyn Component)
-            .collect()
-    }
-}
-
-pub struct LuminairTrace {
-    pub traces: Vec<TraceEval>,
-    pub claims: LuminairClaim,
-}
+/// Preprocessed columns are generated ahead of time,
+/// so at this moment we don't know the log size
+/// of the main and interaction traces.
+///
+/// Therefore, we generate all log sizes that we
+/// want to support, so that the verifier can be
+/// provided a merkle root it can trust, for a claim
+/// of any dynamic size.
+///
+/// Ideally, we should cover all possible log sizes, between
+/// 1 and `LOG_MAX_ROW`
+pub const IS_FIRST_LOG_SIZES: [u32; 12] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];

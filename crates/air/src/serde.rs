@@ -10,10 +10,10 @@ use stwo_prover::core::{
 };
 
 /// Serializable representation of a trace evaluation
-#[derive(Serialize, Deserialize)]
-pub struct SerializableCircleEvaluation {
-    pub log_size: u32,
-    pub values: Vec<BaseField>,
+#[derive(Clone, Serialize, Deserialize, Debug)]
+struct SerializableCircleEvaluation {
+    log_size: u32,
+    values: Vec<BaseField>,
 }
 
 impl<B: Backend> From<&CircleEvaluation<B, BaseField, BitReversedOrder>>
@@ -28,9 +28,9 @@ impl<B: Backend> From<&CircleEvaluation<B, BaseField, BitReversedOrder>>
 }
 
 /// Serializable representation of a trace
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SerializableTrace {
-    pub evaluations: Vec<SerializableCircleEvaluation>,
+    evaluations: Vec<SerializableCircleEvaluation>,
 }
 
 impl SerializableTrace {

@@ -1,2 +1,2 @@
-pub mod trace;
-pub mod components;
+pub mod table;
+pub mod component;

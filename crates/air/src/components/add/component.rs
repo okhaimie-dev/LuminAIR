@@ -4,13 +4,13 @@ use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, Framework
 use crate::components::AddClaim;
 
 /// Implementation of `Component` and `ComponentProver` for the Add component.
-/// It targets the `SimdBackend` from the Stwo constraint framework, with a fallback
-/// on `CpuBakend` for small traces.
+/// It targets the `SimdBackend` from the Stwo constraint framework, with the fallback
+/// on `CpuBackend` for small traces.
 pub type AddComponent = FrameworkComponent<AddEval>;
 
-/// The AIR for the [`AddComponent`].
+/// The AIR for the [`AddComponent`]
 ///
-/// Constraints are defined through the [`FrameworkEval`]
+/// Constraints are defined though the [`FrameworkEval`]
 /// provided by the constraint framework of Stwo.
 pub struct AddEval {
     /// The log size of the component's main trace height.

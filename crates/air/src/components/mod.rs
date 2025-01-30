@@ -1,21 +1,39 @@
-use add::trace::AddColumn;
-use serde::{Deserialize, Serialize};
-use stwo_prover::core::{
-    backend::simd::SimdBackend,
-    channel::Channel,
-    fields::{m31::BaseField, qm31::SecureField, secure_column::SECURE_EXTENSION_DEGREE},
-    pcs::TreeVec,
-    poly::{circle::CircleEvaluation, BitReversedOrder},
-    ColumnVec,
+use add::{
+    component::{AddComponent, AddEval},
+    table::AddColumn,
 };
+use serde::{Deserialize, Serialize};
+use stwo_prover::{
+    constraint_framework::{preprocessed_columns::PreprocessedColumn, TraceLocationAllocator},
+    core::{
+        air::{Component, ComponentProver},
+        backend::simd::SimdBackend,
+        channel::Channel,
+        fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
+        pcs::TreeVec,
+        poly::{circle::CircleEvaluation, BitReversedOrder},
+        ColumnVec,
+    },
+};
+
+use crate::{LuminairClaim, IS_FIRST_LOG_SIZES};
 
 pub mod add;
 
-/// Claim for the Add component.
-pub type AddClaim = Claim<AddColumn>;
-
 /// Type for trace evaluation to be used in Stwo.
 pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
+
+/// Claim for the Add trace.
+pub type AddClaim = Claim<AddColumn>;
+
+/// Represents columns of a trace.
+pub trait TraceColumn {
+    /// Returns the number of columns associated with the specific trace type.
+    ///
+    /// Main trace columns: first element of the tuple
+    /// Interaction trace columns: second element of the tuple
+    fn count() -> (usize, usize);
+}
 
 /// Represents a claim.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -70,32 +88,64 @@ impl<T: TraceColumn> Claim<T> {
     }
 }
 
-/// Represents columns of a trace.
-pub trait TraceColumn {
-    /// Returns the number of columns associated with the specific trace type.
-    ///
-    /// Main trace columns: first element of the tuple
-    /// Interaction trace columns: second element of the tuple
-    fn count() -> (usize, usize);
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum ClaimType {
+    Add(Claim<AddColumn>),
 }
 
-/// The claim of the interaction phase 2 (with the logUp protocol).
+/// All the components that consitute LuminAIR.
 ///
-/// The claimed sum is the total sum, which is the computed sum of the logUp extension column,
-/// including the padding rows.
-/// It allows proving that the main trace of a component is either a permutation, or a sublist of
-/// another.
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct InteractionClaim {
-    /// The computed sum of the logUp extension column, including padding rows (which are actually
-    /// set to a multiplicity of 0).
-    pub claimed_sum: SecureField,
+/// Components are used by the prover as a `ComponentProver`,
+/// and by the verifier as a `Component`.
+pub struct LuminairComponents {
+    add: Vec<AddComponent>,
 }
 
-impl InteractionClaim {
-    /// Mix the sum from the logUp protocol into the Fiat-Shamir [`Channel`],
-    /// to bound the proof to the trace.
-    pub fn mix_into(&self, channel: &mut impl Channel) {
-        channel.mix_felts(&[self.claimed_sum]);
+impl LuminairComponents {
+    /// Initilizes all the LuminAIR components from the claims generated from the trace.
+    pub fn new(claims: &LuminairClaim) -> Self {
+        let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
+            &IS_FIRST_LOG_SIZES
+                .iter()
+                .copied()
+                .map(PreprocessedColumn::IsFirst)
+                .collect::<Vec<_>>(),
+        );
+
+        // Create a component for each Add claim
+        let add_components = claims
+            .add
+            .iter()
+            .map(|c| {
+                AddComponent::new(
+                    tree_span_provider,
+                    AddEval::new(c),
+                    (Default::default(), None),
+                )
+            })
+            .collect();
+
+        Self {
+            add: add_components,
+        }
+    }
+
+    /// Returns the `ComponentProver` of each components, used by the prover.
+    pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
+        let mut provers = Vec::new();
+
+        for add in &self.add {
+            provers.push(add as &dyn ComponentProver<SimdBackend>);
+        }
+
+        provers
+    }
+
+    /// Returns the `Component` of each components used by the verifier.
+    pub fn components(&self) -> Vec<&dyn Component> {
+        self.provers()
+            .into_iter()
+            .map(|component| component as &dyn Component)
+            .collect()
     }
 }

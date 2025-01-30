@@ -26,7 +26,6 @@ macro_rules! single_binary_test {
                 let proof = cx.prove(trace).expect("Proof generation failed");
                 cx.verify(proof).expect("Proof verification failed");
 
-
                 // Retrieve data from `c`
                 let stwo_output = cx.get_final_output(c.id);
 

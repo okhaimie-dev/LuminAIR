@@ -1,26 +1,37 @@
-use std::collections::HashMap;
+use luminair_air::{
+    components::{add::table::AddColumn, ClaimType, LuminairComponents},
+    pie::{LuminairPie, Trace},
+    serde::SerializableTrace,
+    LuminairClaim, LuminairProof, IS_FIRST_LOG_SIZES, LOG_MAX_ROWS,
+};
+use luminal::prelude::*;
+use stwo_prover::{
+    constraint_framework::{
+        preprocessed_columns::gen_is_first, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX,
+    },
+    core::{
+        backend::simd::SimdBackend,
+        channel::Blake2sChannel,
+        pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
+        poly::circle::{CanonicCoset, PolyOps},
+        prover::{self, verify, ProvingError, VerificationError},
+        vcs::blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
+    },
+};
 
 use crate::{
     data::{OutputConverter, StwoData},
     op::HasProcessTrace,
 };
-use luminair_air::{
-    components::add::trace::AddColumn,
-    pie::{ClaimType, LuminairPie, Phase1, Trace},
-    prover::{prover, verifier, LuminairProof},
-    serde::SerializableTrace,
-};
-use luminal::prelude::*;
-use stwo_prover::core::{
-    prover::{ProvingError, VerificationError},
-    vcs::blake2_merkle::Blake2sMerkleHasher,
-};
 
 pub trait LuminairGraph {
     fn gen_trace(&mut self) -> LuminairPie;
-    fn prove(&self, pie: LuminairPie) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError>;
-    fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError>;
     fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32>;
+    fn prove(
+        &mut self,
+        pie: LuminairPie,
+    ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError>;
+    fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError>;
 }
 
 impl LuminairGraph for Graph {
@@ -30,12 +41,12 @@ impl LuminairGraph for Graph {
         if self.linearized_graph.is_none() {
             self.toposort();
         }
+
         let mut consumers = self.consumers_map.as_ref().unwrap().clone();
         let mut dim_stack = Vec::new();
 
         // Initialize trace collectors for different operators
-        let mut traces: HashMap<usize, Trace> = HashMap::new();
-
+        let mut traces = Vec::new();
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
                 continue;
@@ -54,36 +65,19 @@ impl LuminairGraph for Graph {
 
             let tensors =
                 if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
-                    let (tensors, claim, trace) =
+                    let (trace, claim, tensors) =
                         <Box<dyn Operator> as HasProcessTrace<AddColumn>>::call_process_trace(
                             node_op, srcs,
                         )
                         .unwrap();
 
-                    let phase_1 = Phase1 {
-                        trace: SerializableTrace::from(&trace),
+                    traces.push(Trace {
+                        eval: SerializableTrace::from(&trace),
                         claim: ClaimType::Add(claim),
-                    };
-
-                    traces.insert(
-                        node.index(),
-                        Trace {
-                            phase_1,
-                            phase_2: None,
-                        },
-                    );
+                    });
 
                     tensors
-                }
-                // else if <Box<dyn Operator> as HasProcessTrace<MulColumn>>::has_process_trace(node_op) {
-                //     let (tensors, claim, trace) =
-                //         <Box<dyn Operator> as HasProcessTrace<MulColumn>>::call_process_trace(node_op, srcs)
-                //         .unwrap();
-                //     mul_traces.push(trace);
-                //     mul_claims.push(claim);
-                //     tensors
-                // }
-                else {
+                } else {
                     // Handle other operators or fallback
                     node_op.process(srcs)
                 };
@@ -100,18 +94,7 @@ impl LuminairGraph for Graph {
 
         self.reset();
 
-        LuminairPie {
-            execution_resources: None,
-            traces,
-        }
-    }
-
-    fn prove(&self, pie: LuminairPie) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
-        prover(pie)
-    }
-
-    fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError> {
-        verifier(proof)
+        LuminairPie { traces }
     }
 
     fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32> {
@@ -142,5 +125,137 @@ impl LuminairGraph for Graph {
             }
         }
         panic!("No StwoData found for final output conversion");
+    }
+
+    fn prove(
+        &mut self,
+        pie: LuminairPie,
+    ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
+        // Track the number of views pointing to each tensor so we know when to clear
+        if self.linearized_graph.is_none() {
+            self.toposort();
+        }
+
+        // ┌──────────────────────────┐
+        // │     Protocol Setup       │
+        // └──────────────────────────┘
+
+        tracing::info!("Protocol Setup");
+        let config = PcsConfig::default();
+        let twiddles = SimdBackend::precompute_twiddles(
+            CanonicCoset::new(LOG_MAX_ROWS + config.fri_config.log_blowup_factor + 2)
+                .circle_domain()
+                .half_coset,
+        );
+        let channel = &mut Blake2sChannel::default();
+        let mut commitment_scheme =
+            CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, &twiddles);
+
+        // ┌───────────────────────────────────────────────┐
+        // │   Interaction Phase 0 - Preprocessed Trace    │
+        // └───────────────────────────────────────────────┘
+
+        tracing::info!("Preprocessed Trace");
+        // Generate all preprocessed columns
+        let mut tree_builder = commitment_scheme.tree_builder();
+
+        tree_builder.extend_evals(
+            IS_FIRST_LOG_SIZES
+                .iter()
+                .copied()
+                .map(gen_is_first::<SimdBackend>),
+        );
+
+        // Commit the preprocessed trace
+        tree_builder.commit(channel);
+
+        // ┌───────────────────────────────────────┐
+        // │        Interaction Phase 1 & 2        │
+        // └───────────────────────────────────────┘
+        let mut tree_builder_1 = commitment_scheme.tree_builder();
+        let mut claim_1 = LuminairClaim::init();
+
+        // Pre-allocate for expected number of traces
+        claim_1.add.reserve(pie.traces.len());
+
+        for trace in pie.traces.into_iter() {
+            // Consume the traces
+            // ┌───────────────────────────────────────┐
+            // │    Interaction Phase 1 - Main Trace   │
+            // └───────────────────────────────────────┘
+
+            match trace.claim {
+                ClaimType::Add(claim) => {
+                    // Add the components' trace evaluation to the commit tree.
+                    tree_builder_1.extend_evals(trace.eval.to_trace());
+                    claim_1.add.push(claim);
+                }
+            }
+        }
+
+        // Mix the claim into the Fiat-Shamir channel.
+        claim_1.mix_into(channel);
+        // Commit the main trace.
+        tree_builder_1.commit(channel);
+
+        // ┌──────────────────────────┐
+        // │     Proof Generation     │
+        // └──────────────────────────┘
+        tracing::info!("Proof Generation");
+        let component_builder = LuminairComponents::new(&claim_1);
+        let components = component_builder.provers();
+        let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
+
+        self.reset();
+
+        Ok(LuminairProof {
+            claim: claim_1,
+            proof,
+        })
+    }
+
+    fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError> {
+        // ┌──────────────────────────┐
+        // │     Protocol Setup       │
+        // └──────────────────────────┘
+        let config = PcsConfig::default();
+        let channel = &mut Blake2sChannel::default();
+        let commitment_scheme_verifier =
+            &mut CommitmentSchemeVerifier::<Blake2sMerkleChannel>::new(config);
+        let log_sizes = &proof.claim.log_sizes();
+
+        // ┌───────────────────────────────────────────────┐
+        // │   Interaction Phase 0 - Preprocessed Trace    │
+        // └───────────────────────────────────────────────┘
+
+        commitment_scheme_verifier.commit(
+            proof.proof.commitments[PREPROCESSED_TRACE_IDX],
+            &log_sizes[PREPROCESSED_TRACE_IDX],
+            channel,
+        );
+
+        // ┌───────────────────────────────────────┐
+        // │    Interaction Phase 1 - Main Trace   │
+        // └───────────────────────────────────────┘
+        proof.claim.mix_into(channel);
+        commitment_scheme_verifier.commit(
+            proof.proof.commitments[ORIGINAL_TRACE_IDX],
+            &log_sizes[ORIGINAL_TRACE_IDX],
+            channel,
+        );
+
+        // ┌──────────────────────────┐
+        // │    Proof Verification    │
+        // └──────────────────────────┘
+
+        let component_builder = LuminairComponents::new(&proof.claim);
+        let components = component_builder.components();
+
+        verify(
+            &components,
+            channel,
+            commitment_scheme_verifier,
+            proof.proof,
+        )
     }
 }

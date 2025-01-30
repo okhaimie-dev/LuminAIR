@@ -6,6 +6,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
+tracing.workspace = true
 stwo-prover.workspace = true
 luminal.workspace = true
 rayon.workspace = true
