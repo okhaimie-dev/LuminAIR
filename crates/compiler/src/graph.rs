@@ -24,6 +24,14 @@ use crate::{
     op::HasProcessTrace,
 };
 
+/// Struct to hold input source information
+///
+/// is_initial is true if the input is coming from an initial input.
+#[derive(Debug, Clone)]
+pub(crate) struct InputSourceInfo {
+    is_initial: bool,
+}
+
 pub trait LuminairGraph {
     fn gen_trace(&mut self) -> LuminairPie;
     fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32>;
@@ -55,6 +63,14 @@ impl LuminairGraph for Graph {
             let mut srcs =
                 get_source_tensors(&self.no_delete, &mut self.tensors, src_ids, &consumers);
 
+            // Gather input source information
+            let input_sources = src_ids
+                .iter()
+                .map(|(id, _, _)| InputSourceInfo {
+                    is_initial: self.node_weight(*id).unwrap().as_any().is::<Function>(),
+                })
+                .collect::<Vec<_>>();
+
             // Substitute in the dyn dims
             for (_, st) in srcs.iter_mut() {
                 st.resolve_global_dyn_dims_stack(&self.dyn_map, &mut dim_stack);
@@ -65,11 +81,12 @@ impl LuminairGraph for Graph {
 
             let tensors =
                 if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
-                    let (trace, claim, tensors) =
-                        <Box<dyn Operator> as HasProcessTrace<AddColumn>>::call_process_trace(
-                            node_op, srcs,
-                        )
-                        .unwrap();
+                    let (trace, claim, tensors) = <Box<dyn Operator> as HasProcessTrace<
+                        AddColumn,
+                    >>::call_process_trace(
+                        node_op, srcs, input_sources
+                    )
+                    .unwrap();
 
                     traces.push(Trace {
                         eval: SerializableTrace::from(&trace),

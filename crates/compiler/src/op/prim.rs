@@ -9,7 +9,7 @@ use luminair_air::{
 };
 use luminal::prelude::*;
 
-use crate::{data::StwoData, utils::is};
+use crate::{data::StwoData, graph::InputSourceInfo, utils::is};
 
 use super::{IntoOperator, LuminairOperator};
 
@@ -36,6 +36,7 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
     fn process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
+        inp_src_info: Vec<InputSourceInfo>,
     ) -> (TraceEval, Claim<AddColumn>, Vec<Tensor>) {
         // Get data
         let (lhs_tensor, _) = &inp[0];
