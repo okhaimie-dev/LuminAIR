@@ -26,10 +26,10 @@ use crate::{
 
 /// Struct to hold input source information
 ///
-/// is_initial is true if the input is coming from an initial input.
+/// is_initializer is true if the input is coming from an initial input.
 #[derive(Debug, Clone)]
 pub(crate) struct InputSourceInfo {
-    is_initial: bool,
+    is_initializer: bool,
 }
 
 pub trait LuminairGraph {
@@ -67,7 +67,7 @@ impl LuminairGraph for Graph {
             let input_sources = src_ids
                 .iter()
                 .map(|(id, _, _)| InputSourceInfo {
-                    is_initial: self.node_weight(*id).unwrap().as_any().is::<Function>(),
+                    is_initializer: self.node_weight(*id).unwrap().as_any().is::<Function>(),
                 })
                 .collect::<Vec<_>>();
 
