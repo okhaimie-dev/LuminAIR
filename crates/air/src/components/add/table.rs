@@ -16,6 +16,8 @@ pub fn trace_evaluation(
     log_size: u32,
     lhs: &[PackedBaseField],
     rhs: &[PackedBaseField],
+    lhs_is_initializer: bool,
+    rhs_is_initializer: bool,
 ) -> (TraceEval, AddClaim, Vec<PackedBaseField>) {
     // Calculate trace size
     let trace_size = 1 << log_size;
@@ -25,7 +27,7 @@ pub fn trace_evaluation(
     let domain = CanonicCoset::new(log_size).circle_domain();
 
     // Initialize result vector
-    let mut result = Vec::with_capacity(3);
+    let mut main_trace = Vec::with_capacity(3);
 
     // Prepare output data
     let mut output = Vec::with_capacity(size);
@@ -56,10 +58,10 @@ pub fn trace_evaluation(
             }
         }
 
-        result.push(CircleEvaluation::new(domain, column));
+        main_trace.push(CircleEvaluation::new(domain, column));
     }
 
-    (result, AddClaim::new(log_size), output)
+    (main_trace, AddClaim::new(log_size), output)
 }
 
 /// Enum representing the column indices in the Add trace.

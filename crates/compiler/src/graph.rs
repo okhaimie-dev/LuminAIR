@@ -29,7 +29,7 @@ use crate::{
 /// is_initializer is true if the input is coming from an initial input.
 #[derive(Debug, Clone)]
 pub(crate) struct InputSourceInfo {
-    is_initializer: bool,
+   pub(crate)  is_initializer: bool,
 }
 
 pub trait LuminairGraph {

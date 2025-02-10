@@ -60,9 +60,19 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
         let log_size = calculate_log_size(max_size);
 
         // Generate trace and get result tensor
-        let (trace, claim, output) = trace_evaluation(log_size, &lhs.0, &rhs.0);
+        let (main_trace, claim, output) = trace_evaluation(
+            log_size,
+            &lhs.0,
+            &rhs.0,
+            inp_src_info[0].is_initializer,
+            inp_src_info[1].is_initializer,
+        );
 
-        (trace, claim, vec![Tensor::new(StwoData(Arc::new(output)))])
+        (
+            main_trace,
+            claim,
+            vec![Tensor::new(StwoData(Arc::new(output)))],
+        )
     }
 }
 
