@@ -1,6 +1,6 @@
 use add::{
     component::{AddComponent, AddEval},
-    table::AddColumn,
+    table::{AddColumn, AddElements},
 };
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
@@ -16,7 +16,7 @@ use stwo_prover::{
     },
 };
 
-use crate::{LuminairClaim, IS_FIRST_LOG_SIZES};
+use crate::{pie::OpCounter, LuminairClaim, IS_FIRST_LOG_SIZES};
 
 pub mod add;
 
@@ -91,6 +91,25 @@ impl<T: TraceColumn> Claim<T> {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum ClaimType {
     Add(Claim<AddColumn>),
+}
+
+/// All the interaction elements required by the components during the interaction phas 2.
+///
+/// The elements are drawn from a Fiat-Shamir [`Channel`], currently using the BLAKE2 hash.
+pub struct LuminairInteractionElements {
+    pub add_lookup_elements: Vec<AddElements>,
+}
+
+impl LuminairInteractionElements {
+    /// Draw all the interaction elements needed for
+    /// all the components of the system.
+    pub fn draw(channel: &mut impl Channel, op_counter: &OpCounter) -> Self {
+        Self {
+            add_lookup_elements: (0..op_counter.add.unwrap_or(0))
+                .map(|_| AddElements::draw(channel))
+                .collect(),
+        }
+    }
 }
 
 /// All the components that consitute LuminAIR.

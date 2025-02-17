@@ -1,6 +1,8 @@
 use luminair_air::{
-    components::{add::table::AddColumn, ClaimType, LuminairComponents},
-    pie::{LuminairPie, Trace},
+    components::{
+        add::table::AddColumn, ClaimType, LuminairComponents, LuminairInteractionElements,
+    },
+    pie::{ExecutionResources, LuminairPie, OpCounter, Trace},
     serde::SerializableTrace,
     LuminairClaim, LuminairProof, IS_FIRST_LOG_SIZES, LOG_MAX_ROWS,
 };
@@ -29,7 +31,7 @@ use crate::{
 /// is_initializer is true if the input is coming from an initial input.
 #[derive(Debug, Clone)]
 pub(crate) struct InputSourceInfo {
-   pub(crate)  is_initializer: bool,
+    pub(crate) is_initializer: bool,
 }
 
 pub trait LuminairGraph {
@@ -55,6 +57,9 @@ impl LuminairGraph for Graph {
 
         // Initialize trace collectors for different operators
         let mut traces = Vec::new();
+        // Initializes operator counter
+        let mut op_counter = OpCounter::default();
+
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
                 continue;
@@ -92,6 +97,7 @@ impl LuminairGraph for Graph {
                         eval: SerializableTrace::from(&trace),
                         claim: ClaimType::Add(claim),
                     });
+                    *op_counter.add.get_or_insert(0) += 1;
 
                     tensors
                 } else {
@@ -111,7 +117,10 @@ impl LuminairGraph for Graph {
 
         self.reset();
 
-        LuminairPie { traces }
+        LuminairPie {
+            traces,
+            execution_resources: ExecutionResources { op_counter },
+        }
     }
 
     fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32> {
@@ -214,6 +223,14 @@ impl LuminairGraph for Graph {
         claim_1.mix_into(channel);
         // Commit the main trace.
         tree_builder_1.commit(channel);
+
+        // ┌───────────────────────────────────────────────┐
+        // │    Interaction Phase 2 - Interaction Trace    │
+        // └───────────────────────────────────────────────┘
+
+        // Draw interaction elements
+        let interaction_elements =
+            LuminairInteractionElements::draw(channel, &pie.execution_resources.op_counter);
 
         // ┌──────────────────────────┐
         // │     Proof Generation     │
