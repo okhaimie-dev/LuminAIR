@@ -81,18 +81,6 @@ impl LuminairInteractionClaim {
     }
 }
 
-/// Verify that the claims (i.e Statement) are valid.
-pub fn lookup_sum_valid(interaction_claim: &LuminairInteractionClaim) -> bool {
-    let mut sum = PackedSecureField::zero();
-
-    interaction_claim
-        .add
-        .iter()
-        .for_each(|c| sum += c.claimed_sum.into());
-
-    sum.is_zero()
-}
-
 /// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
 ///
 /// Means that Luminair does not accept programs inducing a component with more than 2^LOG_MAX_ROWS steps

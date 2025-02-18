@@ -2,11 +2,7 @@ use luminair_air::{
     components::{
         add::table::{interaction_trace_evaluation, AddColumn},
         ClaimType, LuminairComponents, LuminairInteractionElements,
-    },
-    lookup_sum_valid,
-    pie::{ExecutionResources, LuminairPie, OpCounter, Trace},
-    serde::SerializableTrace,
-    LuminairClaim, LuminairInteractionClaim, LuminairProof, IS_FIRST_LOG_SIZES, LOG_MAX_ROWS,
+    }, pie::{ExecutionResources, LuminairPie, OpCounter, Trace}, serde::SerializableTrace, utils::lookup_sum_valid, LuminairClaim, LuminairInteractionClaim, LuminairProof, IS_FIRST_LOG_SIZES, LOG_MAX_ROWS
 };
 use luminal::prelude::*;
 use stwo_prover::{

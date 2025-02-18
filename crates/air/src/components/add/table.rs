@@ -101,12 +101,12 @@ impl AddColumn {
 
 impl TraceColumn for AddColumn {
     fn count() -> (usize, usize) {
-        (3, 1)
+        (3, 3)
     }
 }
 
 /// The number of random elements necessary for the Add lookup argument.
-const ADD_LOOKUP_ELEMENTS: usize = 1;
+const ADD_LOOKUP_ELEMENTS: usize = 3;
 
 /// The interaction elements are drawn for the extension column of the Add component.
 ///
@@ -165,25 +165,64 @@ pub fn interaction_trace_evaluation(
     let log_size = main_trace_eval[0].domain.log_size();
 
     let mut logup_gen = LogupTraceGenerator::new(log_size);
-    let mut col_gen = logup_gen.new_col();
 
-    // Get the output values form the Add operation
-    let out_col = &main_trace_eval[AddColumn::Out.index()].data;
+    {
+        // ┌───────────────┐
+        // │    LHS COL    │
+        // └───────────────┘
 
-    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
-        let out = out_col[vec_row];
+        let lhs_col = &main_trace_eval[AddColumn::Lhs.index()].data;
 
-        // For each row, we add a fraction to the logUp sum
-        // The numerator will be 1 for real values, indicating this output exists
-        // The denominator uses the lookup elements to create a unique combination for this output
-        // Later nodes that use this output as input will subtract 1 from the logUp sum with the same denominator
-        let num = PackedSecureField::one();
-        let denom: PackedSecureField = lookup_elements.combine(&[out]);
-
-        col_gen.write_frac(vec_row, num, denom);
+        let mut col_lhs = logup_gen.new_col();
+        for row in 0..1 << (log_size - LOG_N_LANES) {
+            let lhs = lhs_col[row];
+            col_lhs.write_frac(
+                row,
+                -PackedSecureField::one(), // the "num" = -1
+                lookup_elements.combine(&[lhs]),
+            );
+        }
+        col_lhs.finalize_col();
     }
 
-    col_gen.finalize_col();
+    {
+        // ┌───────────────┐
+        // │    RHS COL    │
+        // └───────────────┘
+
+        let rhs_col = &main_trace_eval[AddColumn::Rhs.index()].data;
+
+        let mut col_rhs = logup_gen.new_col();
+        for row in 0..1 << (log_size - LOG_N_LANES) {
+            let rhs = rhs_col[row];
+            col_rhs.write_frac(
+                row,
+                -PackedSecureField::one(),
+                lookup_elements.combine(&[rhs]),
+            );
+        }
+        col_rhs.finalize_col();
+    }
+
+    {
+        // ┌───────────────┐
+        // │    OUT COL    │
+        // └───────────────┘
+
+        let out_col = &main_trace_eval[AddColumn::Out.index()].data;
+
+        let mut col_out = logup_gen.new_col();
+        for row in 0..1 << (log_size - LOG_N_LANES) {
+            let out = out_col[row];
+            col_out.write_frac(
+                row,
+                PackedSecureField::one(),
+                lookup_elements.combine(&[out]),
+            );
+        }
+        col_out.finalize_col();
+    }
+
     let (trace, claimed_sum) = logup_gen.finalize_last();
 
     Ok((trace, InteractionClaim { claimed_sum }))

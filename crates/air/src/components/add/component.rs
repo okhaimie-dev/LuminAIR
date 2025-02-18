@@ -64,6 +64,7 @@ impl FrameworkEval for AddEval {
         let rhs = eval.next_trace_mask();
         let out = eval.next_trace_mask();
 
+        // Local consistency: out = lhs + rhs
         eval.eval_fixed_add(lhs.clone(), rhs.clone(), out.clone());
 
         // For the logUp sum, we want sum = out - lhs - rhs = 0.
@@ -73,7 +74,7 @@ impl FrameworkEval for AddEval {
         //   +1 for out
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
-            -E::EF::one(), // -1
+            -E::EF::one(),
             &[lhs],
         ));
         eval.add_to_relation(RelationEntry::new(
@@ -83,7 +84,7 @@ impl FrameworkEval for AddEval {
         ));
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
-            E::EF::one(), // +1
+            E::EF::one(),
             &[out],
         ));
 
