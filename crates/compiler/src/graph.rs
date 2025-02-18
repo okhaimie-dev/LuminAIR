@@ -2,7 +2,11 @@ use luminair_air::{
     components::{
         add::table::{interaction_trace_evaluation, AddColumn},
         ClaimType, LuminairComponents, LuminairInteractionElements,
-    }, pie::{ExecutionResources, LuminairPie, OpCounter, Trace}, serde::SerializableTrace, utils::lookup_sum_valid, LuminairClaim, LuminairInteractionClaim, LuminairProof, IS_FIRST_LOG_SIZES, LOG_MAX_ROWS
+    },
+    pie::{ExecutionResources, IOInfo, InputInfo, LuminairPie, OpCounter, OutputInfo, Trace},
+    serde::SerializableTrace,
+    utils::lookup_sum_valid,
+    LuminairClaim, LuminairInteractionClaim, LuminairProof, IS_FIRST_LOG_SIZES, LOG_MAX_ROWS,
 };
 use luminal::prelude::*;
 use stwo_prover::{
@@ -24,14 +28,6 @@ use crate::{
     data::{OutputConverter, StwoData},
     op::HasProcessTrace,
 };
-
-/// Struct to hold input source information
-///
-/// is_initializer is true if the input is coming from an initial input.
-#[derive(Debug, Clone)]
-pub(crate) struct InputSourceInfo {
-    pub(crate) is_initializer: bool,
-}
 
 pub trait LuminairGraph {
     fn gen_trace(&mut self) -> LuminairPie;
@@ -68,12 +64,17 @@ impl LuminairGraph for Graph {
                 get_source_tensors(&self.no_delete, &mut self.tensors, src_ids, &consumers);
 
             // Gather input source information
-            let input_sources = src_ids
+            let input_info = src_ids
                 .iter()
-                .map(|(id, _, _)| InputSourceInfo {
+                .map(|(id, _, _)| InputInfo {
                     is_initializer: self.node_weight(*id).unwrap().as_any().is::<Function>(),
                 })
                 .collect::<Vec<_>>();
+
+            // Get output source information
+            let output_info = OutputInfo {
+                is_final_output: self.to_retrieve.contains_key(&node),
+            };
 
             // Substitute in the dyn dims
             for (_, st) in srcs.iter_mut() {
@@ -85,16 +86,19 @@ impl LuminairGraph for Graph {
 
             let tensors =
                 if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
-                    let (trace, claim, tensors) = <Box<dyn Operator> as HasProcessTrace<
-                        AddColumn,
-                    >>::call_process_trace(
-                        node_op, srcs, input_sources
-                    )
-                    .unwrap();
+                    let (trace, claim, tensors) =
+                        <Box<dyn Operator> as HasProcessTrace<AddColumn>>::call_process_trace(
+                            node_op, srcs,
+                        )
+                        .unwrap();
 
                     traces.push(Trace {
                         eval: SerializableTrace::from(&trace),
                         claim: ClaimType::Add(claim),
+                        io_info: IOInfo {
+                            inputs: input_info,
+                            output: output_info,
+                        },
                     });
                     *op_counter.add.get_or_insert(0) += 1;
 

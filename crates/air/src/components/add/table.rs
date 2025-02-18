@@ -27,8 +27,6 @@ pub fn trace_evaluation(
     log_size: u32,
     lhs: &[PackedBaseField],
     rhs: &[PackedBaseField],
-    lhs_is_initializer: bool,
-    rhs_is_initializer: bool,
 ) -> (TraceEval, AddClaim, Vec<PackedBaseField>) {
     // Calculate trace size
     let trace_size = 1 << log_size;
