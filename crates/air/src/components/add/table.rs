@@ -1,10 +1,17 @@
-use num_traits::Zero;
+use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
-    constraint_framework::logup::LookupElements,
+    constraint_framework::{
+        logup::{LogupTraceGenerator, LookupElements},
+        Relation, RelationEFTraitBound,
+    },
     core::{
         backend::{
-            simd::{m31::PackedBaseField, SimdBackend},
+            simd::{
+                m31::{PackedBaseField, LOG_N_LANES},
+                qm31::PackedSecureField,
+                SimdBackend,
+            },
             Col, Column,
         },
         channel::Channel,
@@ -13,7 +20,7 @@ use stwo_prover::{
     },
 };
 
-use crate::components::{AddClaim, TraceColumn, TraceEval};
+use crate::components::{AddClaim, InteractionClaim, TraceColumn, TraceError, TraceEval};
 
 /// Generate trace for element-wise addition of two vectors.
 pub fn trace_evaluation(
@@ -119,4 +126,65 @@ impl AddElements {
     pub fn draw(channel: &mut impl Channel) -> Self {
         Self(LookupElements::draw(channel))
     }
+}
+
+impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for AddElements {
+    /// Combine multiple values from a basefield (e.g. [`BaseField`])
+    /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
+    ///
+    /// This is used when computing the interaction values from the main trace values.
+    fn combine(&self, values: &[F]) -> EF {
+        values
+            .iter()
+            .zip(self.0.alpha_powers)
+            .fold(EF::zero(), |acc, (value, power)| {
+                acc + EF::from(power) * value.clone()
+            })
+            - self.0.z.into()
+    }
+
+    fn get_name(&self) -> &str {
+        stringify!(AddElements)
+    }
+
+    fn get_size(&self) -> usize {
+        ADD_LOOKUP_ELEMENTS
+    }
+}
+
+/// Creates the interaction trace from the main trace evaluation
+/// and the interaction elements for the Add component.
+pub fn interaction_trace_evaluation(
+    main_trace_eval: &TraceEval,
+    lookup_elements: &AddElements,
+) -> Result<(TraceEval, InteractionClaim), TraceError> {
+    if main_trace_eval.is_empty() {
+        return Err(TraceError::EmptyTrace);
+    }
+
+    let log_size = main_trace_eval[0].domain.log_size();
+
+    let mut logup_gen = LogupTraceGenerator::new(log_size);
+    let mut col_gen = logup_gen.new_col();
+
+    // Get the output values form the Add operation
+    let out_col = &main_trace_eval[AddColumn::Out.index()].data;
+
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let out = out_col[vec_row];
+
+        // For each row, we add a fraction to the logUp sum
+        // The numerator will be 1 for real values, indicating this output exists
+        // The denominator uses the lookup elements to create a unique combination for this output
+        // Later nodes that use this output as input will subtract 1 from the logUp sum with the same denominator
+        let num = PackedSecureField::one();
+        let denom: PackedSecureField = lookup_elements.combine(&[out]);
+
+        col_gen.write_frac(vec_row, num, denom);
+    }
+
+    col_gen.finalize_col();
+    let (trace, claimed_sum) = logup_gen.finalize_last();
+
+    Ok((trace, InteractionClaim { claimed_sum }))
 }

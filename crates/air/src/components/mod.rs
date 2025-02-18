@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use add::{
     component::{AddComponent, AddEval},
     table::{AddColumn, AddElements},
@@ -9,16 +11,25 @@ use stwo_prover::{
         air::{Component, ComponentProver},
         backend::simd::SimdBackend,
         channel::Channel,
-        fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
+        fields::{m31::BaseField, qm31::SecureField, secure_column::SECURE_EXTENSION_DEGREE},
         pcs::TreeVec,
         poly::{circle::CircleEvaluation, BitReversedOrder},
         ColumnVec,
     },
 };
+use thiserror::Error;
 
-use crate::{pie::OpCounter, LuminairClaim, IS_FIRST_LOG_SIZES};
+use crate::{pie::OpCounter, LuminairClaim, LuminairInteractionClaim, IS_FIRST_LOG_SIZES};
 
 pub mod add;
+
+/// Custom error type for the Trace.
+#[derive(Debug, Error, Eq, PartialEq)]
+pub enum TraceError {
+    /// The component trace is empty.
+    #[error("The trace is empty.")]
+    EmptyTrace,
+}
 
 /// Type for trace evaluation to be used in Stwo.
 pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
@@ -93,11 +104,33 @@ pub enum ClaimType {
     Add(Claim<AddColumn>),
 }
 
+/// The claim of the interaction phase 2 (with the logUp protocol).
+///
+/// The claimed sum is the total sum, which is the computed sum of the logUp extension column,
+/// including the padding rows.
+/// It allows proving that the main trace of a component is either a permutation, or a sublist of
+/// another.
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct InteractionClaim {
+    /// The computed sum of the logUp extension column, including padding rows (which are actually
+    /// set to a multiplicity of 0).
+    pub claimed_sum: SecureField,
+}
+
+impl InteractionClaim {
+    /// Mix the sum from the logUp protocol into the Fiat-Shamir [`Channel`],
+    /// to bound the proof to the trace.
+    pub fn mix_into(&self, channel: &mut impl Channel) {
+        channel.mix_felts(&[self.claimed_sum]);
+    }
+}
+
 /// All the interaction elements required by the components during the interaction phas 2.
 ///
 /// The elements are drawn from a Fiat-Shamir [`Channel`], currently using the BLAKE2 hash.
+#[derive(Clone)]
 pub struct LuminairInteractionElements {
-    pub add_lookup_elements: Vec<AddElements>,
+    pub add_lookup_elements: VecDeque<AddElements>,
 }
 
 impl LuminairInteractionElements {
@@ -122,7 +155,11 @@ pub struct LuminairComponents {
 
 impl LuminairComponents {
     /// Initilizes all the LuminAIR components from the claims generated from the trace.
-    pub fn new(claims: &LuminairClaim) -> Self {
+    pub fn new(
+        claims: &LuminairClaim,
+        interaction_elements: &LuminairInteractionElements,
+        interaction_claim: &LuminairInteractionClaim,
+    ) -> Self {
         let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
             &IS_FIRST_LOG_SIZES
                 .iter()
@@ -135,11 +172,13 @@ impl LuminairComponents {
         let add_components = claims
             .add
             .iter()
-            .map(|c| {
+            .zip(interaction_elements.add_lookup_elements.iter())
+            .zip(interaction_claim.add.iter())
+            .map(|((cl, el), int_cl)| {
                 AddComponent::new(
                     tree_span_provider,
-                    AddEval::new(c),
-                    (Default::default(), None),
+                    AddEval::new(cl, el.clone()),
+                    (int_cl.claimed_sum, None),
                 )
             })
             .collect();

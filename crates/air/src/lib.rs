@@ -1,8 +1,11 @@
 #![feature(trait_upcasting)]
 
 use ::serde::{Deserialize, Serialize};
-use components::AddClaim;
+use components::{AddClaim, InteractionClaim};
+use num_traits::Zero;
+use pie::ExecutionResources;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
+use stwo_prover::core::backend::simd::qm31::PackedSecureField;
 use stwo_prover::core::{
     channel::Channel, pcs::TreeVec, prover::StarkProof, vcs::ops::MerkleHasher,
 };
@@ -18,7 +21,9 @@ pub mod utils;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairProof<H: MerkleHasher> {
     pub claim: LuminairClaim,
+    pub interaction_claim: LuminairInteractionClaim,
     pub proof: StarkProof<H>,
+    pub execution_resources: ExecutionResources,
 }
 
 /// A claim over the log sizes for each component of the system.
@@ -33,8 +38,8 @@ pub struct LuminairClaim {
 }
 
 impl LuminairClaim {
-    pub fn init() -> LuminairClaim {
-        LuminairClaim { add: vec![] }
+    pub fn init() -> Self {
+        Self { add: vec![] }
     }
 
     pub fn mix_into(&self, channel: &mut impl Channel) {
@@ -56,6 +61,36 @@ impl LuminairClaim {
 
         log_sizes
     }
+}
+
+/// A claim over the claimed sum of the interaction columns for each component of the system
+///
+/// Needed for the lookup protocol (logUp with AIR).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LuminairInteractionClaim {
+    pub add: Vec<InteractionClaim>,
+}
+
+impl LuminairInteractionClaim {
+    pub fn init() -> Self {
+        Self { add: vec![] }
+    }
+
+    pub fn mix_into(&self, channel: &mut impl Channel) {
+        self.add.iter().for_each(|c| c.mix_into(channel));
+    }
+}
+
+/// Verify that the claims (i.e Statement) are valid.
+pub fn lookup_sum_valid(interaction_claim: &LuminairInteractionClaim) -> bool {
+    let mut sum = PackedSecureField::zero();
+
+    interaction_claim
+        .add
+        .iter()
+        .for_each(|c| sum += c.claimed_sum.into());
+
+    sum.is_zero()
 }
 
 /// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
