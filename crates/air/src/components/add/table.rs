@@ -15,7 +15,7 @@ use stwo_prover::{
             Col, Column,
         },
         channel::Channel,
-        fields::m31::BaseField,
+        fields::{m31::BaseField, qm31::SecureField},
         poly::circle::{CanonicCoset, CircleEvaluation},
     },
 };
@@ -51,22 +51,20 @@ pub fn trace_evaluation(
 
         for i in 0..trace_size {
             if i < size {
-                // Get values with broadcasting
                 let lhs_val = lhs[i % lhs.len()];
                 let rhs_val = rhs[i % rhs.len()];
                 let out_val = lhs_val + rhs_val;
 
-                // Set appropriate value based on column index
                 match column_idx {
                     0 => column.set(i, lhs_val.to_array()[0]),
                     1 => column.set(i, rhs_val.to_array()[0]),
-                    2 => column.set(i, out_val.to_array()[0]),
+                    2 => {
+                        column.set(i, out_val.to_array()[0]);
+                        output.push(out_val);
+                    }
                     _ => unreachable!(),
                 }
-
-                output.push(out_val)
             } else {
-                // Pad with zeros
                 column.set(i, BaseField::zero());
             }
         }
@@ -166,46 +164,53 @@ pub fn interaction_trace_evaluation(
     let log_size = main_trace_eval[0].domain.log_size();
     let mut logup_gen = LogupTraceGenerator::new(log_size);
 
-    let is_lhs_initializer = io_info.inputs[0].is_initializer;
-    let is_rhs_initializer = io_info.inputs[1].is_initializer;
-    let is_final_output = io_info.output.is_final_output;
-
-    // Always create relations for inputs
+    // Create trace for LHS
     let lhs_col = &main_trace_eval[AddColumn::Lhs.index()].data;
     let mut col_lhs = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
         let lhs = lhs_col[row];
-        let multiplicity = if is_lhs_initializer {
-            PackedSecureField::zero() // No contribution for initializer
+        let multiplicity = if io_info.inputs[0].is_initializer {
+            PackedSecureField::zero()
         } else {
-            -PackedSecureField::one()
+            PackedSecureField::broadcast(-SecureField::one())
         };
+
+        // println!("LHS Multiplicity: {:?} ", multiplicity);
+
         col_lhs.write_frac(row, multiplicity, lookup_elements.combine(&[lhs]));
     }
     col_lhs.finalize_col();
 
+    // Create trace for RHS
     let rhs_col = &main_trace_eval[AddColumn::Rhs.index()].data;
     let mut col_rhs = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
         let rhs = rhs_col[row];
-        let multiplicity = if is_rhs_initializer {
-            PackedSecureField::zero() // No contribution for initializer
+        let multiplicity = if io_info.inputs[1].is_initializer {
+            PackedSecureField::zero()
         } else {
-            -PackedSecureField::one()
+            PackedSecureField::broadcast(-SecureField::one())
         };
+
+        // println!("RHS Multiplicity: {:?} ", multiplicity);
+
         col_rhs.write_frac(row, multiplicity, lookup_elements.combine(&[rhs]));
     }
     col_rhs.finalize_col();
 
+    // Create trace for output
     let out_col = &main_trace_eval[AddColumn::Out.index()].data;
     let mut col_out = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
         let out = out_col[row];
-        let multiplicity = if is_final_output {
-            PackedSecureField::zero() // No contribution for final output
+        let multiplicity = if io_info.output.is_final_output {
+            PackedSecureField::zero()
         } else {
-            PackedSecureField::one()
+            PackedSecureField::broadcast(SecureField::one())
         };
+
+        // println!("Out Multiplicity: {:?} ", multiplicity);
+
         col_out.write_frac(row, multiplicity, lookup_elements.combine(&[out]));
     }
     col_out.finalize_col();

@@ -1,3 +1,7 @@
+use crate::{
+    data::{OutputConverter, StwoData},
+    op::HasProcessTrace,
+};
 use luminair_air::{
     components::{
         add::table::{interaction_trace_evaluation, AddColumn},
@@ -22,11 +26,6 @@ use stwo_prover::{
         prover::{self, verify, ProvingError, VerificationError},
         vcs::blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
     },
-};
-
-use crate::{
-    data::{OutputConverter, StwoData},
-    op::HasProcessTrace,
 };
 
 pub trait LuminairGraph {
@@ -121,6 +120,8 @@ impl LuminairGraph for Graph {
         }
 
         self.reset();
+
+        // println!("Trace: {:?}", traces);
 
         LuminairPie {
             traces,

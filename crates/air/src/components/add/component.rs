@@ -69,23 +69,19 @@ impl FrameworkEval for AddEval {
 
         eval.eval_fixed_add(lhs.clone(), rhs.clone(), out.clone());
 
-        let is_lhs_initializer = self.io_info.inputs[0].is_initializer;
-        let is_rhs_initializer = self.io_info.inputs[1].is_initializer;
-        let is_final_output = self.io_info.output.is_final_output;
-
-        let lhs_multiplicity = if is_lhs_initializer {
+        // Calculate multiplicities based on IO info
+        let lhs_multiplicity = if self.io_info.inputs[0].is_initializer {
             E::EF::zero()
         } else {
             -E::EF::one()
         };
 
-        let rhs_multiplicity = if is_rhs_initializer {
+        let rhs_multiplicity = if self.io_info.inputs[1].is_initializer {
             E::EF::zero()
         } else {
             -E::EF::one()
         };
-
-        let out_multiplicity = if is_final_output {
+        let out_multiplicity = if self.io_info.output.is_final_output {
             E::EF::zero()
         } else {
             E::EF::one()
