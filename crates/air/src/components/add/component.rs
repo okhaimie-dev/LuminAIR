@@ -4,7 +4,7 @@ use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
 };
 
-use crate::components::AddClaim;
+use crate::{components::AddClaim, pie::IOInfo};
 
 use super::table::AddElements;
 
@@ -20,14 +20,17 @@ pub type AddComponent = FrameworkComponent<AddEval>;
 pub struct AddEval {
     /// The log size of the component's main trace height.
     log_size: u32,
-    /// The random elements used for the lookup protocol
+    /// The random elements used for the lookup protocol.
     lookup_elements: AddElements,
+    /// Inputs/output information.
+    io_info: IOInfo,
 }
 
 impl AddEval {
-    pub const fn new(claim: &AddClaim, lookup_elements: AddElements) -> Self {
+    pub fn new(claim: &AddClaim, lookup_elements: AddElements) -> Self {
         Self {
             log_size: claim.log_size,
+            io_info: claim.io_info.clone(),
             lookup_elements,
         }
     }

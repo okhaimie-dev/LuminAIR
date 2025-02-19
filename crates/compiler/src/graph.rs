@@ -76,6 +76,11 @@ impl LuminairGraph for Graph {
                 is_final_output: self.to_retrieve.contains_key(&node),
             };
 
+            let io_info = IOInfo {
+                inputs: input_info,
+                output: output_info,
+            };
+
             // Substitute in the dyn dims
             for (_, st) in srcs.iter_mut() {
                 st.resolve_global_dyn_dims_stack(&self.dyn_map, &mut dim_stack);
@@ -88,17 +93,14 @@ impl LuminairGraph for Graph {
                 if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
                     let (trace, claim, tensors) =
                         <Box<dyn Operator> as HasProcessTrace<AddColumn>>::call_process_trace(
-                            node_op, srcs,
+                            node_op, srcs, &io_info,
                         )
                         .unwrap();
 
                     traces.push(Trace {
                         eval: SerializableTrace::from(&trace),
                         claim: ClaimType::Add(claim),
-                        io_info: IOInfo {
-                            inputs: input_info,
-                            output: output_info,
-                        },
+                        io_info,
                     });
                     *op_counter.add.get_or_insert(0) += 1;
 
@@ -218,6 +220,7 @@ impl LuminairGraph for Graph {
         for trace in pie.traces.into_iter() {
             match trace.claim {
                 ClaimType::Add(claim) => {
+                    let io_info = trace.io_info;
                     let trace = trace.eval.to_trace();
                     // Add the components' trace evaluation to the commit tree.
                     tree_builder_1.extend_evals(trace.clone());
@@ -228,7 +231,8 @@ impl LuminairGraph for Graph {
                         .pop_front()
                         .unwrap();
 
-                    interactions.push(interaction_trace_evaluation(&trace, &int_el).unwrap());
+                    interactions
+                        .push(interaction_trace_evaluation(&trace, &int_el, &io_info).unwrap());
                 }
             }
         }

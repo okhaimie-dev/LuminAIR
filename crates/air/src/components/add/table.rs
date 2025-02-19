@@ -20,13 +20,17 @@ use stwo_prover::{
     },
 };
 
-use crate::components::{AddClaim, InteractionClaim, TraceColumn, TraceError, TraceEval};
+use crate::{
+    components::{AddClaim, InteractionClaim, TraceColumn, TraceError, TraceEval},
+    pie::IOInfo,
+};
 
 /// Generate trace for element-wise addition of two vectors.
 pub fn trace_evaluation(
     log_size: u32,
     lhs: &[PackedBaseField],
     rhs: &[PackedBaseField],
+    io_info: &IOInfo,
 ) -> (TraceEval, AddClaim, Vec<PackedBaseField>) {
     // Calculate trace size
     let trace_size = 1 << log_size;
@@ -70,7 +74,7 @@ pub fn trace_evaluation(
         main_trace.push(CircleEvaluation::new(domain, column));
     }
 
-    (main_trace, AddClaim::new(log_size), output)
+    (main_trace, AddClaim::new(log_size, io_info.clone()), output)
 }
 
 /// Enum representing the column indices in the Add trace.
@@ -155,6 +159,7 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for AddElements {
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
     lookup_elements: &AddElements,
+    io_info: &IOInfo,
 ) -> Result<(TraceEval, InteractionClaim), TraceError> {
     if main_trace_eval.is_empty() {
         return Err(TraceError::EmptyTrace);
