@@ -211,8 +211,6 @@ impl LuminairGraph for Graph {
         let interaction_elements =
             LuminairInteractionElements::draw(channel, &pie.execution_resources.op_counter);
 
-        let mut interaction_elements_clone = interaction_elements.clone();
-
         // Pre-allocate for expected number of traces
         claim_1
             .add
@@ -227,13 +225,10 @@ impl LuminairGraph for Graph {
                     tree_builder_1.extend_evals(trace.clone());
                     claim_1.add.push(claim);
 
-                    let int_el = interaction_elements_clone
-                        .add_lookup_elements
-                        .pop_front()
-                        .unwrap();
+                    let int_el = &interaction_elements.add_lookup_elements;
 
                     interactions
-                        .push(interaction_trace_evaluation(&trace, &int_el, &io_info).unwrap());
+                        .push(interaction_trace_evaluation(&trace, int_el, &io_info).unwrap());
                 }
             }
         }

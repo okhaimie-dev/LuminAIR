@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use add::{
     component::{AddComponent, AddEval},
     table::{AddColumn, AddElements},
@@ -136,17 +134,22 @@ impl InteractionClaim {
 /// The elements are drawn from a Fiat-Shamir [`Channel`], currently using the BLAKE2 hash.
 #[derive(Clone)]
 pub struct LuminairInteractionElements {
-    pub add_lookup_elements: VecDeque<AddElements>,
+    pub add_lookup_elements: AddElements,
 }
 
 impl LuminairInteractionElements {
     /// Draw all the interaction elements needed for
     /// all the components of the system.
     pub fn draw(channel: &mut impl Channel, op_counter: &OpCounter) -> Self {
+        // Only draw elements once and reuse them
+        let add_elements = if op_counter.add.unwrap_or(0) > 0 {
+            AddElements::draw(channel)
+        } else {
+            AddElements::dummy()
+        };
+
         Self {
-            add_lookup_elements: (0..op_counter.add.unwrap_or(0))
-                .map(|_| AddElements::draw(channel))
-                .collect(),
+            add_lookup_elements: add_elements,
         }
     }
 }
@@ -174,16 +177,15 @@ impl LuminairComponents {
                 .collect::<Vec<_>>(),
         );
 
-        // Create a component for each Add claim
+        // Use the same lookup elements for all add components
         let add_components = claims
             .add
             .iter()
-            .zip(interaction_elements.add_lookup_elements.iter())
             .zip(interaction_claim.add.iter())
-            .map(|((cl, el), int_cl)| {
+            .map(|(cl, int_cl)| {
                 AddComponent::new(
                     tree_span_provider,
-                    AddEval::new(cl, el.clone()),
+                    AddEval::new(cl, interaction_elements.add_lookup_elements.clone()),
                     (int_cl.claimed_sum, None),
                 )
             })

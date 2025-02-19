@@ -1,10 +1,7 @@
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
-    constraint_framework::{
-        logup::{LogupTraceGenerator, LookupElements},
-        Relation, RelationEFTraitBound,
-    },
+    constraint_framework::{logup::LogupTraceGenerator, Relation},
     core::{
         backend::{
             simd::{
@@ -14,10 +11,10 @@ use stwo_prover::{
             },
             Col, Column,
         },
-        channel::Channel,
         fields::{m31::BaseField, qm31::SecureField},
         poly::circle::{CanonicCoset, CircleEvaluation},
     },
+    relation,
 };
 
 use crate::{
@@ -105,50 +102,7 @@ impl TraceColumn for AddColumn {
     }
 }
 
-/// The number of random elements necessary for the Add lookup argument.
-const ADD_LOOKUP_ELEMENTS: usize = 1;
-
-/// The interaction elements are drawn for the extension column of the Add component.
-///
-/// The logUp protocol uses these elements to combine the values of the different
-/// registers of the main trace to create a random linear combination
-/// of them, and use it in the denominator of the fraction in the logUp protocol.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AddElements(LookupElements<ADD_LOOKUP_ELEMENTS>);
-
-impl AddElements {
-    /// Draw random elements from the Fiat-Shamir [`Channel`].
-    ///
-    /// These elements are randomly secured, and will be use
-    /// to generate the interaction trace with the logUp protocol.
-    pub fn draw(channel: &mut impl Channel) -> Self {
-        Self(LookupElements::draw(channel))
-    }
-}
-
-impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for AddElements {
-    /// Combine multiple values from a basefield (e.g. [`BaseField`])
-    /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
-    ///
-    /// This is used when computing the interaction values from the main trace values.
-    fn combine(&self, values: &[F]) -> EF {
-        values
-            .iter()
-            .zip(self.0.alpha_powers)
-            .fold(EF::zero(), |acc, (value, power)| {
-                acc + EF::from(power) * value.clone()
-            })
-            - self.0.z.into()
-    }
-
-    fn get_name(&self) -> &str {
-        stringify!(AddElements)
-    }
-
-    fn get_size(&self) -> usize {
-        ADD_LOOKUP_ELEMENTS
-    }
-}
+relation!(AddElements, 3);
 
 /// Creates the interaction trace from the main trace evaluation
 /// and the interaction elements for the Add component.
@@ -175,7 +129,7 @@ pub fn interaction_trace_evaluation(
             PackedSecureField::broadcast(-SecureField::one())
         };
 
-        // println!("LHS Multiplicity: {:?} ", multiplicity);
+        println!("LHS Multiplicity: {:?} ", multiplicity);
 
         col_lhs.write_frac(row, multiplicity, lookup_elements.combine(&[lhs]));
     }
@@ -192,7 +146,7 @@ pub fn interaction_trace_evaluation(
             PackedSecureField::broadcast(-SecureField::one())
         };
 
-        // println!("RHS Multiplicity: {:?} ", multiplicity);
+        println!("RHS Multiplicity: {:?} ", multiplicity);
 
         col_rhs.write_frac(row, multiplicity, lookup_elements.combine(&[rhs]));
     }
@@ -209,13 +163,15 @@ pub fn interaction_trace_evaluation(
             PackedSecureField::broadcast(SecureField::one())
         };
 
-        // println!("Out Multiplicity: {:?} ", multiplicity);
+        println!("Out Multiplicity: {:?} ", multiplicity);
 
         col_out.write_frac(row, multiplicity, lookup_elements.combine(&[out]));
     }
     col_out.finalize_col();
 
     let (trace, claimed_sum) = logup_gen.finalize_last();
+
+    println!("Individual Claimed Sum: {:?}", claimed_sum);
 
     Ok((trace, InteractionClaim { claimed_sum }))
 }

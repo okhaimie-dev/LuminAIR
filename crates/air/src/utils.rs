@@ -19,7 +19,7 @@ pub fn lookup_sum_valid(interaction_claim: &LuminairInteractionClaim) -> bool {
         .iter()
         .for_each(|c| sum += c.claimed_sum.into());
 
-    // println!("LogUp Sum: {:?}", sum);
+    println!("LogUp Sum: {:?}", sum);
 
     sum.is_zero()
 }
