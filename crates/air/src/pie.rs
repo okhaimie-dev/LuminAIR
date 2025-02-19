@@ -48,3 +48,15 @@ pub struct IOInfo {
     pub inputs: Vec<InputInfo>,
     pub output: OutputInfo,
 }
+
+impl IOInfo {
+    /// Checks if any input is an initializer
+    pub fn has_initializer(&self) -> bool {
+        self.inputs.iter().any(|input| input.is_initializer)
+    }
+
+    /// Checks if the output is a final output
+    pub fn is_final_output(&self) -> bool {
+        self.output.is_final_output
+    }
+}

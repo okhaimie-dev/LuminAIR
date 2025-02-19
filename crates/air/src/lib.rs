@@ -2,10 +2,8 @@
 
 use ::serde::{Deserialize, Serialize};
 use components::{AddClaim, InteractionClaim};
-use num_traits::Zero;
 use pie::ExecutionResources;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
-use stwo_prover::core::backend::simd::qm31::PackedSecureField;
 use stwo_prover::core::{
     channel::Channel, pcs::TreeVec, prover::StarkProof, vcs::ops::MerkleHasher,
 };

@@ -1,4 +1,4 @@
-use num_traits::One;
+use num_traits::{One, Zero};
 use numerair::eval::EvalFixedPoint;
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
@@ -67,27 +67,45 @@ impl FrameworkEval for AddEval {
         let rhs = eval.next_trace_mask();
         let out = eval.next_trace_mask();
 
-        // Local consistency: out = lhs + rhs
         eval.eval_fixed_add(lhs.clone(), rhs.clone(), out.clone());
 
-        // For the logUp sum, we want sum = out - lhs - rhs = 0.
-        // So we do:
-        //   -1 for lhs
-        //   -1 for rhs
-        //   +1 for out
+        let is_lhs_initializer = self.io_info.inputs[0].is_initializer;
+        let is_rhs_initializer = self.io_info.inputs[1].is_initializer;
+        let is_final_output = self.io_info.output.is_final_output;
+
+        let lhs_multiplicity = if is_lhs_initializer {
+            E::EF::zero()
+        } else {
+            -E::EF::one()
+        };
+
+        let rhs_multiplicity = if is_rhs_initializer {
+            E::EF::zero()
+        } else {
+            -E::EF::one()
+        };
+
+        let out_multiplicity = if is_final_output {
+            E::EF::zero()
+        } else {
+            E::EF::one()
+        };
+
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
-            -E::EF::one(),
+            lhs_multiplicity,
             &[lhs],
         ));
+
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
-            -E::EF::one(),
+            rhs_multiplicity,
             &[rhs],
         ));
+
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
-            E::EF::one(),
+            out_multiplicity,
             &[out],
         ));
 
