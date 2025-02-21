@@ -1214,7 +1214,6 @@ dependencies = [
 [[package]]
 name = "numerair"
 version = "0.1.0"
-source = "git+https://github.com/gizatechxyz/NumerAir.git?rev=3d9a9b9#3d9a9b98507493330f22e0f01a9589ddd5c5c012"
 dependencies = [
  "num-traits",
  "rayon",
@@ -1674,7 +1673,6 @@ dependencies = [
 [[package]]
 name = "stwo-prover"
 version = "0.1.1"
-source = "git+https://github.com/starkware-libs/stwo.git?rev=36b17ac#36b17ac3b3d66106dbe5268305a5812bcd490e5c"
 dependencies = [
  "blake2",
  "blake3",

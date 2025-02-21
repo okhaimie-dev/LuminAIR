@@ -1,7 +1,8 @@
 #![feature(trait_upcasting)]
 
 use ::serde::{Deserialize, Serialize};
-use components::AddClaim;
+use components::{AddClaim, InteractionClaim};
+use pie::ExecutionResources;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
 use stwo_prover::core::{
     channel::Channel, pcs::TreeVec, prover::StarkProof, vcs::ops::MerkleHasher,
@@ -18,7 +19,9 @@ pub mod utils;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairProof<H: MerkleHasher> {
     pub claim: LuminairClaim,
+    pub interaction_claim: LuminairInteractionClaim,
     pub proof: StarkProof<H>,
+    pub execution_resources: ExecutionResources,
 }
 
 /// A claim over the log sizes for each component of the system.
@@ -33,8 +36,8 @@ pub struct LuminairClaim {
 }
 
 impl LuminairClaim {
-    pub fn init() -> LuminairClaim {
-        LuminairClaim { add: vec![] }
+    pub fn init() -> Self {
+        Self { add: vec![] }
     }
 
     pub fn mix_into(&self, channel: &mut impl Channel) {
@@ -55,6 +58,24 @@ impl LuminairClaim {
         log_sizes[PREPROCESSED_TRACE_IDX] = IS_FIRST_LOG_SIZES.to_vec();
 
         log_sizes
+    }
+}
+
+/// A claim over the claimed sum of the interaction columns for each component of the system
+///
+/// Needed for the lookup protocol (logUp with AIR).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LuminairInteractionClaim {
+    pub add: Vec<InteractionClaim>,
+}
+
+impl LuminairInteractionClaim {
+    pub fn init() -> Self {
+        Self { add: vec![] }
+    }
+
+    pub fn mix_into(&self, channel: &mut impl Channel) {
+        self.add.iter().for_each(|c| c.mix_into(channel));
     }
 }
 

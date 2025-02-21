@@ -1,7 +1,12 @@
+use num_traits::{One, Zero};
 use numerair::eval::EvalFixedPoint;
-use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval};
+use stwo_prover::constraint_framework::{
+    EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
+};
 
-use crate::components::AddClaim;
+use crate::{components::AddClaim, pie::IOInfo};
+
+use super::table::AddElements;
 
 /// Implementation of `Component` and `ComponentProver` for the Add component.
 /// It targets the `SimdBackend` from the Stwo constraint framework, with the fallback
@@ -15,12 +20,18 @@ pub type AddComponent = FrameworkComponent<AddEval>;
 pub struct AddEval {
     /// The log size of the component's main trace height.
     log_size: u32,
+    /// The random elements used for the lookup protocol.
+    lookup_elements: AddElements,
+    /// Inputs/output information.
+    io_info: IOInfo,
 }
 
 impl AddEval {
-    pub const fn new(claim: &AddClaim) -> Self {
+    pub fn new(claim: &AddClaim, lookup_elements: AddElements) -> Self {
         Self {
             log_size: claim.log_size,
+            io_info: claim.io_info.clone(),
+            lookup_elements,
         }
     }
 }
@@ -55,9 +66,46 @@ impl FrameworkEval for AddEval {
         let lhs = eval.next_trace_mask();
         let rhs = eval.next_trace_mask();
         let out = eval.next_trace_mask();
+        
+        eval.eval_fixed_add(lhs.clone(), rhs.clone(), out.clone());
 
-        eval.eval_fixed_add(lhs, rhs, out);
+        let lhs_multiplicity = if self.io_info.inputs[0].is_initializer {
+            E::EF::zero()
+        } else {
+            -E::EF::one()
+        };
 
+        let rhs_multiplicity = if self.io_info.inputs[1].is_initializer {
+            E::EF::zero()
+        } else {
+            -E::EF::one()
+        };
+        let out_multiplicity = if self.io_info.output.is_final_output {
+            E::EF::zero()
+        } else {
+            E::EF::one()
+        };
+
+        eval.add_to_relation(RelationEntry::new(
+            &self.lookup_elements,
+            lhs_multiplicity,
+            &[lhs],
+        ));
+
+        eval.add_to_relation(RelationEntry::new(
+            &self.lookup_elements,
+            rhs_multiplicity,
+            &[rhs],
+        ));
+
+        eval.add_to_relation(RelationEntry::new(
+            &self.lookup_elements,
+            out_multiplicity,
+            &[out],
+        ));
+
+        eval.finalize_logup();
+        
         eval
     }
 }

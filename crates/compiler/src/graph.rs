@@ -1,13 +1,22 @@
+use crate::{
+    data::{OutputConverter, StwoData},
+    op::HasProcessTrace,
+};
 use luminair_air::{
-    components::{add::table::AddColumn, ClaimType, LuminairComponents},
-    pie::{LuminairPie, Trace},
+    components::{
+        add::table::{interaction_trace_evaluation, AddColumn},
+        ClaimType, LuminairComponents, LuminairInteractionElements, TraceEval,
+    },
+    pie::{ExecutionResources, IOInfo, InputInfo, LuminairPie, OpCounter, OutputInfo, Trace},
     serde::SerializableTrace,
-    LuminairClaim, LuminairProof, IS_FIRST_LOG_SIZES, LOG_MAX_ROWS,
+    utils::lookup_sum_valid,
+    LuminairClaim, LuminairInteractionClaim, LuminairProof, IS_FIRST_LOG_SIZES, LOG_MAX_ROWS,
 };
 use luminal::prelude::*;
 use stwo_prover::{
     constraint_framework::{
-        preprocessed_columns::gen_is_first, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX,
+        preprocessed_columns::gen_is_first, INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX,
+        PREPROCESSED_TRACE_IDX,
     },
     core::{
         backend::simd::SimdBackend,
@@ -18,19 +27,6 @@ use stwo_prover::{
         vcs::blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
     },
 };
-
-use crate::{
-    data::{OutputConverter, StwoData},
-    op::HasProcessTrace,
-};
-
-/// Struct to hold input source information
-///
-/// is_initial is true if the input is coming from an initial input.
-#[derive(Debug, Clone)]
-pub(crate) struct InputSourceInfo {
-    is_initial: bool,
-}
 
 pub trait LuminairGraph {
     fn gen_trace(&mut self) -> LuminairPie;
@@ -55,6 +51,9 @@ impl LuminairGraph for Graph {
 
         // Initialize trace collectors for different operators
         let mut traces = Vec::new();
+        // Initializes operator counter
+        let mut op_counter = OpCounter::default();
+
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
                 continue;
@@ -64,12 +63,22 @@ impl LuminairGraph for Graph {
                 get_source_tensors(&self.no_delete, &mut self.tensors, src_ids, &consumers);
 
             // Gather input source information
-            let input_sources = src_ids
+            let input_info = src_ids
                 .iter()
-                .map(|(id, _, _)| InputSourceInfo {
-                    is_initial: self.node_weight(*id).unwrap().as_any().is::<Function>(),
+                .map(|(id, _, _)| InputInfo {
+                    is_initializer: self.node_weight(*id).unwrap().as_any().is::<Function>(),
                 })
                 .collect::<Vec<_>>();
+
+            // Get output source information
+            let output_info = OutputInfo {
+                is_final_output: self.to_retrieve.contains_key(&node),
+            };
+
+            let io_info = IOInfo {
+                inputs: input_info,
+                output: output_info,
+            };
 
             // Substitute in the dyn dims
             for (_, st) in srcs.iter_mut() {
@@ -81,17 +90,18 @@ impl LuminairGraph for Graph {
 
             let tensors =
                 if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
-                    let (trace, claim, tensors) = <Box<dyn Operator> as HasProcessTrace<
-                        AddColumn,
-                    >>::call_process_trace(
-                        node_op, srcs, input_sources
-                    )
-                    .unwrap();
+                    let (trace, claim, tensors) =
+                        <Box<dyn Operator> as HasProcessTrace<AddColumn>>::call_process_trace(
+                            node_op, srcs, &io_info,
+                        )
+                        .unwrap();
 
                     traces.push(Trace {
                         eval: SerializableTrace::from(&trace),
                         claim: ClaimType::Add(claim),
+                        io_info,
                     });
+                    *op_counter.add.get_or_insert(0) += 1;
 
                     tensors
                 } else {
@@ -111,7 +121,10 @@ impl LuminairGraph for Graph {
 
         self.reset();
 
-        LuminairPie { traces }
+        LuminairPie {
+            traces,
+            execution_resources: ExecutionResources { op_counter },
+        }
     }
 
     fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32> {
@@ -187,51 +200,90 @@ impl LuminairGraph for Graph {
         tree_builder.commit(channel);
 
         // ┌───────────────────────────────────────┐
-        // │        Interaction Phase 1 & 2        │
+        // │    Interaction Phase 1 - Main Trace   │
         // └───────────────────────────────────────┘
-        let mut tree_builder_1 = commitment_scheme.tree_builder();
-        let mut claim_1 = LuminairClaim::init();
 
-        // Pre-allocate for expected number of traces
-        claim_1.add.reserve(pie.traces.len());
+        tracing::info!("Main Trace");
+        let mut tree_builder = commitment_scheme.tree_builder();
+        let mut main_claim = LuminairClaim::init();
 
-        for trace in pie.traces.into_iter() {
-            // Consume the traces
-            // ┌───────────────────────────────────────┐
-            // │    Interaction Phase 1 - Main Trace   │
-            // └───────────────────────────────────────┘
-
+        for trace in pie.traces.clone().into_iter() {
             match trace.claim {
                 ClaimType::Add(claim) => {
                     // Add the components' trace evaluation to the commit tree.
-                    tree_builder_1.extend_evals(trace.eval.to_trace());
-                    claim_1.add.push(claim);
+                    tree_builder.extend_evals(trace.eval.to_trace());
+                    main_claim.add.push(claim);
                 }
             }
         }
 
         // Mix the claim into the Fiat-Shamir channel.
-        claim_1.mix_into(channel);
+        main_claim.mix_into(channel);
         // Commit the main trace.
-        tree_builder_1.commit(channel);
+        tree_builder.commit(channel);
+
+        // ┌───────────────────────────────────────────────┐
+        // │    Interaction Phase 2 - Interaction Trace    │
+        // └───────────────────────────────────────────────┘
+
+        // Draw interaction elements
+        let interaction_elements =
+            LuminairInteractionElements::draw(channel, &pie.execution_resources.op_counter);
+
+        // Generate the interaction trace from the main trace, and compute the logUp sum.
+        let mut tree_builder = commitment_scheme.tree_builder();
+        let mut interaction_claim = LuminairInteractionClaim::init();
+
+        for trace in pie.traces.into_iter() {
+            match trace.claim {
+                ClaimType::Add(_) => {
+                    let io_info = trace.io_info;
+                    let trace: TraceEval = trace.eval.to_trace();
+
+                    let lookup_elements = &interaction_elements.add_lookup_elements;
+
+                    let (t, c) =
+                        interaction_trace_evaluation(&trace, lookup_elements, &io_info).unwrap();
+
+                    tree_builder.extend_evals(t);
+                    interaction_claim.add.push(c);
+                }
+            }
+        }
+
+        // Mix the interaction claim into the Fiat-Shamir channel.
+        interaction_claim.mix_into(channel);
+        // Commit the interaction trace.
+        tree_builder.commit(channel);
 
         // ┌──────────────────────────┐
         // │     Proof Generation     │
         // └──────────────────────────┘
         tracing::info!("Proof Generation");
-        let component_builder = LuminairComponents::new(&claim_1);
+        let component_builder =
+            LuminairComponents::new(&main_claim, &interaction_elements, &interaction_claim);
         let components = component_builder.provers();
         let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
 
         self.reset();
 
         Ok(LuminairProof {
-            claim: claim_1,
+            claim: main_claim,
+            interaction_claim,
             proof,
+            execution_resources: pie.execution_resources,
         })
     }
 
-    fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError> {
+    fn verify(
+        &self,
+        LuminairProof {
+            claim,
+            interaction_claim,
+            proof,
+            execution_resources,
+        }: LuminairProof<Blake2sMerkleHasher>,
+    ) -> Result<(), VerificationError> {
         // ┌──────────────────────────┐
         // │     Protocol Setup       │
         // └──────────────────────────┘
@@ -239,14 +291,14 @@ impl LuminairGraph for Graph {
         let channel = &mut Blake2sChannel::default();
         let commitment_scheme_verifier =
             &mut CommitmentSchemeVerifier::<Blake2sMerkleChannel>::new(config);
-        let log_sizes = &proof.claim.log_sizes();
+        let log_sizes = &claim.log_sizes();
 
         // ┌───────────────────────────────────────────────┐
         // │   Interaction Phase 0 - Preprocessed Trace    │
         // └───────────────────────────────────────────────┘
 
         commitment_scheme_verifier.commit(
-            proof.proof.commitments[PREPROCESSED_TRACE_IDX],
+            proof.commitments[PREPROCESSED_TRACE_IDX],
             &log_sizes[PREPROCESSED_TRACE_IDX],
             channel,
         );
@@ -254,10 +306,31 @@ impl LuminairGraph for Graph {
         // ┌───────────────────────────────────────┐
         // │    Interaction Phase 1 - Main Trace   │
         // └───────────────────────────────────────┘
-        proof.claim.mix_into(channel);
+        claim.mix_into(channel);
         commitment_scheme_verifier.commit(
-            proof.proof.commitments[ORIGINAL_TRACE_IDX],
+            proof.commitments[ORIGINAL_TRACE_IDX],
             &log_sizes[ORIGINAL_TRACE_IDX],
+            channel,
+        );
+
+        // ┌───────────────────────────────────────────────┐
+        // │    Interaction Phase 2 - Interaction Trace    │
+        // └───────────────────────────────────────────────┘
+
+        let interaction_elements =
+            LuminairInteractionElements::draw(channel, &execution_resources.op_counter);
+
+        // Check that the lookup sum is valid, otherwise throw
+        if !lookup_sum_valid(&interaction_claim) {
+            return Err(VerificationError::InvalidLookup(
+                "Invalid LogUp sum".to_string(),
+            ));
+        };
+
+        interaction_claim.mix_into(channel);
+        commitment_scheme_verifier.commit(
+            proof.commitments[INTERACTION_TRACE_IDX],
+            &log_sizes[INTERACTION_TRACE_IDX],
             channel,
         );
 
@@ -265,14 +338,10 @@ impl LuminairGraph for Graph {
         // │    Proof Verification    │
         // └──────────────────────────┘
 
-        let component_builder = LuminairComponents::new(&proof.claim);
+        let component_builder =
+            LuminairComponents::new(&claim, &interaction_elements, &interaction_claim);
         let components = component_builder.components();
 
-        verify(
-            &components,
-            channel,
-            commitment_scheme_verifier,
-            proof.proof,
-        )
+        verify(&components, channel, commitment_scheme_verifier, proof)
     }
 }
