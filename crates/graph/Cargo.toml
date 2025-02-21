@@ -1,5 +1,5 @@
 [package]
-name = "luminair_compiler"
+name = "luminair_graph"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true

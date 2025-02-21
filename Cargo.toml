@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/air", "crates/compiler", "examples/simple"]
+members = ["crates/air", "crates/graph", "examples/simple"]
 
 [workspace.package]
 version = "0.0.1"
@@ -9,11 +9,9 @@ repository = "https://github.com/raphaelDkhn/Luminair"
 license = "MIT"
 
 [workspace.dependencies]
-stwo-prover = {path = "/Users/raphaeldoukhan/Desktop/Cairo/stwo/crates/prover"}
-# stwo-prover = { git = "https://github.com/starkware-libs/stwo.git", rev = "36b17ac" }
+stwo-prover = { git = "https://github.com/starkware-libs/stwo.git", rev = "36b17ac" }
 luminal = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "9f13081" }
-# numerair = { git = "https://github.com/gizatechxyz/NumerAir.git", rev = "3d9a9b9" }
-numerair = {path = "/Users/raphaeldoukhan/Desktop/numerair"}
+numerair = { git = "https://github.com/gizatechxyz/NumerAir.git", rev = "3d9a9b9" }
 rayon = "1.10.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"

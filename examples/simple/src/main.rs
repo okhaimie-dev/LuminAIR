@@ -1,4 +1,4 @@
-use luminair_compiler::{graph::LuminairGraph, StwoCompiler};
+use luminair_graph::{graph::LuminairGraph, StwoCompiler};
 use luminal::prelude::*;
 
 // =============== Example Overview ===============
