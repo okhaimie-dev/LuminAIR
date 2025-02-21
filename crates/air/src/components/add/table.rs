@@ -19,7 +19,7 @@ use stwo_prover::{
 
 use crate::{
     components::{AddClaim, InteractionClaim, TraceColumn, TraceError, TraceEval},
-    pie::IOInfo,
+    pie::NodeInfo,
 };
 
 /// Generate trace for element-wise addition of two vectors.
@@ -27,7 +27,7 @@ pub fn trace_evaluation(
     log_size: u32,
     lhs: &[PackedBaseField],
     rhs: &[PackedBaseField],
-    io_info: &IOInfo,
+    node_info: &NodeInfo,
 ) -> (TraceEval, AddClaim, Vec<PackedBaseField>) {
     // Calculate trace size
     let trace_size = 1 << log_size;
@@ -69,7 +69,11 @@ pub fn trace_evaluation(
         main_trace.push(CircleEvaluation::new(domain, column));
     }
 
-    (main_trace, AddClaim::new(log_size, io_info.clone()), output)
+    (
+        main_trace,
+        AddClaim::new(log_size, node_info.clone()),
+        output,
+    )
 }
 
 /// Enum representing the column indices in the Add trace.
@@ -109,7 +113,7 @@ relation!(AddElements, 1);
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
     lookup_elements: &AddElements,
-    io_info: &IOInfo,
+    node_info: &NodeInfo,
 ) -> Result<(TraceEval, InteractionClaim), TraceError> {
     if main_trace_eval.is_empty() {
         return Err(TraceError::EmptyTrace);
@@ -123,7 +127,7 @@ pub fn interaction_trace_evaluation(
     let mut col_lhs = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
         let lhs = lhs_col[row];
-        let multiplicity = if io_info.inputs[0].is_initializer {
+        let multiplicity = if node_info.inputs[0].is_initializer {
             PackedSecureField::zero()
         } else {
             -PackedSecureField::one()
@@ -138,7 +142,7 @@ pub fn interaction_trace_evaluation(
     let mut col_rhs = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
         let rhs = rhs_col[row];
-        let multiplicity = if io_info.inputs[1].is_initializer {
+        let multiplicity = if node_info.inputs[1].is_initializer {
             PackedSecureField::zero()
         } else {
             -PackedSecureField::one()
@@ -153,7 +157,7 @@ pub fn interaction_trace_evaluation(
     let mut col_out = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
         let out = out_col[row];
-        let multiplicity = if io_info.output.is_final_output {
+        let multiplicity = if node_info.output.is_final_output {
             PackedSecureField::zero()
         } else {
             PackedSecureField::one()

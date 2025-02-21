@@ -12,7 +12,7 @@ pub struct LuminairPie {
 pub struct Trace {
     pub eval: SerializableTrace,
     pub claim: ClaimType,
-    pub io_info: IOInfo,
+    pub node_info: NodeInfo,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -43,21 +43,9 @@ pub struct OutputInfo {
     pub is_final_output: bool,
 }
 
-/// Struct to hold input/output information
+/// Struct to hold node information
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct IOInfo {
+pub struct NodeInfo {
     pub inputs: Vec<InputInfo>,
     pub output: OutputInfo,
-}
-
-impl IOInfo {
-    /// Checks if any input is an initializer
-    pub fn has_initializer(&self) -> bool {
-        self.inputs.iter().any(|input| input.is_initializer)
-    }
-
-    /// Checks if the output is a final output
-    pub fn is_final_output(&self) -> bool {
-        self.output.is_final_output
-    }
 }

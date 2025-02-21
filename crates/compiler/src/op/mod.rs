@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use luminair_air::{
     components::{Claim, TraceColumn, TraceEval},
-    pie::IOInfo,
+    pie::NodeInfo,
 };
 use luminal::prelude::*;
 
@@ -12,7 +12,7 @@ pub(crate) trait LuminairOperator<C: TraceColumn + Debug + 'static>: Operator {
     fn process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-        io_info: &IOInfo,
+        node_info: &NodeInfo,
     ) -> (TraceEval, Claim<C>, Vec<Tensor>);
 }
 
@@ -24,7 +24,7 @@ pub(crate) trait HasProcessTrace<C: TraceColumn + Debug + 'static> {
     fn call_process_trace(
         &mut self,
         _inp: Vec<(InputTensor, ShapeTracker)>,
-        _io_info: &IOInfo,
+        _node_info: &NodeInfo,
     ) -> Option<(TraceEval, Claim<C>, Vec<Tensor>)> {
         None
     }
@@ -47,9 +47,9 @@ impl<C: TraceColumn + Debug + 'static> HasProcessTrace<C> for LuminairWrapper<C>
     fn call_process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-        io_info: &IOInfo,
+        node_info: &NodeInfo,
     ) -> Option<(TraceEval, Claim<C>, Vec<Tensor>)> {
-        Some(self.0.process_trace(inp, io_info))
+        Some(self.0.process_trace(inp, node_info))
     }
 }
 
@@ -65,10 +65,10 @@ impl<C: TraceColumn + Debug + 'static> HasProcessTrace<C> for Box<dyn Operator> 
     fn call_process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-        io_info: &IOInfo,
+        node_info: &NodeInfo,
     ) -> Option<(TraceEval, Claim<C>, Vec<Tensor>)> {
         if let Some(wrapper) = (**self).as_any_mut().downcast_mut::<LuminairWrapper<C>>() {
-            wrapper.call_process_trace(inp, io_info)
+            wrapper.call_process_trace(inp, node_info)
         } else {
             None
         }
