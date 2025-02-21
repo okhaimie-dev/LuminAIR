@@ -1,7 +1,8 @@
 use num_traits::{One, Zero};
 use numerair::eval::EvalFixedPoint;
-use stwo_prover::constraint_framework::{
-    EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
+use stwo_prover::{
+    constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry},
+    core::fields::m31::BaseField,
 };
 
 use crate::{components::AddClaim, pie::NodeInfo};
@@ -83,7 +84,7 @@ impl FrameworkEval for AddEval {
         let out_multiplicity = if self.node_info.output.is_final_output {
             E::EF::zero()
         } else {
-            E::EF::one()
+            E::EF::one() * BaseField::from_u32_unchecked(self.node_info.num_consumers as u32)
         };
 
         eval.add_to_relation(RelationEntry::new(

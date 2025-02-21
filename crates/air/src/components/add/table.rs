@@ -160,7 +160,7 @@ pub fn interaction_trace_evaluation(
         let multiplicity = if node_info.output.is_final_output {
             PackedSecureField::zero()
         } else {
-            PackedSecureField::one()
+            PackedSecureField::one() * BaseField::from_u32_unchecked(node_info.num_consumers as u32)
         };
 
         col_out.write_frac(row, multiplicity, lookup_elements.combine(&[out]));
