@@ -9,8 +9,8 @@ use luminair_air::{
     },
     pie::{ExecutionResources, IOInfo, InputInfo, LuminairPie, OpCounter, OutputInfo, Trace},
     serde::SerializableTrace,
-    utils::lookup_sum_valid,
-    LuminairClaim, LuminairInteractionClaim, LuminairProof, IS_FIRST_LOG_SIZES, LOG_MAX_ROWS,
+    utils::{get_is_first_log_sizes, lookup_sum_valid},
+    LuminairClaim, LuminairInteractionClaim, LuminairProof,
 };
 use luminal::prelude::*;
 use stwo_prover::{
@@ -54,6 +54,8 @@ impl LuminairGraph for Graph {
         // Initializes operator counter
         let mut op_counter = OpCounter::default();
 
+        let mut max_log_size = 0;
+
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
                 continue;
@@ -96,6 +98,8 @@ impl LuminairGraph for Graph {
                         )
                         .unwrap();
 
+                    max_log_size = max_log_size.max(claim.log_size);
+
                     traces.push(Trace {
                         eval: SerializableTrace::from(&trace),
                         claim: ClaimType::Add(claim),
@@ -123,7 +127,10 @@ impl LuminairGraph for Graph {
 
         LuminairPie {
             traces,
-            execution_resources: ExecutionResources { op_counter },
+            execution_resources: ExecutionResources {
+                op_counter,
+                max_log_size,
+            },
         }
     }
 
@@ -172,8 +179,10 @@ impl LuminairGraph for Graph {
 
         tracing::info!("Protocol Setup");
         let config = PcsConfig::default();
+        let max_log_size = pie.execution_resources.max_log_size;
+        let is_first_log_sizes = get_is_first_log_sizes(max_log_size);
         let twiddles = SimdBackend::precompute_twiddles(
-            CanonicCoset::new(LOG_MAX_ROWS + config.fri_config.log_blowup_factor + 2)
+            CanonicCoset::new(max_log_size + config.fri_config.log_blowup_factor + 2)
                 .circle_domain()
                 .half_coset,
         );
@@ -190,7 +199,7 @@ impl LuminairGraph for Graph {
         let mut tree_builder = commitment_scheme.tree_builder();
 
         tree_builder.extend_evals(
-            IS_FIRST_LOG_SIZES
+            is_first_log_sizes
                 .iter()
                 .copied()
                 .map(gen_is_first::<SimdBackend>),
@@ -205,7 +214,7 @@ impl LuminairGraph for Graph {
 
         tracing::info!("Main Trace");
         let mut tree_builder = commitment_scheme.tree_builder();
-        let mut main_claim = LuminairClaim::init();
+        let mut main_claim = LuminairClaim::init(is_first_log_sizes.clone());
 
         for trace in pie.traces.clone().into_iter() {
             match trace.claim {
@@ -260,8 +269,12 @@ impl LuminairGraph for Graph {
         // │     Proof Generation     │
         // └──────────────────────────┘
         tracing::info!("Proof Generation");
-        let component_builder =
-            LuminairComponents::new(&main_claim, &interaction_elements, &interaction_claim);
+        let component_builder = LuminairComponents::new(
+            &main_claim,
+            &interaction_elements,
+            &interaction_claim,
+            &is_first_log_sizes,
+        );
         let components = component_builder.provers();
         let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
 
@@ -292,6 +305,7 @@ impl LuminairGraph for Graph {
         let commitment_scheme_verifier =
             &mut CommitmentSchemeVerifier::<Blake2sMerkleChannel>::new(config);
         let log_sizes = &claim.log_sizes();
+        let is_first_log_sizes = get_is_first_log_sizes(execution_resources.max_log_size);
 
         // ┌───────────────────────────────────────────────┐
         // │   Interaction Phase 0 - Preprocessed Trace    │
@@ -338,8 +352,12 @@ impl LuminairGraph for Graph {
         // │    Proof Verification    │
         // └──────────────────────────┘
 
-        let component_builder =
-            LuminairComponents::new(&claim, &interaction_elements, &interaction_claim);
+        let component_builder = LuminairComponents::new(
+            &claim,
+            &interaction_elements,
+            &interaction_claim,
+            &is_first_log_sizes,
+        );
         let components = component_builder.components();
 
         verify(&components, channel, commitment_scheme_verifier, proof)

@@ -20,3 +20,8 @@ pub fn lookup_sum_valid(interaction_claim: &LuminairInteractionClaim) -> bool {
         .for_each(|c| sum += c.claimed_sum.into());
     sum.is_zero()
 }
+
+pub fn get_is_first_log_sizes(max_log_size: u32) -> Vec<u32> {
+    let padded_max = max_log_size + 2;
+    (4..=padded_max).rev().collect()
+}

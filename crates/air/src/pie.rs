@@ -18,6 +18,7 @@ pub struct Trace {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutionResources {
     pub op_counter: OpCounter,
+    pub max_log_size: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]

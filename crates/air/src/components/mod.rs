@@ -19,7 +19,7 @@ use thiserror::Error;
 
 use crate::{
     pie::{IOInfo, OpCounter},
-    LuminairClaim, LuminairInteractionClaim, IS_FIRST_LOG_SIZES,
+    LuminairClaim, LuminairInteractionClaim,
 };
 
 pub mod add;
@@ -168,9 +168,10 @@ impl LuminairComponents {
         claims: &LuminairClaim,
         interaction_elements: &LuminairInteractionElements,
         interaction_claim: &LuminairInteractionClaim,
+        is_first_log_sizes: &[u32],
     ) -> Self {
         let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
-            &IS_FIRST_LOG_SIZES
+            &is_first_log_sizes
                 .iter()
                 .copied()
                 .map(PreprocessedColumn::IsFirst)
