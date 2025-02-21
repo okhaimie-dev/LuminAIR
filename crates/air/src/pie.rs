@@ -48,4 +48,5 @@ pub struct OutputInfo {
 pub struct NodeInfo {
     pub inputs: Vec<InputInfo>,
     pub output: OutputInfo,
+    pub num_consumers: usize,
 }

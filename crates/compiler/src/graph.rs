@@ -80,6 +80,7 @@ impl LuminairGraph for Graph {
             let node_info = NodeInfo {
                 inputs: input_info,
                 output: output_info,
+                num_consumers: *consumers.get(&(*node, 0)).unwrap_or(&0),
             };
 
             // Substitute in the dyn dims
