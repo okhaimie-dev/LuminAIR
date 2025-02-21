@@ -7,7 +7,7 @@ use luminair_air::{
         add::table::{interaction_trace_evaluation, AddColumn},
         ClaimType, LuminairComponents, LuminairInteractionElements, TraceEval,
     },
-    pie::{ExecutionResources, IOInfo, InputInfo, LuminairPie, OpCounter, OutputInfo, Trace},
+    pie::{ExecutionResources, InputInfo, LuminairPie, NodeInfo, OpCounter, OutputInfo, Trace},
     serde::SerializableTrace,
     utils::{get_is_first_log_sizes, lookup_sum_valid},
     LuminairClaim, LuminairInteractionClaim, LuminairProof,
@@ -77,9 +77,10 @@ impl LuminairGraph for Graph {
                 is_final_output: self.to_retrieve.contains_key(&node),
             };
 
-            let io_info = IOInfo {
+            let node_info = NodeInfo {
                 inputs: input_info,
                 output: output_info,
+                num_consumers: *consumers.get(&(*node, 0)).unwrap_or(&0),
             };
 
             // Substitute in the dyn dims
@@ -94,7 +95,7 @@ impl LuminairGraph for Graph {
                 if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
                     let (trace, claim, tensors) =
                         <Box<dyn Operator> as HasProcessTrace<AddColumn>>::call_process_trace(
-                            node_op, srcs, &io_info,
+                            node_op, srcs, &node_info,
                         )
                         .unwrap();
 
@@ -103,7 +104,7 @@ impl LuminairGraph for Graph {
                     traces.push(Trace {
                         eval: SerializableTrace::from(&trace),
                         claim: ClaimType::Add(claim),
-                        io_info,
+                        node_info,
                     });
                     *op_counter.add.get_or_insert(0) += 1;
 
@@ -246,13 +247,13 @@ impl LuminairGraph for Graph {
         for trace in pie.traces.into_iter() {
             match trace.claim {
                 ClaimType::Add(_) => {
-                    let io_info = trace.io_info;
+                    let node_info = trace.node_info;
                     let trace: TraceEval = trace.eval.to_trace();
 
                     let lookup_elements = &interaction_elements.add_lookup_elements;
 
                     let (t, c) =
-                        interaction_trace_evaluation(&trace, lookup_elements, &io_info).unwrap();
+                        interaction_trace_evaluation(&trace, lookup_elements, &node_info).unwrap();
 
                     tree_builder.extend_evals(t);
                     interaction_claim.add.push(c);

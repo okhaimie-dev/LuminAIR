@@ -5,7 +5,7 @@ use luminair_air::{
         add::table::{trace_evaluation, AddColumn},
         Claim, TraceEval,
     },
-    pie::IOInfo,
+    pie::NodeInfo,
     utils::calculate_log_size,
 };
 use luminal::prelude::*;
@@ -37,7 +37,7 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
     fn process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-        io_info: &IOInfo,
+        node_info: &NodeInfo,
     ) -> (TraceEval, Claim<AddColumn>, Vec<Tensor>) {
         // Get data
         let (lhs_tensor, _) = &inp[0];
@@ -61,7 +61,7 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
         let log_size = calculate_log_size(max_size);
 
         // Generate trace and get result tensor
-        let (main_trace, claim, output) = trace_evaluation(log_size, &lhs.0, &rhs.0, io_info);
+        let (main_trace, claim, output) = trace_evaluation(log_size, &lhs.0, &rhs.0, node_info);
 
         (
             main_trace,

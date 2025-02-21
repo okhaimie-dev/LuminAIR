@@ -1,10 +1,11 @@
 use num_traits::{One, Zero};
 use numerair::eval::EvalFixedPoint;
-use stwo_prover::constraint_framework::{
-    EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
+use stwo_prover::{
+    constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry},
+    core::fields::m31::BaseField,
 };
 
-use crate::{components::AddClaim, pie::IOInfo};
+use crate::{components::AddClaim, pie::NodeInfo};
 
 use super::table::AddElements;
 
@@ -22,15 +23,15 @@ pub struct AddEval {
     log_size: u32,
     /// The random elements used for the lookup protocol.
     lookup_elements: AddElements,
-    /// Inputs/output information.
-    io_info: IOInfo,
+    /// Node information.
+    node_info: NodeInfo,
 }
 
 impl AddEval {
     pub fn new(claim: &AddClaim, lookup_elements: AddElements) -> Self {
         Self {
             log_size: claim.log_size,
-            io_info: claim.io_info.clone(),
+            node_info: claim.node_info.clone(),
             lookup_elements,
         }
     }
@@ -66,24 +67,24 @@ impl FrameworkEval for AddEval {
         let lhs = eval.next_trace_mask();
         let rhs = eval.next_trace_mask();
         let out = eval.next_trace_mask();
-        
+
         eval.eval_fixed_add(lhs.clone(), rhs.clone(), out.clone());
 
-        let lhs_multiplicity = if self.io_info.inputs[0].is_initializer {
+        let lhs_multiplicity = if self.node_info.inputs[0].is_initializer {
             E::EF::zero()
         } else {
             -E::EF::one()
         };
 
-        let rhs_multiplicity = if self.io_info.inputs[1].is_initializer {
+        let rhs_multiplicity = if self.node_info.inputs[1].is_initializer {
             E::EF::zero()
         } else {
             -E::EF::one()
         };
-        let out_multiplicity = if self.io_info.output.is_final_output {
+        let out_multiplicity = if self.node_info.output.is_final_output {
             E::EF::zero()
         } else {
-            E::EF::one()
+            E::EF::one() * BaseField::from_u32_unchecked(self.node_info.num_consumers as u32)
         };
 
         eval.add_to_relation(RelationEntry::new(
@@ -105,7 +106,7 @@ impl FrameworkEval for AddEval {
         ));
 
         eval.finalize_logup();
-        
+
         eval
     }
 }

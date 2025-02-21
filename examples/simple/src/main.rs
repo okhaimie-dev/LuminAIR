@@ -21,7 +21,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Define computation operations on tensors:
     let c = a + b;
-    let mut d = (c + w).retrieve();
+    let d = c + w;
+    let mut e = (c + d).retrieve();
 
     // At this point, no computation has occurred. We have just defined the computation graph.
     // The operations will be executed only when the trace is generated.
@@ -29,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =============== Step 2: Compilation & Execution ===============
     // Compile the computation graph to transform the operations and prepare for execution.
     println!("Compiling computation graph...");
-    cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
+    cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut e);
     println!("Graph compiled successfully. ✅");
 
     // Optionally, visualize the computation graph (useful for debugging or optimization).
@@ -42,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Execution trace generated successfully. ✅");
 
     // Retrieve and display the final result.
-    let result = cx.get_final_output(d.id);
+    let result = cx.get_final_output(e.id);
     println!("Final result: {:?}", result);
 
     // =============== Step 3: Generating Proof & Verification ===============

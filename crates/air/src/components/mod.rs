@@ -18,7 +18,7 @@ use stwo_prover::{
 use thiserror::Error;
 
 use crate::{
-    pie::{IOInfo, OpCounter},
+    pie::{NodeInfo, OpCounter},
     LuminairClaim, LuminairInteractionClaim,
 };
 
@@ -52,18 +52,18 @@ pub trait TraceColumn {
 pub struct Claim<T: TraceColumn> {
     /// Logarithmic size (`log2`) of the evaluated trace.
     pub log_size: u32,
-    /// Inputs/output information.
-    pub io_info: IOInfo,
+    /// Node information.
+    pub node_info: NodeInfo,
     /// Marker for the trace type.
     _marker: std::marker::PhantomData<T>,
 }
 
 impl<T: TraceColumn> Claim<T> {
     /// Creates a new claim.
-    pub const fn new(log_size: u32, io_info: IOInfo) -> Self {
+    pub const fn new(log_size: u32, node_info: NodeInfo) -> Self {
         Self {
             log_size,
-            io_info,
+            node_info,
             _marker: std::marker::PhantomData,
         }
     }
