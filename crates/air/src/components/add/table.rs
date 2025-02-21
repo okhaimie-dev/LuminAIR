@@ -102,7 +102,7 @@ impl TraceColumn for AddColumn {
     }
 }
 
-relation!(AddElements, 3);
+relation!(AddElements, 1);
 
 /// Creates the interaction trace from the main trace evaluation
 /// and the interaction elements for the Add component.
