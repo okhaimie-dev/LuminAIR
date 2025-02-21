@@ -24,7 +24,7 @@ use crate::{
 
 pub mod add;
 
-/// Custom error type for the Trace.
+/// Errors related to trace operations.
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum TraceError {
     /// The component trace is empty.
@@ -32,7 +32,7 @@ pub enum TraceError {
     EmptyTrace,
 }
 
-/// Type for trace evaluation to be used in Stwo.
+/// Alias for trace evaluation columns used in Stwo.
 pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
 
 /// Claim for the Add trace.
@@ -50,16 +50,16 @@ pub trait TraceColumn {
 /// Represents a claim.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Claim<T: TraceColumn> {
-    /// Logarithmic size (`log2`) of the evaluated trace.
+    /// Logarithmic size (base 2) of the trace.
     pub log_size: u32,
-    /// Node information.
+    /// Information about the node in the computational graph.
     pub node_info: NodeInfo,
-    /// Marker for the trace type.
+    /// Phantom data to associate with the trace column type.
     _marker: std::marker::PhantomData<T>,
 }
 
 impl<T: TraceColumn> Claim<T> {
-    /// Creates a new claim.
+    /// Creates a new claim with the given log size and node information.
     pub const fn new(log_size: u32, node_info: NodeInfo) -> Self {
         Self {
             log_size,
@@ -68,21 +68,7 @@ impl<T: TraceColumn> Claim<T> {
         }
     }
 
-    /// Returns the `log_size` for each type of trace committed for the given trace type:
-    /// - Preprocessed trace,
-    /// - Main trace,
-    /// - Interaction trace.
-    ///
-    /// The number of columns of each trace is known before actually evaluating them.
-    /// The `log_size` is known once the main trace has been evaluated, to which we add
-    /// [`stwo_prover::core::backend::simd::m31::LOG_N_LANES`]
-    /// for the [`stwo_prover::core::backend::simd::SimdBackend`])
-    ///
-    /// Each element of the [`TreeVec`] is dedicated to the commitment of one type of trace.
-    /// First element is for the preprocessed trace, second for the main trace and third for the
-    /// interaction one.
-    ///
-    /// NOTE: Currently only the main trace is provided.
+    /// Computes log sizes for preprocessed, main, and interaction traces.
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         let (main_trace_cols, interaction_trace_cols) = T::count();
         let preprocessed_trace_log_sizes: Vec<u32> = vec![self.log_size];
@@ -103,6 +89,7 @@ impl<T: TraceColumn> Claim<T> {
     }
 }
 
+/// Enum representing different types of claims.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum ClaimType {
     Add(Claim<AddColumn>),
@@ -129,7 +116,7 @@ impl InteractionClaim {
     }
 }
 
-/// All the interaction elements required by the components during the interaction phas 2.
+/// All the interaction elements required by the components during the interaction phase 2.
 ///
 /// The elements are drawn from a Fiat-Shamir [`Channel`], currently using the BLAKE2 hash.
 #[derive(Clone, Debug)]
@@ -163,7 +150,7 @@ pub struct LuminairComponents {
 }
 
 impl LuminairComponents {
-    /// Initilizes all the LuminAIR components from the claims generated from the trace.
+    /// Initializes components from claims and interaction elements.
     pub fn new(
         claims: &LuminairClaim,
         interaction_elements: &LuminairInteractionElements,

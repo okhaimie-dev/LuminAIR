@@ -9,7 +9,7 @@ use stwo_prover::core::{
     ColumnVec,
 };
 
-/// Serializable representation of a trace evaluation
+/// Serializable form of a single trace evaluation, capturing its domain size and values.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 struct SerializableCircleEvaluation {
     log_size: u32,
@@ -19,6 +19,7 @@ struct SerializableCircleEvaluation {
 impl<B: Backend> From<&CircleEvaluation<B, BaseField, BitReversedOrder>>
     for SerializableCircleEvaluation
 {
+    /// Converts a `CircleEvaluation` into its serializable counterpart by extracting the log size and values.
     fn from(eval: &CircleEvaluation<B, BaseField, BitReversedOrder>) -> Self {
         Self {
             log_size: eval.domain.log_size(),
@@ -27,13 +28,14 @@ impl<B: Backend> From<&CircleEvaluation<B, BaseField, BitReversedOrder>>
     }
 }
 
-/// Serializable representation of a trace
+/// Serializable collection of trace evaluations, used for storing or transmitting multiple trace columns.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SerializableTrace {
     evaluations: Vec<SerializableCircleEvaluation>,
 }
 
 impl SerializableTrace {
+    /// Reconstructs the original trace columns from the serializable data, creating a `ColumnVec` of `CircleEvaluation`s.
     pub fn to_trace<B: Backend>(
         &self,
     ) -> ColumnVec<CircleEvaluation<B, BaseField, BitReversedOrder>> {
@@ -55,6 +57,7 @@ impl SerializableTrace {
 impl<B: Backend> From<&ColumnVec<CircleEvaluation<B, BaseField, BitReversedOrder>>>
     for SerializableTrace
 {
+    /// Converts a collection of trace evaluations into a serializable format by mapping each `CircleEvaluation` to its serializable form.
     fn from(trace: &ColumnVec<CircleEvaluation<B, BaseField, BitReversedOrder>>) -> Self {
         Self {
             evaluations: trace

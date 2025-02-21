@@ -22,7 +22,7 @@ use crate::{
     pie::NodeInfo,
 };
 
-/// Generate trace for element-wise addition of two vectors.
+/// Generates the main trace for element-wise addition of two vectors.
 pub fn trace_evaluation(
     log_size: u32,
     lhs: &[PackedBaseField],
@@ -101,15 +101,18 @@ impl AddColumn {
 }
 
 impl TraceColumn for AddColumn {
+    /// Returns the number of columns in the main trace and interaction trace.
+    ///     
+    /// For the Add component, both the main trace and interaction trace have 3 columns each.
     fn count() -> (usize, usize) {
         (3, 3)
     }
 }
 
+// Defines the relation for the Add component's lookup elements.
 relation!(AddElements, 1);
 
-/// Creates the interaction trace from the main trace evaluation
-/// and the interaction elements for the Add component.
+/// Generates the interaction trace for the Add component using the main trace and lookup elements.
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
     lookup_elements: &AddElements,

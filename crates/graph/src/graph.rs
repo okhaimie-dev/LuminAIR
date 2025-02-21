@@ -28,18 +28,28 @@ use stwo_prover::{
     },
 };
 
+/// Trait defining the core functionality of a LuminAIR computation graph.
+///
+/// Provides methods to generate execution traces, retrieve outputs, and handle proof
+/// generation and verification using Stwo.
 pub trait LuminairGraph {
+    /// Generates an execution trace for the graph’s computation.
     fn gen_trace(&mut self) -> LuminairPie;
-    fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32>;
+
+    /// Retrieves the output of a node as a vector of `f32` values.
+    fn get_output(&mut self, id: NodeIndex) -> Vec<f32>;
+
+    /// Generates a proof of the graph’s execution using the provided trace.
     fn prove(
         &mut self,
         pie: LuminairPie,
     ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError>;
+
+    /// Verifies a proof to ensure integrity of graph’s computation.
     fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError>;
 }
 
 impl LuminairGraph for Graph {
-    /// Execute the graph and generate trace.
     fn gen_trace(&mut self) -> LuminairPie {
         // Track the number of views pointing to each tensor so we know when to clear
         if self.linearized_graph.is_none() {
@@ -135,7 +145,7 @@ impl LuminairGraph for Graph {
         }
     }
 
-    fn get_final_output(&mut self, id: NodeIndex) -> Vec<f32> {
+    fn get_output(&mut self, id: NodeIndex) -> Vec<f32> {
         // Get the shape from the graph edges
         let output_size = if let Some((_, shape)) = self.to_retrieve.get(&id) {
             shape

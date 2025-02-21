@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Execution trace generated successfully. ✅");
 
     // Retrieve and display the final result.
-    let result = cx.get_final_output(e.id);
+    let result = cx.get_output(e.id);
     println!("Final result: {:?}", result);
 
     // =============== Step 3: Generating Proof & Verification ===============

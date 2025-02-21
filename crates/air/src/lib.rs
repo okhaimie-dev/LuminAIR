@@ -13,9 +13,9 @@ pub mod pie;
 pub mod serde;
 pub mod utils;
 
-/// The STARK proof of the execution of a given Luminair Graph.
+/// STARK proof for a Luminair computational graph execution.
 ///
-/// It includes the proof as well as the claims during the various phases of the proof generation.
+/// Contains the proof and claims from all proof generation phases.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairProof<H: MerkleHasher> {
     pub claim: LuminairClaim,
@@ -24,12 +24,7 @@ pub struct LuminairProof<H: MerkleHasher> {
     pub execution_resources: ExecutionResources,
 }
 
-/// A claim over the log sizes for each component of the system.
-///
-/// A component is made of three types of trace:
-/// - Preprocessed Trace (Phase 0)
-/// - Main Trace (Phase 1)
-/// - Interaction Trace (Phase 2)
+/// Claim for system components.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairClaim {
     pub add: Vec<AddClaim>,
@@ -37,6 +32,7 @@ pub struct LuminairClaim {
 }
 
 impl LuminairClaim {
+    /// Initializes a new claim with specified preprocessed trace log sizes.
     pub fn init(is_first_log_sizes: Vec<u32>) -> Self {
         Self {
             add: vec![],
@@ -44,10 +40,12 @@ impl LuminairClaim {
         }
     }
 
+    /// Mixes claim data into a Fiat-Shamir channel for proof binding.
     pub fn mix_into(&self, channel: &mut impl Channel) {
         self.add.iter().for_each(|c| c.mix_into(channel));
     }
 
+    /// Computes log sizes for all trace types in the claim.
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         let mut log_sizes = TreeVec::concat_cols(
             self.add
@@ -56,28 +54,26 @@ impl LuminairClaim {
                 .collect::<Vec<_>>()
                 .into_iter(),
         );
-
-        // We overwrite the preprocessed column claim to have all possible log sizes
-        // in the merkle root for the verification.
         log_sizes[PREPROCESSED_TRACE_IDX] = self.is_first_log_sizes.clone();
-
         log_sizes
     }
 }
 
-/// A claim over the claimed sum of the interaction columns for each component of the system
+/// Claim over the sum of interaction columns per system component.
 ///
-/// Needed for the lookup protocol (logUp with AIR).
+/// Used in the logUp lookup protocol with AIR.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairInteractionClaim {
     pub add: Vec<InteractionClaim>,
 }
 
 impl LuminairInteractionClaim {
+    /// Initializes a new interaction claim.
     pub fn init() -> Self {
         Self { add: vec![] }
     }
 
+    /// Mixes interaction claim data into a Fiat-Shamir channel.
     pub fn mix_into(&self, channel: &mut impl Channel) {
         self.add.iter().for_each(|c| c.mix_into(channel));
     }

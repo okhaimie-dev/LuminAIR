@@ -27,7 +27,7 @@ macro_rules! single_binary_test {
                 cx.verify(proof).expect("Proof verification failed");
 
                 // Retrieve data from `c`
-                let stwo_output = cx.get_final_output(c.id);
+                let stwo_output = cx.get_output(c.id);
 
                 // CPUCompiler comparison
                 let mut cx_cpu = Graph::new();

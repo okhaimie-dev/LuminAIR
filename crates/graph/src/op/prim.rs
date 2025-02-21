@@ -14,26 +14,35 @@ use crate::{data::StwoData, utils::is};
 
 use super::{IntoOperator, LuminairOperator};
 
+/// Compiles primitive operations into provable forms for LuminAIR.
+///
+/// Replaces standard Luminal operators with LuminAIR-specific implementations
+/// that support trace generation.
 #[derive(Default)]
 pub struct PrimitiveCompiler {}
 
 impl PrimitiveCompiler {
+    /// Creates a new `PrimitiveCompiler` instance.
     pub fn new() -> Self {
         Self {}
     }
 }
 
 // ====== BINARY ======
+
+/// Implements element-wise addition for LuminAIR.
 #[derive(Debug, Clone, Default, PartialEq)]
 struct LuminairAdd {}
 
 impl LuminairAdd {
+    /// Creates a new `LuminairAdd` instance.
     pub fn new() -> Self {
         Self {}
     }
 }
 
 impl LuminairOperator<AddColumn> for LuminairAdd {
+    /// Processes two input tensors, generating a trace, claim, and output tensor.
     fn process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
@@ -72,8 +81,8 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
 }
 
 impl Operator for LuminairAdd {
+    /// This method is not used as `process_trace` handles all computation for this operator.
     fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        // We don't need to implement process as we implement process_trace for this op.
         unimplemented!()
     }
 }
@@ -81,6 +90,7 @@ impl Operator for LuminairAdd {
 impl Compiler for PrimitiveCompiler {
     type Output = ();
 
+    /// Compiles a graph by replacing Luminal operators with LuminAIR equivalents.
     fn compile<T: ToIdsMut>(&self, graph: &mut Graph, _ids: T) -> Self::Output {
         for id in graph.node_indices().collect::<Vec<_>>() {
             let op = graph.node_weight(id).unwrap().as_any().type_id();
