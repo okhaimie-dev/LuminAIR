@@ -132,7 +132,7 @@ impl InteractionClaim {
 /// All the interaction elements required by the components during the interaction phas 2.
 ///
 /// The elements are drawn from a Fiat-Shamir [`Channel`], currently using the BLAKE2 hash.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LuminairInteractionElements {
     pub add_lookup_elements: AddElements,
 }
@@ -177,7 +177,6 @@ impl LuminairComponents {
                 .collect::<Vec<_>>(),
         );
 
-        // Use the same lookup elements for all add components
         let add_components = claims
             .add
             .iter()
@@ -198,20 +197,14 @@ impl LuminairComponents {
 
     /// Returns the `ComponentProver` of each components, used by the prover.
     pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-        let mut provers = Vec::new();
-
-        for add in &self.add {
-            provers.push(add as &dyn ComponentProver<SimdBackend>);
-        }
-
-        provers
+        self.add
+            .iter()
+            .map(|c| c as &dyn ComponentProver<SimdBackend>)
+            .collect()
     }
 
     /// Returns the `Component` of each components used by the verifier.
     pub fn components(&self) -> Vec<&dyn Component> {
-        self.provers()
-            .into_iter()
-            .map(|component| component as &dyn Component)
-            .collect()
+        self.add.iter().map(|c| c as &dyn Component).collect()
     }
 }

@@ -11,7 +11,7 @@ use stwo_prover::{
             },
             Col, Column,
         },
-        fields::{m31::BaseField, qm31::SecureField},
+        fields::m31::BaseField,
         poly::circle::{CanonicCoset, CircleEvaluation},
     },
     relation,
@@ -126,10 +126,8 @@ pub fn interaction_trace_evaluation(
         let multiplicity = if io_info.inputs[0].is_initializer {
             PackedSecureField::zero()
         } else {
-            PackedSecureField::broadcast(-SecureField::one())
+            -PackedSecureField::one()
         };
-
-        println!("LHS Multiplicity: {:?} ", multiplicity);
 
         col_lhs.write_frac(row, multiplicity, lookup_elements.combine(&[lhs]));
     }
@@ -143,10 +141,8 @@ pub fn interaction_trace_evaluation(
         let multiplicity = if io_info.inputs[1].is_initializer {
             PackedSecureField::zero()
         } else {
-            PackedSecureField::broadcast(-SecureField::one())
+            -PackedSecureField::one()
         };
-
-        println!("RHS Multiplicity: {:?} ", multiplicity);
 
         col_rhs.write_frac(row, multiplicity, lookup_elements.combine(&[rhs]));
     }
@@ -160,18 +156,14 @@ pub fn interaction_trace_evaluation(
         let multiplicity = if io_info.output.is_final_output {
             PackedSecureField::zero()
         } else {
-            PackedSecureField::broadcast(SecureField::one())
+            PackedSecureField::one()
         };
-
-        println!("Out Multiplicity: {:?} ", multiplicity);
 
         col_out.write_frac(row, multiplicity, lookup_elements.combine(&[out]));
     }
     col_out.finalize_col();
 
     let (trace, claimed_sum) = logup_gen.finalize_last();
-
-    println!("Individual Claimed Sum: {:?}", claimed_sum);
 
     Ok((trace, InteractionClaim { claimed_sum }))
 }

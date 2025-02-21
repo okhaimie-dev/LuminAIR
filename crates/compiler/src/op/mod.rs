@@ -35,7 +35,6 @@ struct LuminairWrapper<C: TraceColumn + Debug + 'static>(Box<dyn LuminairOperato
 
 impl<C: TraceColumn + Debug + 'static> Operator for LuminairWrapper<C> {
     fn process(&mut self, inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        println!("Wrapper process called");
         self.0.process(inp)
     }
 }
@@ -86,7 +85,6 @@ where
     C: TraceColumn + Debug + 'static,
 {
     fn into_operator(self) -> Box<dyn Operator> {
-        println!("Converting LuminairOperator to Operator");
         Box::new(LuminairWrapper(Box::new(self)))
     }
 }

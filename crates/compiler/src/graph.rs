@@ -5,7 +5,7 @@ use crate::{
 use luminair_air::{
     components::{
         add::table::{interaction_trace_evaluation, AddColumn},
-        ClaimType, LuminairComponents, LuminairInteractionElements,
+        ClaimType, LuminairComponents, LuminairInteractionElements, TraceEval,
     },
     pie::{ExecutionResources, IOInfo, InputInfo, LuminairPie, OpCounter, OutputInfo, Trace},
     serde::SerializableTrace,
@@ -121,8 +121,6 @@ impl LuminairGraph for Graph {
 
         self.reset();
 
-        // println!("Trace: {:?}", traces);
-
         LuminairPie {
             traces,
             execution_resources: ExecutionResources { op_counter },
@@ -161,7 +159,7 @@ impl LuminairGraph for Graph {
 
     fn prove(
         &mut self,
-        mut pie: LuminairPie,
+        pie: LuminairPie,
     ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
         // Track the number of views pointing to each tensor so we know when to clear
         if self.linearized_graph.is_none() {
@@ -202,68 +200,76 @@ impl LuminairGraph for Graph {
         tree_builder.commit(channel);
 
         // ┌───────────────────────────────────────┐
-        // │        Interaction Phase 1 & 2        │
+        // │    Interaction Phase 1 - Main Trace   │
         // └───────────────────────────────────────┘
-        let mut tree_builder_1 = commitment_scheme.tree_builder();
-        let mut claim_1 = LuminairClaim::init();
 
-        let mut interactions = Vec::new();
-        let interaction_elements =
-            LuminairInteractionElements::draw(channel, &pie.execution_resources.op_counter);
+        tracing::info!("Main Trace");
+        let mut tree_builder = commitment_scheme.tree_builder();
+        let mut main_claim = LuminairClaim::init();
 
-        // Pre-allocate for expected number of traces
-        claim_1
-            .add
-            .reserve(*pie.execution_resources.op_counter.add.get_or_insert(0));
-
-        for trace in pie.traces.into_iter() {
+        for trace in pie.traces.clone().into_iter() {
             match trace.claim {
                 ClaimType::Add(claim) => {
-                    let io_info = trace.io_info;
-                    let trace = trace.eval.to_trace();
                     // Add the components' trace evaluation to the commit tree.
-                    tree_builder_1.extend_evals(trace.clone());
-                    claim_1.add.push(claim);
-
-                    let int_el = &interaction_elements.add_lookup_elements;
-
-                    interactions
-                        .push(interaction_trace_evaluation(&trace, int_el, &io_info).unwrap());
+                    tree_builder.extend_evals(trace.eval.to_trace());
+                    main_claim.add.push(claim);
                 }
             }
         }
 
         // Mix the claim into the Fiat-Shamir channel.
-        claim_1.mix_into(channel);
+        main_claim.mix_into(channel);
         // Commit the main trace.
-        tree_builder_1.commit(channel);
+        tree_builder.commit(channel);
 
-        let mut tree_builder_2 = commitment_scheme.tree_builder();
-        let mut claim_2 = LuminairInteractionClaim::init();
+        // ┌───────────────────────────────────────────────┐
+        // │    Interaction Phase 2 - Interaction Trace    │
+        // └───────────────────────────────────────────────┘
 
-        for (trace_eval, claim) in interactions {
-            tree_builder_2.extend_evals(trace_eval);
-            claim_2.add.push(claim);
+        // Draw interaction elements
+        let interaction_elements =
+            LuminairInteractionElements::draw(channel, &pie.execution_resources.op_counter);
+
+        // Generate the interaction trace from the main trace, and compute the logUp sum.
+        let mut tree_builder = commitment_scheme.tree_builder();
+        let mut interaction_claim = LuminairInteractionClaim::init();
+
+        for trace in pie.traces.into_iter() {
+            match trace.claim {
+                ClaimType::Add(_) => {
+                    let io_info = trace.io_info;
+                    let trace: TraceEval = trace.eval.to_trace();
+
+                    let lookup_elements = &interaction_elements.add_lookup_elements;
+
+                    let (t, c) =
+                        interaction_trace_evaluation(&trace, lookup_elements, &io_info).unwrap();
+
+                    tree_builder.extend_evals(t);
+                    interaction_claim.add.push(c);
+                }
+            }
         }
 
         // Mix the interaction claim into the Fiat-Shamir channel.
-        claim_2.mix_into(channel);
+        interaction_claim.mix_into(channel);
         // Commit the interaction trace.
-        tree_builder_2.commit(channel);
+        tree_builder.commit(channel);
 
         // ┌──────────────────────────┐
         // │     Proof Generation     │
         // └──────────────────────────┘
         tracing::info!("Proof Generation");
-        let component_builder = LuminairComponents::new(&claim_1, &interaction_elements, &claim_2);
+        let component_builder =
+            LuminairComponents::new(&main_claim, &interaction_elements, &interaction_claim);
         let components = component_builder.provers();
         let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
 
         self.reset();
 
         Ok(LuminairProof {
-            claim: claim_1,
-            interaction_claim: claim_2,
+            claim: main_claim,
+            interaction_claim,
             proof,
             execution_resources: pie.execution_resources,
         })

@@ -66,10 +66,9 @@ impl FrameworkEval for AddEval {
         let lhs = eval.next_trace_mask();
         let rhs = eval.next_trace_mask();
         let out = eval.next_trace_mask();
-
+        
         eval.eval_fixed_add(lhs.clone(), rhs.clone(), out.clone());
 
-        // Calculate multiplicities based on IO info
         let lhs_multiplicity = if self.io_info.inputs[0].is_initializer {
             E::EF::zero()
         } else {
@@ -106,7 +105,7 @@ impl FrameworkEval for AddEval {
         ));
 
         eval.finalize_logup();
-
+        
         eval
     }
 }
