@@ -87,10 +87,28 @@ impl<T: TraceColumn> Claim<T> {
         ])
     }
 
-    /// Mix the log size of the table to the Fiat-Shamir [`Channel`],
-    /// to bound the channel randomness and the trace.
+    /// Mix the log size of the table and the node structure to the Fiat-Shamir [`Channel`].
     pub fn mix_into(&self, channel: &mut impl Channel) {
+        // Mix log_size
         channel.mix_u64(self.log_size.into());
+
+        // Mix number of inputs
+        channel.mix_u64(self.node_info.inputs.len() as u64);
+
+        // Mix input flags
+        for input in &self.node_info.inputs {
+            channel.mix_u64(if input.is_initializer { 1 } else { 0 });
+        }
+
+        // Mix output flag
+        channel.mix_u64(if self.node_info.output.is_final_output {
+            1
+        } else {
+            0
+        });
+
+        // Mix consumer count
+        channel.mix_u64(self.node_info.num_consumers as u64);
     }
 }
 

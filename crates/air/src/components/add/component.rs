@@ -2,13 +2,10 @@ use num_traits::{One, Zero};
 use numerair::eval::EvalFixedPoint;
 use stwo_prover::{
     constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry},
-    core::fields::m31::BaseField,
+    core::fields::{m31::BaseField, qm31::SecureField},
 };
 
-use crate::{
-    components::{AddClaim, NodeElements},
-    pie::NodeInfo,
-};
+use crate::components::{AddClaim, NodeElements};
 
 /// Component for addition operations, using `SimdBackend` with fallback to `CpuBackend` for small traces.
 pub type AddComponent = FrameworkComponent<AddEval>;
@@ -17,16 +14,37 @@ pub type AddComponent = FrameworkComponent<AddEval>;
 pub struct AddEval {
     log_size: u32,
     lookup_elements: NodeElements,
-    node_info: NodeInfo,
+    lhs_multiplicity: SecureField,
+    rhs_multiplicity: SecureField,
+    out_multiplicity: SecureField,
 }
 
 impl AddEval {
     /// Creates a new `AddEval` instance from a claim and lookup elements.
     pub fn new(claim: &AddClaim, lookup_elements: NodeElements) -> Self {
+        let lhs_multiplicity = if claim.node_info.inputs[0].is_initializer {
+            SecureField::zero()
+        } else {
+            -SecureField::one()
+        };
+
+        let rhs_multiplicity = if claim.node_info.inputs[1].is_initializer {
+            SecureField::zero()
+        } else {
+            -SecureField::one()
+        };
+        let out_multiplicity = if claim.node_info.output.is_final_output {
+            SecureField::zero()
+        } else {
+            SecureField::one() * BaseField::from_u32_unchecked(claim.node_info.num_consumers as u32)
+        };
+
         Self {
             log_size: claim.log_size,
-            node_info: claim.node_info.clone(),
             lookup_elements,
+            lhs_multiplicity,
+            rhs_multiplicity,
+            out_multiplicity,
         }
     }
 }
@@ -52,38 +70,21 @@ impl FrameworkEval for AddEval {
 
         eval.eval_fixed_add(lhs.clone(), rhs.clone(), out.clone());
 
-        let lhs_multiplicity = if self.node_info.inputs[0].is_initializer {
-            E::EF::zero()
-        } else {
-            -E::EF::one()
-        };
-
-        let rhs_multiplicity = if self.node_info.inputs[1].is_initializer {
-            E::EF::zero()
-        } else {
-            -E::EF::one()
-        };
-        let out_multiplicity = if self.node_info.output.is_final_output {
-            E::EF::zero()
-        } else {
-            E::EF::one() * BaseField::from_u32_unchecked(self.node_info.num_consumers as u32)
-        };
-
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
-            lhs_multiplicity,
+            self.lhs_multiplicity.into(),
             &[lhs],
         ));
 
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
-            rhs_multiplicity,
+            self.rhs_multiplicity.into(),
             &[rhs],
         ));
 
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
-            out_multiplicity,
+            self.out_multiplicity.into(),
             &[out],
         ));
 
