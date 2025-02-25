@@ -20,9 +20,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let w = cx.tensor((2, 2)).set(vec![-1.0, -1.0, -1.0, -1.0]);
 
     // Define computation operations on tensors:
-    let c = a + b;
-    let d = c + w;
-    let mut e = (c + d).retrieve();
+    let c = a * b;
+    let d = c * w;
+    let mut e = (c * d).retrieve();
 
     // At this point, no computation has occurred. We have just defined the computation graph.
     // The operations will be executed only when the trace is generated.

@@ -1,7 +1,8 @@
 use crate::{data::StwoData, op::HasProcessTrace};
 use luminair_air::{
     components::{
-        add::table::{interaction_trace_evaluation, AddColumn},
+        add::{self, table::AddColumn},
+        mul::{self, table::MulColumn},
         ClaimType, LuminairComponents, LuminairInteractionElements, TraceEval,
     },
     pie::{ExecutionResources, InputInfo, LuminairPie, NodeInfo, OpCounter, OutputInfo, Trace},
@@ -116,6 +117,25 @@ impl LuminairGraph for Graph {
                     *op_counter.add.get_or_insert(0) += 1;
 
                     tensors
+                } else if <Box<dyn Operator> as HasProcessTrace<MulColumn>>::has_process_trace(
+                    node_op,
+                ) {
+                    let (trace, claim, tensors) =
+                        <Box<dyn Operator> as HasProcessTrace<MulColumn>>::call_process_trace(
+                            node_op, srcs, &node_info,
+                        )
+                        .unwrap();
+
+                    max_log_size = max_log_size.max(claim.log_size);
+
+                    traces.push(Trace {
+                        eval: SerializableTrace::from(&trace),
+                        claim: ClaimType::Mul(claim),
+                        node_info,
+                    });
+                    *op_counter.mul.get_or_insert(0) += 1;
+
+                    tensors
                 } else {
                     // Handle other operators or fallback
                     node_op.process(srcs)
@@ -204,12 +224,11 @@ impl LuminairGraph for Graph {
         let mut main_claim = LuminairClaim::init(is_first_log_sizes.clone());
 
         for trace in pie.traces.clone().into_iter() {
+            tree_builder.extend_evals(trace.eval.to_trace());
+
             match trace.claim {
-                ClaimType::Add(claim) => {
-                    // Add the components' trace evaluation to the commit tree.
-                    tree_builder.extend_evals(trace.eval.to_trace());
-                    main_claim.add.push(claim);
-                }
+                ClaimType::Add(claim) => main_claim.add.push(claim),
+                ClaimType::Mul(claim) => main_claim.mul.push(claim),
             }
         }
 
@@ -230,18 +249,33 @@ impl LuminairGraph for Graph {
         let mut interaction_claim = LuminairInteractionClaim::init();
 
         for trace in pie.traces.into_iter() {
-            match trace.claim {
+            let claim = trace.claim;
+            let node_info = trace.node_info;
+            let trace: TraceEval = trace.eval.to_trace();
+            let lookup_elements = &interaction_elements.node_lookup_elements;
+
+            match claim {
                 ClaimType::Add(_) => {
-                    let node_info = trace.node_info;
-                    let trace: TraceEval = trace.eval.to_trace();
-
-                    let lookup_elements = &interaction_elements.node_lookup_elements;
-
-                    let (t, c) =
-                        interaction_trace_evaluation(&trace, lookup_elements, &node_info).unwrap();
+                    let (t, c) = add::table::interaction_trace_evaluation(
+                        &trace,
+                        lookup_elements,
+                        &node_info,
+                    )
+                    .unwrap();
 
                     tree_builder.extend_evals(t);
                     interaction_claim.add.push(c);
+                }
+                ClaimType::Mul(_) => {
+                    let (t, c) = mul::table::interaction_trace_evaluation(
+                        &trace,
+                        lookup_elements,
+                        &node_info,
+                    )
+                    .unwrap();
+
+                    tree_builder.extend_evals(t);
+                    interaction_claim.mul.push(c);
                 }
             }
         }

@@ -2,14 +2,18 @@ use std::sync::Arc;
 
 use luminair_air::{
     components::{
-        add::table::{trace_evaluation, AddColumn},
+        add::{self, table::AddColumn},
+        mul::{self, table::MulColumn},
         Claim, TraceEval,
     },
     pie::NodeInfo,
 };
 use luminal::prelude::*;
 
-use crate::{data::StwoData, utils::is};
+use crate::{
+    data::StwoData,
+    utils::{get_data, is},
+};
 
 use super::{IntoOperator, LuminairOperator};
 
@@ -51,21 +55,11 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
         let (lhs_tensor, _) = &inp[0];
         let (rhs_tensor, _) = &inp[1];
 
-        let get_data = |tensor: &InputTensor| {
-            if let Some(data) = tensor.borrowed().downcast_ref::<Vec<f32>>() {
-                StwoData::from_f32(data)
-            } else if let Some(data) = tensor.borrowed().downcast_ref::<StwoData>() {
-                StwoData(Arc::clone(&data.0))
-            } else {
-                panic!("Unsupported input type for Add");
-            }
-        };
-
         let lhs = get_data(lhs_tensor);
         let rhs = get_data(rhs_tensor);
 
-        // Generate trace and get result tensor
-        let (main_trace, claim, output) = trace_evaluation(&lhs.0, &rhs.0, node_info);
+        // Generate trace, claim, and get result tensor
+        let (main_trace, claim, output) = add::table::trace_evaluation(&lhs.0, &rhs.0, node_info);
 
         (
             main_trace,
@@ -76,6 +70,48 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
 }
 
 impl Operator for LuminairAdd {
+    /// This method is not used as `process_trace` handles all computation for this operator.
+    fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        unimplemented!()
+    }
+}
+
+/// Implements element-wise multiplication for LuminAIR.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct LuminairMul {}
+
+impl LuminairMul {
+    /// Creates a new `LuminairMul` instance.
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl LuminairOperator<MulColumn> for LuminairMul {
+    fn process_trace(
+        &mut self,
+        inp: Vec<(InputTensor, ShapeTracker)>,
+        node_info: &NodeInfo,
+    ) -> (TraceEval, Claim<MulColumn>, Vec<Tensor>) {
+        // Get data
+        let (lhs_tensor, _) = &inp[0];
+        let (rhs_tensor, _) = &inp[1];
+
+        let lhs = get_data(lhs_tensor);
+        let rhs = get_data(rhs_tensor);
+
+        // Generate trace, claim, and get result tensor
+        let (main_trace, claim, output) = mul::table::trace_evaluation(&lhs.0, &rhs.0, node_info);
+
+        (
+            main_trace,
+            claim,
+            vec![Tensor::new(StwoData(Arc::new(output)))],
+        )
+    }
+}
+
+impl Operator for LuminairMul {
     /// This method is not used as `process_trace` handles all computation for this operator.
     fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
         unimplemented!()
@@ -93,6 +129,8 @@ impl Compiler for PrimitiveCompiler {
 
             if is::<luminal::op::Add>(op) {
                 *op_ref = LuminairAdd::new().into_operator()
+            } else if is::<luminal::op::Mul>(op) {
+                *op_ref = LuminairMul::new().into_operator()
             } else if is::<luminal::op::Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
             } else if is::<luminal::op::Function>(op) {
