@@ -153,6 +153,12 @@ impl LuminairGraph for Graph {
 
         self.reset();
 
+        // Sort traces to match the order of components
+        traces.sort_by_key(|trace| match trace.claim {
+            ClaimType::Add(_) => 0,
+            ClaimType::Mul(_) => 1,
+        });
+
         LuminairPie {
             traces,
             execution_resources: ExecutionResources {
