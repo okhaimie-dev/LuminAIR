@@ -6,7 +6,6 @@ use luminair_air::{
         Claim, TraceEval,
     },
     pie::NodeInfo,
-    utils::calculate_log_size,
 };
 use luminal::prelude::*;
 
@@ -65,12 +64,8 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
         let lhs = get_data(lhs_tensor);
         let rhs = get_data(rhs_tensor);
 
-        // Calculate required trace size based on tensor dimensions
-        let max_size = lhs.0.len().max(rhs.0.len());
-        let log_size = calculate_log_size(max_size);
-
         // Generate trace and get result tensor
-        let (main_trace, claim, output) = trace_evaluation(log_size, &lhs.0, &rhs.0, node_info);
+        let (main_trace, claim, output) = trace_evaluation(&lhs.0, &rhs.0, node_info);
 
         (
             main_trace,

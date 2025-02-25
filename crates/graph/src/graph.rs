@@ -1,7 +1,4 @@
-use crate::{
-    data::{OutputConverter, StwoData},
-    op::HasProcessTrace,
-};
+use crate::{data::StwoData, op::HasProcessTrace};
 use luminair_air::{
     components::{
         add::table::{interaction_trace_evaluation, AddColumn},
@@ -146,30 +143,9 @@ impl LuminairGraph for Graph {
     }
 
     fn get_output(&mut self, id: NodeIndex) -> Vec<f32> {
-        // Get the shape from the graph edges
-        let output_size = if let Some((_, shape)) = self.to_retrieve.get(&id) {
-            shape
-                .n_elements()
-                .to_usize()
-                .expect("Failed to get tensor size")
-        } else {
-            // Fallback to checking graph edges if not in to_retrieve
-            self.graph
-                .edges_directed(id, petgraph::Direction::Incoming)
-                .find_map(|e| e.weight().as_data())
-                .map(|(_, _, shape)| {
-                    shape
-                        .n_elements()
-                        .to_usize()
-                        .expect("Failed to get tensor size")
-                })
-                .expect("Could not determine tensor shape")
-        };
-
         if let Some(tensor) = self.tensors.remove(&(id, 0)) {
             if let Some(data) = tensor.downcast_ref::<StwoData>() {
-                let converter = OutputConverter::new(data.clone(), output_size);
-                return converter.to_f32();
+                return data.to_f32();
             }
         }
         panic!("No StwoData found for final output conversion");

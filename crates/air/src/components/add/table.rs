@@ -1,15 +1,12 @@
 use num_traits::{One, Zero};
+use numerair::FixedPoint;
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::{logup::LogupTraceGenerator, Relation},
     core::{
         backend::{
-            simd::{
-                m31::{PackedBaseField, LOG_N_LANES},
-                qm31::PackedSecureField,
-                SimdBackend,
-            },
-            Col, Column,
+            simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
+            Column,
         },
         fields::m31::BaseField,
         poly::circle::{CanonicCoset, CircleEvaluation},
@@ -21,58 +18,45 @@ use crate::{
     pie::NodeInfo,
 };
 
+/// Represents a single row of the [`AddTable`]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct AddTableRow {
+    lhs: BaseField,
+    rhs: BaseField,
+}
+
 /// Generates the main trace for element-wise addition of two vectors.
 pub fn trace_evaluation(
-    log_size: u32,
-    lhs: &[PackedBaseField],
-    rhs: &[PackedBaseField],
+    lhs: &[BaseField],
+    rhs: &[BaseField],
     node_info: &NodeInfo,
-) -> (TraceEval, AddClaim, Vec<PackedBaseField>) {
-    // Calculate trace size
-    let trace_size = 1 << log_size;
-    // Calculate actual size needed
-    let size = lhs.len().max(rhs.len());
-    // Create domain
-    let domain = CanonicCoset::new(log_size).circle_domain();
+) -> (TraceEval, AddClaim, Vec<BaseField>) {
+    let n_rows = lhs.len().min(rhs.len()) as u32;
+    let log_n_rows = n_rows.next_power_of_two().ilog2();
+    let log_size = log_n_rows + LOG_N_LANES;
+    let mut trace = vec![BaseColumn::zeros(1 << log_size); AddColumn::count().0];
 
-    // Initialize result vector
-    let mut main_trace = Vec::with_capacity(3);
+    let mut out = Vec::with_capacity(n_rows as usize);
 
-    // Prepare output data
-    let mut output = Vec::with_capacity(size);
+    for i in 0..n_rows as usize {
+        let lhs_val = lhs[i];
+        let rhs_val = rhs[i];
+        let out_val = lhs_val.fixed_add(rhs_val);
 
-    // Create separate columns and fill them
-    for column_idx in 0..3 {
-        let mut column = Col::<SimdBackend, BaseField>::zeros(trace_size);
+        trace[AddColumn::Lhs.index()].data[i] = lhs_val.into();
+        trace[AddColumn::Rhs.index()].data[i] = rhs_val.into();
+        trace[AddColumn::Out.index()].data[i] = out_val.into();
 
-        for i in 0..trace_size {
-            if i < size {
-                let lhs_val = lhs[i % lhs.len()];
-                let rhs_val = rhs[i % rhs.len()];
-                let out_val = lhs_val + rhs_val;
-
-                match column_idx {
-                    0 => column.set(i, lhs_val.to_array()[0]),
-                    1 => column.set(i, rhs_val.to_array()[0]),
-                    2 => {
-                        column.set(i, out_val.to_array()[0]);
-                        output.push(out_val);
-                    }
-                    _ => unreachable!(),
-                }
-            } else {
-                column.set(i, BaseField::zero());
-            }
-        }
-
-        main_trace.push(CircleEvaluation::new(domain, column));
+        out.push(out_val);
     }
 
-    (
-        main_trace,
-        AddClaim::new(log_size, node_info.clone()),
-        output,
-    )
+    let domain = CanonicCoset::new(log_size).circle_domain();
+    let trace = trace
+        .into_iter()
+        .map(|col| CircleEvaluation::new(domain, col))
+        .collect();
+
+    (trace, AddClaim::new(log_size, node_info.clone()), out)
 }
 
 /// Enum representing the column indices in the Add trace.
