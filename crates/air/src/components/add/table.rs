@@ -31,23 +31,29 @@ pub fn trace_evaluation(
     rhs: &[BaseField],
     node_info: &NodeInfo,
 ) -> (TraceEval, AddClaim, Vec<BaseField>) {
-    let n_rows = lhs.len().min(rhs.len()) as u32;
-    let log_n_rows = n_rows.next_power_of_two().ilog2();
+    // Calculate actual size needed
+    let actual_size = lhs.len().min(rhs.len()) as u32;
+    let log_n_rows = actual_size.next_power_of_two().ilog2();
     let log_size = log_n_rows + LOG_N_LANES;
-    let mut trace = vec![BaseColumn::zeros(1 << log_size); AddColumn::count().0];
+    // Calculate trace size
+    let trace_size = 1 << log_size;
 
-    let mut out = Vec::with_capacity(n_rows as usize);
+    let mut trace = vec![BaseColumn::zeros(trace_size); AddColumn::count().0];
 
-    for i in 0..n_rows as usize {
-        let lhs_val = lhs[i];
-        let rhs_val = rhs[i];
-        let out_val = lhs_val.fixed_add(rhs_val);
+    let mut out = Vec::with_capacity(actual_size as usize);
 
-        trace[AddColumn::Lhs.index()].data[i] = lhs_val.into();
-        trace[AddColumn::Rhs.index()].data[i] = rhs_val.into();
-        trace[AddColumn::Out.index()].data[i] = out_val.into();
+    for i in 0..trace_size as usize {
+        if i < actual_size as usize {
+            let lhs_val = lhs[i];
+            let rhs_val = rhs[i];
+            let out_val = lhs_val.fixed_add(rhs_val);
 
-        out.push(out_val);
+            trace[AddColumn::Lhs.index()].data[i] = lhs_val.into();
+            trace[AddColumn::Rhs.index()].data[i] = rhs_val.into();
+            trace[AddColumn::Out.index()].data[i] = out_val.into();
+
+            out.push(out_val);
+        }
     }
 
     let domain = CanonicCoset::new(log_size).circle_domain();
