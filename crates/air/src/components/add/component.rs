@@ -5,9 +5,10 @@ use stwo_prover::{
     core::fields::m31::BaseField,
 };
 
-use crate::{components::AddClaim, pie::NodeInfo};
-
-use super::table::AddElements;
+use crate::{
+    components::{AddClaim, NodeElements},
+    pie::NodeInfo,
+};
 
 /// Component for addition operations, using `SimdBackend` with fallback to `CpuBackend` for small traces.
 pub type AddComponent = FrameworkComponent<AddEval>;
@@ -15,13 +16,13 @@ pub type AddComponent = FrameworkComponent<AddEval>;
 /// Defines the AIR for the addition component.
 pub struct AddEval {
     log_size: u32,
-    lookup_elements: AddElements,
+    lookup_elements: NodeElements,
     node_info: NodeInfo,
 }
 
 impl AddEval {
     /// Creates a new `AddEval` instance from a claim and lookup elements.
-    pub fn new(claim: &AddClaim, lookup_elements: AddElements) -> Self {
+    pub fn new(claim: &AddClaim, lookup_elements: NodeElements) -> Self {
         Self {
             log_size: claim.log_size,
             node_info: claim.node_info.clone(),

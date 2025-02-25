@@ -1,6 +1,6 @@
 use add::{
     component::{AddComponent, AddEval},
-    table::{AddColumn, AddElements},
+    table::AddColumn,
 };
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
@@ -14,13 +14,11 @@ use stwo_prover::{
         poly::{circle::CircleEvaluation, BitReversedOrder},
         ColumnVec,
     },
+    relation,
 };
 use thiserror::Error;
 
-use crate::{
-    pie::{NodeInfo, OpCounter},
-    LuminairClaim, LuminairInteractionClaim,
-};
+use crate::{pie::NodeInfo, LuminairClaim, LuminairInteractionClaim};
 
 pub mod add;
 
@@ -116,27 +114,26 @@ impl InteractionClaim {
     }
 }
 
+// Defines the relation for the node lookup elements.
+// It allows to constrain relationship between nodes.
+relation!(NodeElements, 1);
+
 /// All the interaction elements required by the components during the interaction phase 2.
 ///
 /// The elements are drawn from a Fiat-Shamir [`Channel`], currently using the BLAKE2 hash.
 #[derive(Clone, Debug)]
 pub struct LuminairInteractionElements {
-    pub add_lookup_elements: AddElements,
+    pub node_lookup_elements: NodeElements,
 }
 
 impl LuminairInteractionElements {
     /// Draw all the interaction elements needed for
     /// all the components of the system.
-    pub fn draw(channel: &mut impl Channel, op_counter: &OpCounter) -> Self {
-        // Only draw elements once and reuse them
-        let add_elements = if op_counter.add.unwrap_or(0) > 0 {
-            AddElements::draw(channel)
-        } else {
-            AddElements::dummy()
-        };
+    pub fn draw(channel: &mut impl Channel) -> Self {
+        let node_lookup_elements = NodeElements::draw(channel);
 
         Self {
-            add_lookup_elements: add_elements,
+            node_lookup_elements,
         }
     }
 }
@@ -172,7 +169,7 @@ impl LuminairComponents {
             .map(|(cl, int_cl)| {
                 AddComponent::new(
                     tree_span_provider,
-                    AddEval::new(cl, interaction_elements.add_lookup_elements.clone()),
+                    AddEval::new(cl, interaction_elements.node_lookup_elements.clone()),
                     (int_cl.claimed_sum, None),
                 )
             })

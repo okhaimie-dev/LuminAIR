@@ -247,8 +247,7 @@ impl LuminairGraph for Graph {
         // └───────────────────────────────────────────────┘
 
         // Draw interaction elements
-        let interaction_elements =
-            LuminairInteractionElements::draw(channel, &pie.execution_resources.op_counter);
+        let interaction_elements = LuminairInteractionElements::draw(channel);
 
         // Generate the interaction trace from the main trace, and compute the logUp sum.
         let mut tree_builder = commitment_scheme.tree_builder();
@@ -260,7 +259,7 @@ impl LuminairGraph for Graph {
                     let node_info = trace.node_info;
                     let trace: TraceEval = trace.eval.to_trace();
 
-                    let lookup_elements = &interaction_elements.add_lookup_elements;
+                    let lookup_elements = &interaction_elements.node_lookup_elements;
 
                     let (t, c) =
                         interaction_trace_evaluation(&trace, lookup_elements, &node_info).unwrap();
@@ -342,8 +341,7 @@ impl LuminairGraph for Graph {
         // │    Interaction Phase 2 - Interaction Trace    │
         // └───────────────────────────────────────────────┘
 
-        let interaction_elements =
-            LuminairInteractionElements::draw(channel, &execution_resources.op_counter);
+        let interaction_elements = LuminairInteractionElements::draw(channel);
 
         // Check that the lookup sum is valid, otherwise throw
         if !lookup_sum_valid(&interaction_claim) {

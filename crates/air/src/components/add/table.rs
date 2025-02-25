@@ -14,11 +14,10 @@ use stwo_prover::{
         fields::m31::BaseField,
         poly::circle::{CanonicCoset, CircleEvaluation},
     },
-    relation,
 };
 
 use crate::{
-    components::{AddClaim, InteractionClaim, TraceColumn, TraceError, TraceEval},
+    components::{AddClaim, InteractionClaim, NodeElements, TraceColumn, TraceError, TraceEval},
     pie::NodeInfo,
 };
 
@@ -109,13 +108,10 @@ impl TraceColumn for AddColumn {
     }
 }
 
-// Defines the relation for the Add component's lookup elements.
-relation!(AddElements, 1);
-
 /// Generates the interaction trace for the Add component using the main trace and lookup elements.
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
-    lookup_elements: &AddElements,
+    lookup_elements: &NodeElements,
     node_info: &NodeInfo,
 ) -> Result<(TraceEval, InteractionClaim), TraceError> {
     if main_trace_eval.is_empty() {
