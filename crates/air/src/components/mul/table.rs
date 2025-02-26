@@ -1,6 +1,7 @@
 use crate::{
     components::{InteractionClaim, MulClaim, NodeElements, TraceColumn, TraceError, TraceEval},
     pie::NodeInfo,
+    utils::calculate_log_size,
 };
 use num_traits::{One, Zero};
 use numerair::packed::FixedPackedBaseField;
@@ -9,8 +10,8 @@ use stwo_prover::{
     constraint_framework::{logup::LogupTraceGenerator, Relation},
     core::{
         backend::{
-            simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
-            Column,
+            simd::{m31::LOG_N_LANES, qm31::PackedSecureField, SimdBackend},
+            Col, Column,
         },
         fields::m31::BaseField,
         poly::circle::{CanonicCoset, CircleEvaluation},
@@ -24,38 +25,54 @@ pub fn trace_evaluation(
     node_info: &NodeInfo,
 ) -> (TraceEval, MulClaim, Vec<FixedPackedBaseField>) {
     // Calculate actual size needed
-    let actual_size = lhs.len().min(rhs.len()) as u32;
-    let log_n_rows = actual_size.next_power_of_two().ilog2();
-    let log_size = log_n_rows + LOG_N_LANES;
+    let actual_size = lhs.len().max(rhs.len());
+
+    // Calculate log size
+    let log_size = calculate_log_size(actual_size);
+
     // Calculate trace size
     let trace_size = 1 << log_size;
 
-    let mut trace = vec![BaseColumn::zeros(trace_size); MulColumn::count().0];
+    // Create domain
+    let domain = CanonicCoset::new(log_size).circle_domain();
 
-    let mut out = Vec::with_capacity(actual_size as usize);
+    // Instantiate trace
+    let mut trace = Vec::with_capacity(MulColumn::count().0);
 
-    for i in 0..trace_size as usize {
-        if i < actual_size as usize {
-            let lhs_val = lhs[i];
-            let rhs_val = rhs[i];
-            let (out_val, rem_val) = lhs_val * rhs_val;
+    // Instantiate output vector
+    let mut output_vec = Vec::with_capacity(actual_size);
 
-            trace[MulColumn::Lhs.index()].data[i] = lhs_val.0.into();
-            trace[MulColumn::Rhs.index()].data[i] = rhs_val.0.into();
-            trace[MulColumn::Out.index()].data[i] = out_val.0.into();
-            trace[MulColumn::Rem.index()].data[i] = rem_val.0.into();
+    // Fill columns
+    for column_idx in 0..MulColumn::count().0 {
+        let mut column = Col::<SimdBackend, BaseField>::zeros(trace_size);
 
-            out.push(out_val);
+        for i in 0..trace_size {
+            if i < actual_size {
+                let lhs_val = lhs[i % lhs.len()];
+                let rhs_val = rhs[i % rhs.len()];
+                let (out_val, rem_val) = lhs_val * rhs_val;
+
+                match column_idx {
+                    0 => column.set(i, lhs_val.0.to_array()[0]),
+                    1 => column.set(i, rhs_val.0.to_array()[0]),
+                    2 => {
+                        column.set(i, out_val.0.to_array()[0]);
+                        output_vec.push(out_val);
+                    }
+                    3 => column.set(i, rem_val.0.to_array()[0]),
+                    _ => unreachable!(),
+                }
+            }
         }
+
+        trace.push(CircleEvaluation::new(domain, column));
     }
 
-    let domain = CanonicCoset::new(log_size).circle_domain();
-    let trace = trace
-        .into_iter()
-        .map(|col| CircleEvaluation::new(domain, col))
-        .collect();
-
-    (trace, MulClaim::new(log_size, node_info.clone()), out)
+    (
+        trace,
+        MulClaim::new(log_size, node_info.clone()),
+        output_vec,
+    )
 }
 
 /// Enum representing the column indices in the Mul trace.
