@@ -1227,12 +1227,14 @@ dependencies = [
 [[package]]
 name = "numerair"
 version = "0.1.0"
-source = "git+https://github.com/gizatechxyz/NumerAir.git?rev=8731cad#8731cad64db3cfe6f09461cd9753803aa80fb677"
+source = "git+https://github.com/gizatechxyz/NumerAir.git?rev=98c54bf#98c54bfc2ba45fa05b2d2a3afe0bf9092c0e4c25"
 dependencies = [
+ "bytemuck",
  "lazy_static",
  "num-traits",
  "once_cell",
  "rayon",
+ "serde",
  "stwo-prover",
 ]
 

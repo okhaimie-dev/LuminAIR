@@ -1,5 +1,5 @@
 use num_traits::{One, Zero};
-use numerair::FixedPoint;
+use numerair::packed::FixedPackedBaseField;
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::{logup::LogupTraceGenerator, Relation},
@@ -20,10 +20,10 @@ use crate::{
 
 /// Generates the main trace for element-wise addition of two tensors.
 pub fn trace_evaluation(
-    lhs: &[BaseField],
-    rhs: &[BaseField],
+    lhs: &[FixedPackedBaseField],
+    rhs: &[FixedPackedBaseField],
     node_info: &NodeInfo,
-) -> (TraceEval, AddClaim, Vec<BaseField>) {
+) -> (TraceEval, AddClaim, Vec<FixedPackedBaseField>) {
     // Calculate actual size needed
     let actual_size = lhs.len().min(rhs.len()) as u32;
     let log_n_rows = actual_size.next_power_of_two().ilog2();
@@ -39,11 +39,11 @@ pub fn trace_evaluation(
         if i < actual_size as usize {
             let lhs_val = lhs[i];
             let rhs_val = rhs[i];
-            let out_val = lhs_val.fixed_add(rhs_val);
+            let out_val = lhs_val + rhs_val;
 
-            trace[AddColumn::Lhs.index()].data[i] = lhs_val.into();
-            trace[AddColumn::Rhs.index()].data[i] = rhs_val.into();
-            trace[AddColumn::Out.index()].data[i] = out_val.into();
+            trace[AddColumn::Lhs.index()].data[i] = lhs_val.0.into();
+            trace[AddColumn::Rhs.index()].data[i] = rhs_val.0.into();
+            trace[AddColumn::Out.index()].data[i] = out_val.0.into();
 
             out.push(out_val);
         }
