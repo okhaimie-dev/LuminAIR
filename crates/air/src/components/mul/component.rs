@@ -1,17 +1,16 @@
+use crate::components::{MulClaim, NodeElements};
 use num_traits::{One, Zero};
-use numerair::eval::EvalFixedPoint;
+use numerair::{eval::EvalFixedPoint, SCALE_FACTOR};
 use stwo_prover::{
     constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry},
     core::fields::{m31::BaseField, qm31::SecureField},
 };
 
-use crate::components::{AddClaim, NodeElements};
+/// Component for multiplication operations, using `SimdBackend` with fallback to `CpuBackend` for small traces.
+pub type MulComponent = FrameworkComponent<MulEval>;
 
-/// Component for addition operations, using `SimdBackend` with fallback to `CpuBackend` for small traces.
-pub type AddComponent = FrameworkComponent<AddEval>;
-
-/// Defines the AIR for the addition component.
-pub struct AddEval {
+/// Defines the AIR for the multiplication component.
+pub struct MulEval {
     log_size: u32,
     lookup_elements: NodeElements,
     lhs_multiplicity: SecureField,
@@ -19,9 +18,9 @@ pub struct AddEval {
     out_multiplicity: SecureField,
 }
 
-impl AddEval {
-    /// Creates a new `AddEval` instance from a claim and lookup elements.
-    pub fn new(claim: &AddClaim, lookup_elements: NodeElements) -> Self {
+impl MulEval {
+    /// Creates a new `MulEval` instance from a claim and lookup elements.
+    pub fn new(claim: &MulClaim, lookup_elements: NodeElements) -> Self {
         let lhs_multiplicity = if claim.node_info.inputs[0].is_initializer {
             SecureField::zero()
         } else {
@@ -49,7 +48,7 @@ impl AddEval {
     }
 }
 
-impl FrameworkEval for AddEval {
+impl FrameworkEval for MulEval {
     /// Returns the logarithmic size of the main trace.
     fn log_size(&self) -> u32 {
         self.log_size
@@ -67,8 +66,15 @@ impl FrameworkEval for AddEval {
         let lhs = eval.next_trace_mask();
         let rhs = eval.next_trace_mask();
         let out = eval.next_trace_mask();
+        let rem = eval.next_trace_mask();
 
-        eval.eval_fixed_add(lhs.clone(), rhs.clone(), out.clone());
+        eval.eval_fixed_mul(
+            lhs.clone(),
+            rhs.clone(),
+            SCALE_FACTOR.into(),
+            out.clone(),
+            rem,
+        );
 
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,

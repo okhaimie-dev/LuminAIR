@@ -16,7 +16,7 @@ In its initial phase, LuminAIR supports a primitive set of 11 operators, suffici
 | Sqrt       | ⏳     |
 | Recip      | ⏳     |
 | Add        | ✅     |
-| Mul        | ⏳     |
+| Mul        | ✅     |
 | Mod        | ⏳     |
 | LessThan   | ⏳     |
 | SumReduce  | ⏳     |
