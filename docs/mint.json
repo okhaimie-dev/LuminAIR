@@ -1,0 +1,60 @@
+{
+    "name": "LuminAIR",
+    "logo": "",
+    "favicon": "",
+    "colors": {
+        "primary": "#DFFE00",
+        "dark": "#DFFE00",
+        "anchors": {
+            "from": "#DFFE00",
+            "to": "#DFFE00"
+        }
+    },
+    "topbarLinks": [],
+    "topbarCtaButton": {
+        "name": "Launch App",
+        "url": "https://arma.xyz"
+    },
+    "navigation": [
+        {
+            "group": "Introduction",
+            "pages": [
+                "docs/overview",
+                "docs/core-features"
+            ]
+        },
+        {
+            "group": "How ARMA Works",
+            "pages": [
+                "docs/how-it-works",
+                "docs/agent-components",
+                "docs/security"
+            ]
+        },
+        {
+            "group": "User Guide",
+            "pages": [
+                "docs/getting-started",
+                "docs/fees"
+            ]
+        },
+        {
+            "group": "Help & Reference",
+            "pages": [
+                "docs/faqs",
+                "docs/glossary",
+                "docs/terms-and-conditions",
+                "docs/privacy-policy"
+            ]
+        }
+    ],
+    "footerSocials": {
+        "twitter": "https://x.com/gizatechxyz",
+        "github": "https://github.com/gizatechxyz"
+    },
+    "modeToggle": {
+        "default": "dark",
+        "isHidden": true
+    },
+    "default": "docs/introduction"
+}
