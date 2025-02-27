@@ -16,6 +16,10 @@
           {
             "group": "Introduction",
             "pages": ["welcome", "quick-start", "behind-the-scenes"]
+          },
+          {
+            "group": "More",
+            "pages": ["more/roadmap"]
           }
         ]
       }

@@ -1,0 +1,84 @@
+---
+title: Roadmap
+description: A plan to unlock ML integrity.
+---
+
+LuminAIR is being developed in carefully planned phases to address the challenges of proving 
+large-scale machine learning models while enabling practical use cases early on. 
+
+Below is the roadmap outlining our phased approach to building and expanding LuminAIR.
+
+# 🏗️ Phase 1: Supporting Primitive Operators
+
+<Accordion title="Support All Primitive Operators">
+
+In this foundational phase, LuminAIR focuses on supporting a minimal set of **11 primitive operators**, 
+which are sufficient to implement a wide range of machine learning models, such as linear regression, convolutional networks, and transformers.
+
+| Operator     | Status |
+| ------------ | ------ |
+| `Log2`       | ⏳     |
+| `Exp2`       | ⏳     |
+| `Sin`        | ⏳     |
+| `Sqrt`       | ⏳     |
+| `Recip`      | ⏳     |
+| `Add`        | ✅     |
+| `Mul`        | ✅     |
+| `Mod`        | ⏳     |
+| `LessThan`   | ⏳     |
+| `SumReduce`  | ⏳     |
+| `MaxReduce`  | ⏳     |
+| `Contiguous` | ✅     |
+
+- These operators are implemented via the PrimitiveCompiler, a subset of the `StwoCompiler`.
+- Each operator requires a corresponding specialized component in the AIR (Algebraic Intermediate Representation).
+    
+</Accordion>
+
+<Info>This phase currently under active development 🏗️.</Info>
+
+# 🔒 Phase 2: Optimizations and Accessibility
+
+This phase focuses on improving performance and developer experience by introducing fused compilers, specialized operators, and easier integration tools.
+
+<AccordionGroup>
+  <Accordion title="Implement Fused and Specialized Compilers">
+
+    A small primitive operator set can lead to computational graphs with hundreds or thousands of operations, making them slow to execute and prove.
+   
+    To address this, we will:
+    - Develop compilers that fuse multiple primitive operations into efficient composite operators.
+    - Add support for common ML operators like `MatMul`, `SoftMax`, and `ReLU`.
+    - Extend the AIR with specialized components for these new operators.
+  </Accordion>
+  <Accordion title="Improve DX with a Python SDK">
+    Currently, LuminAIR is written in Rust, requiring users to interact with it through Rust code.
+    A Python SDK will be developed to make LuminAIR more accessible to data scientists and ML practitioners who are more familiar with Python.
+  </Accordion>
+  <Accordion title="WASM Verifier Support">
+     This task will enable proof verification directly in web browsers using WebAssembly (WASM).
+  </Accordion>
+</AccordionGroup>
+
+# 🔒 Phase 3: Decentralized Verification and GPU Support
+
+This phase aims to bring LuminAIR proofs into decentralized ecosystems and enhance performance through GPU acceleration.
+
+<AccordionGroup>
+  <Accordion title="Onchain Proof Verification">
+    Deploy the LuminAIR verifier as a smart contract for decentralized proof verification.
+    Possible approaches include:
+	- Implementing the verifier as a Cairo program verified on Starknet.
+	- Leveraging Ethereum’s crypto-economic security via AVS networks like Aligned Layer.
+  </Accordion>
+  <Accordion title="Support for Icicle-Stwo Backend (GPU Acceleration)">
+    Integrate support for Icicle-Stwo, which enables GPU acceleration via CUDA backends.
+    This will significantly improve the speed of proof generation for large-scale models  
+  </Accordion>
+</AccordionGroup>
+
+# 🔒 Phase 4: Future Enhancements
+Details for this phase are yet to be finalized but may include:
+- Support for ONNX graph.
+- Scaling support for larger models.
+- Expanding compatibility with additional ZK backends.
