@@ -1,7 +1,7 @@
 {
     "name": "LuminAIR",
-    "logo": "",
-    "favicon": "",
+    "logo": "/logo/arma.svg",
+    "favicon": "/logo/arma.svg",
     "colors": {
         "primary": "#DFFE00",
         "dark": "#DFFE00",
