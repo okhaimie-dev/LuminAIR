@@ -1,0 +1,48 @@
+---
+title: Behind the scenes
+description: Bridging Machine Learning and Zero-Knowledge Proofs
+---
+
+**LuminAIR** leverages the strengths of two powerful frameworks: [Luminal](https://github.com/jafioti/luminal) and [Stwo](https://github.com/starkware-libs/stwo). 
+
+- **Luminal** provides the foundation for our machine learning framework, expertly handling computational graphs and compilers. 
+- **Stwo** serves as the constraint framework, enabling us to design an Algebraic Intermediate Representation (AIR) that is provable using Stwo’s compatible prover and verifier.
+
+<img className="w-full" src="/images/anatomy.png" />
+
+# Luminal: A Minimalist Machine Learning Framework
+
+Luminal is a Rust-based machine learning framework, drawing inspiration from [Tinygrad](https://github.com/tinygrad/tinygrad). 
+
+Its key feature is the use of composable compilers, which simplify the process of adding support for new backends. Luminal’s design philosophy centers around a minimal core, ensuring maintainability.
+
+At its heart, Luminal operates with just 11 primitive operators:
+- **Unary**: `Log2`, `Exp2`, `Sin`, `Sqrt`, `Recip`
+- **Binary**: `Add`, `Mul`, `Mod`, `LessThan`
+- **Other**: `SumReduce`, `MaxReduce`, `Contiguous`
+
+These ops are enough to support linear regression, convnets, transformers, etc.
+
+You might think that such a small set of operations would severely limit the library’s capabilities. 
+However, Luminal overcomes this limitation through the strategic use of composable compilers. 
+These compilers allow us to extend the functionality of the core by adding new operations and optimizations in a modular and isolated manner.
+
+For example, because the core library doesn’t handle specific devices, we can create compilers that replace the core operations with 
+equivalent operations optimized for different hardware, such as CUDA GPUs or TPUs. In the context of LuminAIR, we use compilers to target ZK circuits. 
+
+The beauty of this approach is that with only 11 core operations, the process of creating these specialized compilers becomes remarkably straightforward.
+
+Therefore, our work with LuminAIR involves harnessing Luminal’s composable compilers to develop efficient compilers 
+specifically tailored for proving computational graphs using a ZK framework.
+
+# AIR: A Custom Algebraic Intermediate Representation Proved with Stwo
+
+Stwo, developed by [Starkware](https://starkware.co/), represents the next generation of STARK provers. 
+It incorporates the innovative [Circle STARK protocol](https://eprint.iacr.org/2024/278), along with a variety of other optimizations. 
+Stwo unlocks the potential of the highly efficient prime field M31, benefiting the entire ZK-proof ecosystem.
+
+We are leveraging Stwo’s evaluation framework to define constraints for our AIR. 
+LuminAIR employs a compiler that replaces each operation in the graph with its corresponding component in our AIR, 
+enabling the generation of C-STARK proofs for the computational graph.
+
+While, in theory, we could support other ZK backends in the future by developing new compilers, our primary focus for now is on Stwo.

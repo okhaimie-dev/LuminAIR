@@ -1,0 +1,33 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "LuminAIR documentation",
+  "colors": {
+    "primary": "#F86032",
+    "light": "#EA580C",
+    "dark": "#F86032"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "languages": [
+      {
+        "language": "en",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": ["welcome", "quick-start", "behind-the-scenes"]
+          }
+        ]
+      }
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/gizatechxyz/LuminAIR"
+    }
+  }
+}

@@ -1,0 +1,95 @@
+---
+title: 'Quick Start'
+description: 'Build, Run, and Prove Computational Graphs with LuminAIR'
+---
+
+<img className="w-full" src="/images/hero-quickstart.png" />
+
+This guide walks you through the steps to:
+1. **Build** a computational graph using tensor operations.
+2. **Compile** and execute the graph to generate execution traces.
+3. **Prove** the computational graph using C-STARK proofs.
+4. **Verify** the proof to ensure computation integrity.
+
+
+## Step 1: Create a Computational Graph
+
+```rust
+use luminair_graph::{graph::LuminairGraph, StwoCompiler};
+use luminal::prelude::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+  // Create a new computational graph.
+  let mut cx = Graph::new();
+
+  // Define three 2x2 tensors with sample data.
+  // In a real-world scenario, these could be input features, weights, etc.
+  let a = cx.tensor((2, 2)).set(vec![1.0, 2.0, 3.0, 4.0]);
+  let b = cx.tensor((2, 2)).set(vec![10.0, 20.0, 30.0, 40.0]);
+  let w = cx.tensor((2, 2)).set(vec![-1.0, -1.0, -1.0, -1.0]);
+
+  // Define computation operations on tensors:
+  let c = a * b;       // Element-wise multiplication
+  let d = c + w;       // Element-wise addition
+  let mut e = (c * d).retrieve(); // Final operation
+}
+```
+
+**At this stage**:
+- No computation has been performed yet.
+- The graph only defines the operations that will be executed later when the trace is generated.
+  
+## Step 2: Compile the Graph
+
+```rust
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  // Previous code ..
+
+  // Compile the computation graph to transform the operations and prepare for execution.
+  cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut e);
+}
+```
+
+**Explanation**:
+- `GenericCompiler`: Applies backend-agnostic optimizations such as [CSE](https://en.wikipedia.org/wiki/Common_subexpression_elimination).
+- `StwoCompiler`: A specialized compiler provided by LuminAIR that replaces operations with their equivalent components in the AIR.
+
+## Step 3: Execute the Graph & Generate Execution Trace
+
+```rust
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  // Previous code ..
+
+  // Execute and generate a trace of the computation graph.
+  // This is when the actual computation happens.
+  let trace = cx.gen_trace();
+
+  // Retrieve and display the final result.
+  let result = cx.get_final_output(e.id);
+  println!("Final result: {:?}", result);
+}
+```
+The actual computation happens during trace generation (`gen_trace()`).
+
+## Step 4: Prove and Verify the Computation
+
+```rust
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  // Previous code ..
+
+  // Generate a C-STARK proof for the execution trace.
+  let proof = cx.prove(trace)?;
+
+  // Verify the generated proof to ensure the integrity of the computation.
+  cx.verify(proof)?;
+
+  println!("Proof verified successfully. Computation integrity ensured. 🎉");
+}
+```
+
+<Tip>
+In real-world scenarios, proving and verifying are typically performed by different entities:
+- The prover generates the proof after executing the computation.
+- The verifier validates that proof without needing to re-execute the computation
+</Tip>
