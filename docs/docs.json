@@ -23,7 +23,8 @@
               "concepts/integrity",
               "concepts/compilers",
               "concepts/operators",
-              "concepts/graph-tensor"
+              "concepts/graph-tensor",
+              "concepts/shape-tracking"
             ]
           },
           {
