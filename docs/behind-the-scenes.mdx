@@ -32,8 +32,8 @@ equivalent operations optimized for different hardware, such as CUDA GPUs or TPU
 
 The beauty of this approach is that with only 11 core operations, the process of creating these specialized compilers becomes remarkably straightforward.
 
-Therefore, our work with LuminAIR involves harnessing Luminal’s composable compilers to develop efficient compilers 
-specifically tailored for proving computational graphs using a ZK framework.
+Therefore, our work with LuminAIR involves leveraging Luminal’s composable compilers to develop efficient compilers 
+specifically tailored for proving computational graphs using Zero Knowledge proofs.
 
 # AIR: A Custom Algebraic Intermediate Representation Proved with Stwo
 
@@ -41,8 +41,8 @@ Stwo, developed by [Starkware](https://starkware.co/), represents the next gener
 It incorporates the innovative [Circle STARK protocol](https://eprint.iacr.org/2024/278), along with a variety of other optimizations. 
 Stwo unlocks the potential of the highly efficient prime field M31, benefiting the entire ZK-proof ecosystem.
 
-We are leveraging Stwo’s evaluation framework to define constraints for our AIR. 
-LuminAIR employs a compiler that replaces each operation in the graph with its corresponding component in our AIR, 
+We are leveraging Stwo framework to define constraints for our AIR. 
+LuminAIR designs a compiler that swaps each operation in the graph with its corresponding component in our AIR, 
 enabling the generation of C-STARK proofs for the computational graph.
 
 While, in theory, we could support other ZK backends in the future by developing new compilers, our primary focus for now is on Stwo.

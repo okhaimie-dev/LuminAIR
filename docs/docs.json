@@ -18,6 +18,10 @@
             "pages": ["welcome", "quick-start", "behind-the-scenes"]
           },
           {
+            "group": "Concepts",
+            "pages": ["concepts/integrity", "concepts/compilers"]
+          },
+          {
             "group": "More",
             "pages": ["more/roadmap"]
           }
