@@ -3,3 +3,55 @@ title: Compilers
 description: Core transformations of the computation graph.
 ---
 
+
+A fundamental principle of LuminAIR is its reliance on ahead-of-time (AOT) compilation. 
+By pushing all computations to compile time, LuminAIR eliminates runtime overhead, 
+ensuring that every operation in the computational graph is static and optimized before execution.
+
+When you write an expression like `x + y` in LuminAIR, no computation happens immediately. Instead:
+- The operation is recorded in a directed acyclic computation graph.
+- Actual computation occurs only when `graph.gen_trace()` is executed.
+
+This approach, akin to lazy execution, allows LuminAIR to treat entire ML models as static computation graphs. 
+
+## Why AOT Compilation?
+By fully representing ML models as static computation graphs, compilers have global knowledge of the entire model. 
+
+This allows for:
+1. **Advanced Optimizations**: Compilers can perform tasks like operator fusion, backend-specific optimizations, and linking operations to their AIR equivalents.
+2. **Separation of Concerns**: All complexity is pushed to compile time, leaving runtime execution lightweight and efficient.
+
+## How LuminAIR Compilers Work
+Compilers in LuminAIR are modular and stackable, meaning multiple compilers can be applied sequentially to transform the computation graph. 
+Each compiler focuses on a specific optimization task.
+
+<img className="w-full" src="/images/compiler.png" />
+
+### Default Compilers Provided by LuminAIR
+1. **GenericCompiler**
+    - Developed by [Luminal](https://github.com/jafioti/luminal), it applies backend-agnostic optimizations.
+    - Includes techniques like Common Subexpression Elimination [(CSE)](https://en.wikipedia.org/wiki/Common_subexpression_elimination). to eliminate redundant computations.
+    - Should always run before any specialized compilers.
+2. **StwoCompiler**
+    - A specialized compiler designed for proving computational graphs using the [Stwo](https://github.com/starkware-libs/stwo) prover.
+    - Replaces operations in the graph with their equivalent components in the AIR.
+
+`StwoCompiler` currently includes `PrimitiveCompiler`. It maps primitive operators (e.g., `Add`, `Mul`) to their corresponding AIR components.
+
+```rust
+pub type StwoCompiler = (op::prim::PrimitiveCompiler,);
+```
+
+In the future, `StwoCompiler` will include additional sub-compilers, such as `FuseOpCompiler`, focuses on fusing multiple primitive operations into optimized composite operators.
+
+### Customizing Compilers for Specific Use Cases
+LuminAIR supports custom compilers, designed by users, that can be stacked alongside default ones to address specific use cases. 
+
+```rust
+cx.compile(<(GenericCompiler, MyCustomCompiler, StwoCompiler)>::default(), &mut e);
+```
+
+Here:
+- `GenericCompiler` applies general optimizations.
+- `MyCustomCompiler` implements user-defined transformations for a specific task.
+- `StwoCompiler` prepares the graph for proof generation using the Stwo prover.
