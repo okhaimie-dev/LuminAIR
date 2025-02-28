@@ -19,7 +19,7 @@
           },
           {
             "group": "Concepts",
-            "pages": ["concepts/integrity", "concepts/compilers"]
+            "pages": ["concepts/integrity", "concepts/compilers", "concepts/operators"]
           },
           {
             "group": "More",
