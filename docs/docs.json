@@ -1,38 +1,40 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "maple",
+  "theme": "palm",
   "name": "LuminAIR documentation",
   "colors": {
     "primary": "#F86032",
     "light": "#EA580C",
     "dark": "#F86032"
   },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "href": "https://github.com/gizatechxyz/LuminAIR",
+      "label": "Github"
+    }
+  },
   "favicon": "/favicon.svg",
   "navigation": {
-    "languages": [
+    "groups": [
       {
-        "language": "en",
-        "groups": [
-          {
-            "group": "Introduction",
-            "pages": ["welcome", "quick-start", "behind-the-scenes"]
-          },
-          {
-            "group": "Concepts",
-            "pages": [
-              "concepts/integrity",
-              "concepts/compilers",
-              "concepts/operators",
-              "concepts/graph-tensor",
-              "concepts/shape-tracking",
-              "concepts/prove-verify"
-            ]
-          },
-          {
-            "group": "Learn More",
-            "pages": ["more/roadmap", "more/contribute"]
-          }
+        "group": "Introduction",
+        "pages": ["welcome", "quick-start", "behind-the-scenes"]
+      },
+      {
+        "group": "Concepts",
+        "pages": [
+          "concepts/integrity",
+          "concepts/compilers",
+          "concepts/operators",
+          "concepts/graph-tensor",
+          "concepts/shape-tracking",
+          "concepts/prove-verify"
         ]
+      },
+      {
+        "group": "Learn More",
+        "pages": ["more/roadmap", "more/contribute"]
       }
     ]
   },
