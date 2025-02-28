@@ -19,7 +19,12 @@
           },
           {
             "group": "Concepts",
-            "pages": ["concepts/integrity", "concepts/compilers", "concepts/operators"]
+            "pages": [
+              "concepts/integrity",
+              "concepts/compilers",
+              "concepts/operators",
+              "concepts/graph-tensor"
+            ]
           },
           {
             "group": "More",

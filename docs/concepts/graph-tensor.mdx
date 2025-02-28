@@ -1,0 +1,37 @@
+---
+title: GraphTensor
+description: The high-level interface for writing ML code, checked at compile time.
+---
+
+**GraphTensors** are a fundamental part of LuminAIR, serving as references to nodes within the computational graph. 
+They provide a high-level interface for defining machine learning models and operations, ensuring that all computations are checked at compile time.
+
+# Creating a GraphTensor
+To get started, you can create a `GraphTensor` by initializing a graph and adding tensor nodes:
+
+```rust
+let mut cx = Graph::new(); // Initialize a new computational graph
+let a: GraphTensor<R1<3>> = cx.tensor(); // Create a new tensor node in the graph
+```
+
+Here:
+- `Graph::new()` initializes a new computational graph.
+- `GraphTensor<R1<3>>` represents a tensor node with metadata about its shape (in this case, rank-1 with size 3).
+
+
+# Performing Operations with GraphTensors
+Once you have created `GraphTensors`, you can perform various linear algebra operations, similar to libraries like [PyTorch](https://pytorch.org/):
+
+```rust
+let b = a.exp().sqrt(); // Apply exponentiation and square root operations
+let c = b + a; // Add tensors b and a
+```
+
+Operations like `b + a` do not consume the original tensors (`a` and `b`). 
+Both remain available for reuse in subsequent operations. This is made possible because `GraphTensor` is a lightweight tracking structure that implements the `Copy` trait.
+
+This design allows operations on `GraphTensor` to construct a computational graph without immediate execution, so no values are assigned to the `GraphTensor` at this stage.
+Actual computations are postponed until `cx.gen_trace()` is invoked, which enables the compiler to optimize the execution process effectively.
+
+
+For more details on how to build, run, and prove graphs, check out this [guide](/quick-start).
