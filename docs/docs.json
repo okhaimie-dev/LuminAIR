@@ -29,8 +29,8 @@
             ]
           },
           {
-            "group": "More",
-            "pages": ["more/roadmap"]
+            "group": "Learn More",
+            "pages": ["more/roadmap", "more/contribute"]
           }
         ]
       }
