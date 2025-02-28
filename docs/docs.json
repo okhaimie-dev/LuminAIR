@@ -24,7 +24,8 @@
               "concepts/compilers",
               "concepts/operators",
               "concepts/graph-tensor",
-              "concepts/shape-tracking"
+              "concepts/shape-tracking",
+              "concepts/prove-verify"
             ]
           },
           {

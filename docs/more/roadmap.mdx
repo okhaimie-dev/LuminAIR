@@ -68,11 +68,11 @@ This phase aims to bring LuminAIR proofs into decentralized ecosystems and enhan
   <Accordion title="Onchain Proof Verification">
     Deploy the LuminAIR verifier as a smart contract for decentralized proof verification.
     Possible approaches include:
-	- Implementing the verifier as a Cairo program verified on Starknet.
-	- Leveraging Ethereum’s crypto-economic security via AVS networks like Aligned Layer.
+	- Implementing the verifier as a [Cairo](https://www.cairo-lang.org/) program verified on Starknet.
+	- Leveraging Ethereum’s crypto-economic security via [AVSs](https://app.eigenlayer.xyz/avs) networks like [Aligned Layer](https://alignedlayer.com/).
   </Accordion>
   <Accordion title="Support for Icicle-Stwo Backend (GPU Acceleration)">
-    Integrate support for Icicle-Stwo, which enables GPU acceleration via CUDA backends.
+    Integrate support for [Icicle-Stwo](https://github.com/ingonyama-zk/icicle-stwo), which enables GPU acceleration via CUDA backends.
     This will significantly improve the speed of proof generation for large-scale models  
   </Accordion>
 </AccordionGroup>
@@ -80,5 +80,5 @@ This phase aims to bring LuminAIR proofs into decentralized ecosystems and enhan
 # 🔒 Phase 4: Future Enhancements
 Details for this phase are yet to be finalized but may include:
 - Support for ONNX graph.
-- Scaling support for larger models.
+- Continuation mechanism, allowing the proof to be divided into several parts that can be proved in parallel.
 - Expanding compatibility with additional ZK backends.
