@@ -1,31 +1,15 @@
 # LuminAIR - Unlocking AI Integrity
 
-LuminAIR is a Machine Learning framework that leverages [Circle Stark Proofs](https://eprint.iacr.org/2024/278) to ensure the integrity of computational graphs. It allows a prover to cryptographically demonstrate that a computational graph has been executed correctly. A verifier can then validate this proof using fewer resources than re-executing the graph.
+LuminAIR is a Machine Learning framework that leverages [Circle STARK Proofs](https://eprint.iacr.org/2024/278) to ensure the integrity of computational graphs.
 
-> **⚠️ Disclaimer:** LuminAIR is currently under development 🏗️.
+It allows provers to cryptographically demonstrate that a computational graph has been executed correctly, 
+while verifiers can validate these proofs with significantly fewer resources than re-executing the graph.
 
-## RISC-style architecture
+This makes it ideal for applications where trustlessness and integrity are paramount, such as healthcare, finance, decentralized protocols and verifiable agents.
 
-In its initial phase, LuminAIR supports a primitive set of 11 operators, sufficient to cover a large type of models (linear regression, convolutional networks, transformers, ...).
+> **⚠️ Disclaimer:** LuminAIR is currently under active development 🏗️.
 
-| Operator   | Status |
-| ---------- | ------ |
-| Log2       | ⏳     |
-| Exp2       | ⏳     |
-| Sin        | ⏳     |
-| Sqrt       | ⏳     |
-| Recip      | ⏳     |
-| Add        | ✅     |
-| Mul        | ✅     |
-| Mod        | ⏳     |
-| LessThan   | ⏳     |
-| SumReduce  | ⏳     |
-| MaxReduce  | ⏳     |
-| Contiguous | ✅     |
-
-Future phases will focus on adding fused and specialized operators for improved efficiency.
-
-## Example
+## Quick Start
 
 To see LuminAIR in action, run the provided example:
 
@@ -47,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let w = cx.tensor((2, 2)).set(vec![-1.0, -1.0, -1.0, -1.0]);
 
     // Build computation graph
-    let c = a + b;
+    let c = a * b;
     let mut d = (c + w).retrieve();
 
     // Compile the computation graph
@@ -63,6 +47,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Documentation
+You can check our official documentation [here](https://luminair.gizatech.xyz/).
+
+## Roadmap
+You can check our roadmap to unlock ML integrity [here](http://localhost:3000/more/roadmap).
+
+## Contribute
+Contribute to LuminAIR and be rewarded via [OnlyDust](https://app.onlydust.com/projects/giza/overview).
+
+Check the contribution guideline [here](https://luminair.gizatech.xyz/more/contribute)
+
+## Benchmarks
+Check performance benchmarks for LuminAIR operators [here](https://luminair.gizatech.xyz/more/benchmarks).
 
 ## Acknowledgements
 
