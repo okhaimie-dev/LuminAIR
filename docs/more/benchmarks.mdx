@@ -1,0 +1,32 @@
+---
+title: Benchmarks
+description: Performance benchmarks for LuminAIR operations.
+---
+
+# LuminAIR Performance Benchmarks
+
+This page shows the performance benchmarks for core LuminAIR operations, including trace generation, proof generation, and verification times.
+
+<div className="full-width-container" style={{position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden'}}>
+  <iframe 
+    src="https://gizatechxyz.github.io/LuminAIR/bench/" 
+    style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none'}}
+    title="LuminAIR Benchmarks"
+    allowFullScreen>
+  </iframe>
+</div>
+
+## Understanding the Benchmarks
+
+These benchmarks track the performance of key operations for each implemented [operator](/concepts/operators).
+
+The benchmarks are run on every commit to the main branch, allowing us to track performance improvements or regressions over time.
+
+## Benchmark Environment
+
+All benchmarks are run in GitHub Actions using the following configuration:
+- Ubuntu latest runner
+- Rust nightly toolchain
+- Criterion.rs benchmark framework
+
+For more details on our benchmarking setup, see the [benchmark.yml](https://github.com/gizatechxyz/LuminAIR/blob/master/.github/workflows/benchmark.yml) workflow configuration.

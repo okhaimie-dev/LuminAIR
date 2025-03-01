@@ -34,7 +34,7 @@
       },
       {
         "group": "Learn More",
-        "pages": ["more/roadmap", "more/contribute"]
+        "pages": ["more/roadmap", "more/contribute", "more/benchmarks"]
       }
     ]
   },

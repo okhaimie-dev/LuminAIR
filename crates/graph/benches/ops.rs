@@ -32,94 +32,112 @@ macro_rules! create_graph {
 
 /// Benchmark for Add operator: trace generation.
 fn benchmark_add_trace_generation(c: &mut Criterion) {
-    c.bench_function("Add Trace Generation", |b| {
-        b.iter(|| {
-            let mut graph = create_graph!(|a, b| a + b, (32, 32), (32, 32));
-            let _trace = graph.gen_trace();
-        })
-    });
+    c.bench_function(
+        "Trace Generation of Add operator on tensors (32, 32), (32, 32)",
+        |b| {
+            b.iter(|| {
+                let mut graph = create_graph!(|a, b| a + b, (32, 32), (32, 32));
+                let _trace = graph.gen_trace();
+            })
+        },
+    );
 }
 
 /// Benchmark for Add operator: proof generation.
 fn benchmark_add_prove(c: &mut Criterion) {
-    c.bench_function("Add Prove", |b| {
-        b.iter_with_setup(
-            || {
-                // Setup: Create graph and generate trace
-                let mut graph = create_graph!(|a, b| a + b, (32, 32), (32, 32));
-                let trace = graph.gen_trace();
-                (graph, trace)
-            },
-            |(mut graph, trace)| {
-                let _proof = graph.prove(trace).expect("Proof generation failed");
-            },
-        )
-    });
+    c.bench_function(
+        "Proving of Add operator on tensors (32, 32), (32, 32)",
+        |b| {
+            b.iter_with_setup(
+                || {
+                    // Setup: Create graph and generate trace
+                    let mut graph = create_graph!(|a, b| a + b, (32, 32), (32, 32));
+                    let trace = graph.gen_trace();
+                    (graph, trace)
+                },
+                |(mut graph, trace)| {
+                    let _proof = graph.prove(trace).expect("Proof generation failed");
+                },
+            )
+        },
+    );
 }
 
 /// Benchmark for Add operator: proof verification.
 fn benchmark_add_verify(c: &mut Criterion) {
-    c.bench_function("Add Verify", |b| {
-        b.iter_with_setup(
-            || {
-                // Setup: Create graph, generate trace, and create proof
-                let mut graph = create_graph!(|a, b| a + b, (32, 32), (32, 32));
-                let trace = graph.gen_trace();
-                let proof = graph.prove(trace).expect("Proof generation failed");
-                (graph, proof)
-            },
-            |(graph, proof)| {
-                graph.verify(proof).expect("Proof verification failed");
-            },
-        )
-    });
+    c.bench_function(
+        "Proof verification of Add operator on tensors (32, 32), (32, 32)",
+        |b| {
+            b.iter_with_setup(
+                || {
+                    // Setup: Create graph, generate trace, and create proof
+                    let mut graph = create_graph!(|a, b| a + b, (32, 32), (32, 32));
+                    let trace = graph.gen_trace();
+                    let proof = graph.prove(trace).expect("Proof generation failed");
+                    (graph, proof)
+                },
+                |(graph, proof)| {
+                    graph.verify(proof).expect("Proof verification failed");
+                },
+            )
+        },
+    );
 }
 
 // =============== MUL OPERATOR BENCHMARKS ===============
 
 /// Benchmark for Mul operator: trace generation.
 fn benchmark_mul_trace_generation(c: &mut Criterion) {
-    c.bench_function("Mul Trace Generation", |b| {
-        b.iter(|| {
-            let mut graph = create_graph!(|a, b| a * b, (32, 32), (32, 32));
-            let _trace = graph.gen_trace();
-        })
-    });
+    c.bench_function(
+        "Trace Generation of Mul operator on tensors (32, 32), (32, 32)",
+        |b| {
+            b.iter(|| {
+                let mut graph = create_graph!(|a, b| a * b, (32, 32), (32, 32));
+                let _trace = graph.gen_trace();
+            })
+        },
+    );
 }
 
 /// Benchmark for Mul operator: proof generation.
 fn benchmark_mul_prove(c: &mut Criterion) {
-    c.bench_function("Mul Prove", |b| {
-        b.iter_with_setup(
-            || {
-                // Setup: Create graph and generate trace
-                let mut graph = create_graph!(|a, b| a * b, (32, 32), (32, 32));
-                let trace = graph.gen_trace();
-                (graph, trace)
-            },
-            |(mut graph, trace)| {
-                let _proof = graph.prove(trace).expect("Proof generation failed");
-            },
-        )
-    });
+    c.bench_function(
+        "Proving of Mul operator on tensors (32, 32), (32, 32)",
+        |b| {
+            b.iter_with_setup(
+                || {
+                    // Setup: Create graph and generate trace
+                    let mut graph = create_graph!(|a, b| a * b, (32, 32), (32, 32));
+                    let trace = graph.gen_trace();
+                    (graph, trace)
+                },
+                |(mut graph, trace)| {
+                    let _proof = graph.prove(trace).expect("Proof generation failed");
+                },
+            )
+        },
+    );
 }
 
 /// Benchmark for Mul operator: proof verification.
 fn benchmark_mul_verify(c: &mut Criterion) {
-    c.bench_function("Mul Verify", |b| {
-        b.iter_with_setup(
-            || {
-                // Setup: Create graph, generate trace, and create proof
-                let mut graph = create_graph!(|a, b| a * b, (32, 32), (32, 32));
-                let trace = graph.gen_trace();
-                let proof = graph.prove(trace).expect("Proof generation failed");
-                (graph, proof)
-            },
-            |(graph, proof)| {
-                graph.verify(proof).expect("Proof verification failed");
-            },
-        )
-    });
+    c.bench_function(
+        "Proof verification of Mul operator on tensors (32, 32), (32, 32)",
+        |b| {
+            b.iter_with_setup(
+                || {
+                    // Setup: Create graph, generate trace, and create proof
+                    let mut graph = create_graph!(|a, b| a * b, (32, 32), (32, 32));
+                    let trace = graph.gen_trace();
+                    let proof = graph.prove(trace).expect("Proof generation failed");
+                    (graph, proof)
+                },
+                |(graph, proof)| {
+                    graph.verify(proof).expect("Proof verification failed");
+                },
+            )
+        },
+    );
 }
 
 criterion_group!(
