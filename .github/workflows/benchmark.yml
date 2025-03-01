@@ -26,108 +26,14 @@ jobs:
       - name: Run benchmark
         run: |
           cd crates/graph
-          cargo bench --bench ops
-
-      - name: Process benchmark results
-        run: |
-          # Process the Criterion benchmark results into format compatible with github-action-benchmark
-          python3 -c '
-          import json
-          import os
-          import glob
-          import re
-
-          try:
-              # Look for the Criterion benchmark results with improved debugging
-              benchmark_files = glob.glob("crates/graph/target/criterion/**/new/estimates.json", recursive=True)
-              print(f"Found {len(benchmark_files)} benchmark files")
-              
-              benchmarks = []
-              for file in benchmark_files:
-                  try:
-                      with open(file, "r") as f:
-                          data = json.load(f)
-                      
-                      # Extract benchmark name from path using regex
-                      # This handles paths like "Add Prove/new/estimates.json" or "Add/Prove/new/estimates.json"
-                      match = re.search(r'criterion/([^/]+(?:/[^/]+)?)/', file)
-                      if match:
-                          name = match.group(1).replace('/', ' ')
-                          print(f"Processing benchmark: {name}")
-                          
-                          # Extract mean estimate
-                          if "mean" in data and "point_estimate" in data["mean"]:
-                              mean = data["mean"]["point_estimate"]
-                              benchmarks.append({
-                                  "name": name,
-                                  "value": mean / 1e9,  # Convert to seconds
-                                  "unit": "s"
-                              })
-                              print(f"Added benchmark {name}: {mean / 1e9} seconds")
-                          else:
-                              print(f"Warning: No mean point_estimate found in {file}")
-                      else:
-                          print(f"Warning: Could not extract benchmark name from {file}")
-                  except (json.JSONDecodeError, KeyError) as e:
-                      print(f"Error processing {file}: {e}")
-                      continue
-              
-              if not benchmarks:
-                  print("No benchmarks found! Check that Criterion is generating results correctly.")
-                  # List directory content for debugging
-                  print("Listing target/criterion directory:")
-                  criterion_dirs = glob.glob("crates/graph/target/criterion/*")
-                  for d in criterion_dirs:
-                      print(f"  - {d}")
-                  
-                  benchmarks = [{"name": "example", "value": 1.0, "unit": "s"}]
-              
-              # Print summary
-              print(f"Total benchmarks processed: {len(benchmarks)}")
-              for b in benchmarks:
-                  print(f"  - {b['name']}: {b['value']} {b['unit']}")
-              
-              # Write to expected format for github-action-benchmark
-              with open("benchmark_results.json", "w") as f:
-                  json.dump(benchmarks, f)
-                  print(f"Wrote benchmark results to benchmark_results.json")
-          except Exception as e:
-              print(f"Error: {e}")
-              # Write a fallback benchmark to avoid CI failure
-              with open("benchmark_results.json", "w") as f:
-                  json.dump([{"name": "error", "value": 1.0, "unit": "s"}], f)
-                  print("Wrote fallback benchmark due to error")
-          '
-
-      - name: Prepare gh-pages branch
-        run: |
-          # Configure git
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-
-          # Fetch gh-pages branch if it exists, create it if it doesn't
-          if git fetch origin gh-pages; then
-            # Branch exists remotely, create a local tracking branch
-            git branch gh-pages origin/gh-pages
-          else
-            # Branch doesn't exist, create an orphan branch
-            git checkout --orphan gh-pages
-            git reset --hard
-            mkdir -p bench
-            touch bench/.gitkeep
-            git add bench/.gitkeep
-            git commit -m "Initialize gh-pages branch with bench directory"
-            git push origin gh-pages
-            # Go back to the original branch
-            git checkout -
-          fi
+          cargo bench --bench ops -- --output-format bencher | tee output.txt
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: LuminAIR Benchmarks
-          tool: "customSmallerIsBetter"
-          output-file-path: benchmark_results.json
+          tool: "cargo"
+          output-file-path: crates/graph/output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           alert-threshold: "150%"
