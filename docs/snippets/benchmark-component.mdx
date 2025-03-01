@@ -1,0 +1,219 @@
+export const BenchmarkChart = () => {
+  // Function for generating bar charts
+  const BarChart = ({ title, data, height, maxValue, colorA, colorB }) => {
+    const chartWidth = 720;
+    const chartHeight = height || 180;
+    const padding = { top: 40, right: 20, bottom: 40, left: 80 };
+    const innerWidth = chartWidth - padding.left - padding.right;
+    const innerHeight = chartHeight - padding.top - padding.bottom;
+    
+    // Format large numbers
+    const formatNumber = (num) => {
+      if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+      return num.toString();
+    };
+    
+    return (
+      <div className="mb-6 border rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+        <div className="p-4 border-b dark:border-gray-700">
+          <h3 className="font-bold text-lg">{title}</h3>
+        </div>
+        <div className="p-4">
+          <svg width="100%" height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="overflow-visible">
+            {/* Title */}
+            <text 
+              x={padding.left + innerWidth / 2} 
+              y={20} 
+              textAnchor="middle" 
+              className="fill-gray-700 dark:fill-gray-300 text-sm font-medium"
+            >
+              Last 3 commits (most recent on left)
+            </text>
+            
+            {/* Y-axis line */}
+            <line 
+              x1={padding.left} 
+              y1={padding.top} 
+              x2={padding.left} 
+              y2={chartHeight - padding.bottom} 
+              stroke="#9CA3AF" 
+              strokeWidth="1"
+            />
+            
+            {/* X-axis line */}
+            <line 
+              x1={padding.left} 
+              y1={chartHeight - padding.bottom} 
+              x2={chartWidth - padding.right} 
+              y2={chartHeight - padding.bottom} 
+              stroke="#9CA3AF" 
+              strokeWidth="1"
+            />
+            
+            {/* Y-axis labels */}
+            {[0, 0.25, 0.5, 0.75, 1].map((tick, i) => {
+              const y = padding.top + innerHeight * (1 - tick);
+              return (
+                <g key={i}>
+                  <line 
+                    x1={padding.left - 5} 
+                    y1={y} 
+                    x2={padding.left} 
+                    y2={y} 
+                    stroke="#9CA3AF" 
+                    strokeWidth="1"
+                  />
+                  <text 
+                    x={padding.left - 10} 
+                    y={y + 4} 
+                    textAnchor="end" 
+                    className="fill-gray-600 dark:fill-gray-400 text-xs"
+                  >
+                    {formatNumber(maxValue * tick)}
+                  </text>
+                  <line 
+                    x1={padding.left} 
+                    y1={y} 
+                    x2={chartWidth - padding.right} 
+                    y2={y} 
+                    stroke="#E5E7EB" 
+                    strokeWidth="1"
+                    strokeDasharray="4,4"
+                  />
+                </g>
+              );
+            })}
+            
+            {/* Bars */}
+            {data.map((group, groupIndex) => {
+              const barWidth = (innerWidth / data.length / 2) - 10;
+              const groupWidth = innerWidth / data.length;
+              const groupX = padding.left + groupIndex * groupWidth;
+              
+              return (
+                <g key={groupIndex}>
+                  {/* Group label */}
+                  <text 
+                    x={groupX + groupWidth/2} 
+                    y={chartHeight - padding.bottom + 20} 
+                    textAnchor="middle" 
+                    className="fill-gray-600 dark:fill-gray-400 text-xs"
+                  >
+                    Commit {3 - groupIndex}
+                  </text>
+                  
+                  {/* Add operator bar */}
+                  <g>
+                    <rect 
+                      x={groupX + 10} 
+                      y={chartHeight - padding.bottom - (innerHeight * (group.add / maxValue))}
+                      width={barWidth}
+                      height={innerHeight * (group.add / maxValue)}
+                      fill={colorA || "#3B82F6"}
+                      rx="3"
+                    />
+                    <text 
+                      x={groupX + 10 + barWidth/2} 
+                      y={chartHeight - padding.bottom - (innerHeight * (group.add / maxValue)) - 10}
+                      textAnchor="middle" 
+                      className="fill-gray-700 dark:fill-gray-300 text-xs font-medium"
+                    >
+                      {formatNumber(group.add)}
+                    </text>
+                  </g>
+                  
+                  {/* Multiply operator bar */}
+                  <g>
+                    <rect 
+                      x={groupX + barWidth + 20} 
+                      y={chartHeight - padding.bottom - (innerHeight * (group.mul / maxValue))}
+                      width={barWidth}
+                      height={innerHeight * (group.mul / maxValue)}
+                      fill={colorB || "#F97316"}
+                      rx="3"
+                    />
+                    <text 
+                      x={groupX + barWidth + 20 + barWidth/2} 
+                      y={chartHeight - padding.bottom - (innerHeight * (group.mul / maxValue)) - 10}
+                      textAnchor="middle" 
+                      className="fill-gray-700 dark:fill-gray-300 text-xs font-medium"
+                    >
+                      {formatNumber(group.mul)}
+                    </text>
+                  </g>
+                </g>
+              );
+            })}
+            
+            {/* Legend */}
+            <g transform={`translate(${padding.left}, 20)`}>
+              {/* Add operator */}
+              <rect x="0" y="0" width="12" height="12" fill={colorA || "#3B82F6"} rx="2" />
+              <text x="20" y="10" className="fill-gray-700 dark:fill-gray-300 text-xs">Add Operator</text>
+              
+              {/* Multiply operator */}
+              <rect x="100" y="0" width="12" height="12" fill={colorB || "#F97316"} rx="2" />
+              <text x="120" y="10" className="fill-gray-700 dark:fill-gray-300 text-xs">Multiply Operator</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    );
+  };
+  
+  // Sample data for the charts
+  const traceGenData = [
+    { add: 95918, mul: 1258696 },
+    { add: 98000, mul: 1300000 },
+    { add: 105000, mul: 1350000 }
+  ];
+  
+  const proofGenData = [
+    { add: 13050958, mul: 13123327 },
+    { add: 13200000, mul: 13300000 },
+    { add: 13500000, mul: 13600000 }
+  ];
+  
+  const verificationData = [
+    { add: 258133, mul: 255627 },
+    { add: 260000, mul: 257000 },
+    { add: 265000, mul: 262000 }
+  ];
+  
+  return (
+    <div className="my-6">
+      <BarChart 
+        title="Trace Generation Time Trend" 
+        data={traceGenData} 
+        maxValue={1400000}
+        colorA="#3B82F6"
+        colorB="#F97316"
+      />
+      
+      <BarChart 
+        title="Proof Generation Time Trend" 
+        data={proofGenData} 
+        maxValue={14000000}
+        colorA="#2563EB"
+        colorB="#EA580C"
+      />
+      
+      <BarChart 
+        title="Verification Time Trend" 
+        data={verificationData} 
+        maxValue={300000}
+        colorA="#60A5FA"
+        colorB="#FDBA74"
+      />
+      
+      <div className="mt-4 text-sm text-gray-500">
+        <p>Last updated: March 1, 2025</p>
+        <p>
+          Showing trend data from the last 3 commits, with the most recent commit on the left.
+          Data is collected from benchmark runs on Ubuntu with Rust nightly.
+        </p>
+      </div>
+    </div>
+  );
+};
