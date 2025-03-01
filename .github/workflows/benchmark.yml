@@ -76,12 +76,34 @@ jobs:
                   json.dump([{"name": "error", "value": 1.0, "unit": "s"}], f)
           '
 
+      - name: Prepare gh-pages branch
+        run: |
+          # Configure git
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+          # Fetch gh-pages branch if it exists, create it if it doesn't
+          if git fetch origin gh-pages; then
+            # Branch exists remotely, create a local tracking branch
+            git branch gh-pages origin/gh-pages
+          else
+            # Branch doesn't exist, create an orphan branch
+            git checkout --orphan gh-pages
+            git reset --hard
+            mkdir -p bench
+            touch bench/.gitkeep
+            git add bench/.gitkeep
+            git commit -m "Initialize gh-pages branch with bench directory"
+            git push origin gh-pages
+            # Go back to the original branch
+            git checkout -
+          fi
+
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: LuminAIR Benchmarks
-          skip-fetch-gh-pages: true 
-          tool: "customSmallerIsBetter" # Using custom JSON format
+          tool: "customSmallerIsBetter"
           output-file-path: benchmark_results.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
@@ -89,6 +111,5 @@ jobs:
           comment-on-alert: true
           fail-on-alert: false
           alert-comment-cc-users: "@gizatechxyz"
-          # GitHub Pages configuration
           gh-pages-branch: gh-pages
           benchmark-data-dir-path: bench
