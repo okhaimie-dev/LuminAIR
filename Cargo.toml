@@ -12,7 +12,7 @@ license = "MIT"
 stwo-prover = { git = "https://github.com/starkware-libs/stwo.git", rev = "36b17ac" }
 luminal = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "80ae0fd" }
 
-numerair = { git = "https://github.com/gizatechxyz/NumerAir.git", rev = "98c54bf" }
+numerair = { git = "https://github.com/gizatechxyz/NumerAir.git", rev = "c898fc6" }
 rayon = "1.10.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
