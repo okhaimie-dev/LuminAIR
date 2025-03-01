@@ -26,25 +26,7 @@ jobs:
       - name: Run benchmark
         run: |
           cd crates/graph
-          cargo bench --bench ops -- --output-format bencher | tee raw_output.txt
-
-          # Create a conversion script
-          cat > convert.awk << 'EOF'
-          /bench:/ {
-            match($0, /bench:[[:space:]]+([0-9]+) ns\/iter/, ns)
-            if (ns[1] != "") {
-              ms = ns[1] / 1000000
-              sub(/bench:[[:space:]]+[0-9]+ ns\/iter/, sprintf("bench: %.3f ms/iter", ms))
-            }
-          }
-          { print }
-          EOF
-
-          # Convert nanoseconds to milliseconds using awk
-          awk -f convert.awk raw_output.txt > output.txt
-
-          # Display the converted output
-          cat output.txt
+          cargo bench --bench ops -- --output-format bencher | tee output.txt
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
