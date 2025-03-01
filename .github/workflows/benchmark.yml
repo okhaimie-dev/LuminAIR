@@ -35,10 +35,12 @@ jobs:
           import json
           import os
           import glob
+          import re
 
           try:
-              # Look for the Criterion benchmark results
+              # Look for the Criterion benchmark results with improved debugging
               benchmark_files = glob.glob("crates/graph/target/criterion/**/new/estimates.json", recursive=True)
+              print(f"Found {len(benchmark_files)} benchmark files")
               
               benchmarks = []
               for file in benchmark_files:
@@ -46,10 +48,13 @@ jobs:
                       with open(file, "r") as f:
                           data = json.load(f)
                       
-                      # Extract benchmark name from path
-                      path_parts = file.split(os.sep)
-                      if len(path_parts) > 3:
-                          name = path_parts[3]
+                      # Extract benchmark name from path using regex
+                      # This handles paths like "Add Prove/new/estimates.json" or "Add/Prove/new/estimates.json"
+                      match = re.search(r'criterion/([^/]+(?:/[^/]+)?)/', file)
+                      if match:
+                          name = match.group(1).replace('/', ' ')
+                          print(f"Processing benchmark: {name}")
+                          
                           # Extract mean estimate
                           if "mean" in data and "point_estimate" in data["mean"]:
                               mean = data["mean"]["point_estimate"]
@@ -58,22 +63,40 @@ jobs:
                                   "value": mean / 1e9,  # Convert to seconds
                                   "unit": "s"
                               })
+                              print(f"Added benchmark {name}: {mean / 1e9} seconds")
+                          else:
+                              print(f"Warning: No mean point_estimate found in {file}")
+                      else:
+                          print(f"Warning: Could not extract benchmark name from {file}")
                   except (json.JSONDecodeError, KeyError) as e:
                       print(f"Error processing {file}: {e}")
                       continue
               
               if not benchmarks:
-                  print("No benchmarks found!")
+                  print("No benchmarks found! Check that Criterion is generating results correctly.")
+                  # List directory content for debugging
+                  print("Listing target/criterion directory:")
+                  criterion_dirs = glob.glob("crates/graph/target/criterion/*")
+                  for d in criterion_dirs:
+                      print(f"  - {d}")
+                  
                   benchmarks = [{"name": "example", "value": 1.0, "unit": "s"}]
+              
+              # Print summary
+              print(f"Total benchmarks processed: {len(benchmarks)}")
+              for b in benchmarks:
+                  print(f"  - {b['name']}: {b['value']} {b['unit']}")
               
               # Write to expected format for github-action-benchmark
               with open("benchmark_results.json", "w") as f:
                   json.dump(benchmarks, f)
+                  print(f"Wrote benchmark results to benchmark_results.json")
           except Exception as e:
               print(f"Error: {e}")
               # Write a fallback benchmark to avoid CI failure
               with open("benchmark_results.json", "w") as f:
                   json.dump([{"name": "error", "value": 1.0, "unit": "s"}], f)
+                  print("Wrote fallback benchmark due to error")
           '
 
       - name: Prepare gh-pages branch
