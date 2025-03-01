@@ -1,4 +1,8 @@
-# LuminAIR - Unlocking AI Integrity
+# LuminAIR
+
+<div align="center">
+  <img src="docs/images/hero.png" style="width: 70%; height: auto;">
+</div>
 
 LuminAIR is a Machine Learning framework that leverages [Circle STARK Proofs](https://eprint.iacr.org/2024/278) to ensure the integrity of computational graphs.
 
