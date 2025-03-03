@@ -42,4 +42,3 @@ jobs:
           alert-comment-cc-users: "@gizatechxyz"
           gh-pages-branch: gh-pages
           benchmark-data-dir-path: bench
-          time-unit: "micro"
