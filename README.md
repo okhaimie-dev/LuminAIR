@@ -1,21 +1,37 @@
-# LuminAIR - Unlock ML Integrity
+# LuminAIR
 
 <div align="center">
   <img src="docs/images/gh-banner.png" style="width: 70%; height: auto;">
   </br>
+</div>
+
+<div align="center">
+  <h3>
+    <a href="https://luminair.gizatech.xyz/welcome">
+      Documentation
+    </a>
+    <span> | </span>
+    <a href="https://luminair.gizatech.xyz/more/roadmap">
+      Roadmap
+    </a>
+    <span> | </span>
+    <a href="https://luminair.gizatech.xyz/more/benchmarks">
+      Benchmarks
+    </a>
+  </h3>
   </br>
 </div>
 
-LuminAIR is a Machine Learning framework that leverages [Circle STARK Proofs](https://eprint.iacr.org/2024/278) to ensure the integrity of computational graphs.
+LuminAIR is a **Machine Learning** framework that leverages [Circle STARK Proofs](https://eprint.iacr.org/2024/278) to ensure the integrity of computational graphs.
 
-It allows provers to cryptographically demonstrate that a computational graph has been executed correctly, 
+It allows provers to cryptographically demonstrate that a computational graph has been executed correctly,
 while verifiers can validate these proofs with significantly fewer resources than re-executing the graph.
 
 This makes it ideal for applications where trustlessness and integrity are paramount, such as healthcare, finance, decentralized protocols and verifiable agents.
 
 > **⚠️ Disclaimer:** LuminAIR is currently under active development 🏗️.
 
-## Quick Start
+## 🚀 Quick Start
 
 To see LuminAIR in action, run the provided example:
 
@@ -54,18 +70,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Documentation
+## 📖 Documentation
+
 You can check our official documentation [here](https://luminair.gizatech.xyz/).
 
-## Roadmap
+## 🔮 Roadmap
+
 You can check our roadmap to unlock ML integrity [here](http://localhost:3000/more/roadmap).
 
-## Contribute
+## 🫶 Contribute
+
 Contribute to LuminAIR and be rewarded via [OnlyDust](https://app.onlydust.com/projects/giza/overview).
 
 Check the contribution guideline [here](https://luminair.gizatech.xyz/more/contribute)
 
-## Benchmarks
+## 📊 Benchmarks
+
 Check performance benchmarks for LuminAIR operators [here](https://luminair.gizatech.xyz/more/benchmarks).
 
 ## Acknowledgements
