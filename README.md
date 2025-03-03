@@ -76,7 +76,7 @@ You can check our official documentation [here](https://luminair.gizatech.xyz/).
 
 ## 🔮 Roadmap
 
-You can check our roadmap to unlock ML integrity [here](http://localhost:3000/more/roadmap).
+You can check our roadmap to unlock ML integrity [here](https://luminair.gizatech.xyz/more/roadmap).
 
 ## 🫶 Contribute
 
