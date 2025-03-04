@@ -11,6 +11,7 @@ stwo-prover.workspace = true
 luminal.workspace = true
 rayon.workspace = true
 numerair.workspace = true
+thiserror.workspace = true
 luminair_air = { path = "../air" }
 
 [dev-dependencies]
