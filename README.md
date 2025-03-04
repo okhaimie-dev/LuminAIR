@@ -88,6 +88,17 @@ Check the contribution guideline [here](https://luminair.gizatech.xyz/more/contr
 
 Check performance benchmarks for LuminAIR operators [here](https://luminair.gizatech.xyz/more/benchmarks).
 
+## 💖 Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
 ## Acknowledgements
 
 A special thanks to the developers and maintainers of the foundational projects that make LuminAIR possible:
