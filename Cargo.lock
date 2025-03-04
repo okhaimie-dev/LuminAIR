@@ -1206,6 +1206,7 @@ dependencies = [
  "rand",
  "rayon",
  "stwo-prover",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -1352,7 +1353,7 @@ dependencies = [
 [[package]]
 name = "numerair"
 version = "0.1.0"
-source = "git+https://github.com/gizatechxyz/NumerAir.git?rev=af56d5d#af56d5db7c0e838b0c5f98ea6ee02e4539079493"
+source = "git+https://github.com/gizatechxyz/NumerAir.git?rev=b89fe29#b89fe29c58f431f364b406f46593ef879159a843"
 dependencies = [
  "bytemuck",
  "lazy_static",
@@ -1856,7 +1857,7 @@ dependencies = [
 [[package]]
 name = "stwo-prover"
 version = "0.1.1"
-source = "git+https://github.com/starkware-libs/stwo.git?rev=36b17ac#36b17ac3b3d66106dbe5268305a5812bcd490e5c"
+source = "git+https://github.com/starkware-libs/stwo.git?rev=8902113#8902113710a45672d068f847cb7aa72913265731"
 dependencies = [
  "blake2",
  "blake3",

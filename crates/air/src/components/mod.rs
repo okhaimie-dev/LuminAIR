@@ -8,7 +8,7 @@ use mul::{
 };
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
-    constraint_framework::{preprocessed_columns::PreprocessedColumn, TraceLocationAllocator},
+    constraint_framework::{preprocessed_columns::IsFirst, TraceLocationAllocator},
     core::{
         air::{Component, ComponentProver},
         backend::simd::SimdBackend,
@@ -185,7 +185,7 @@ impl LuminairComponents {
             &is_first_log_sizes
                 .iter()
                 .copied()
-                .map(PreprocessedColumn::IsFirst)
+                .map(|log_size| IsFirst::new(log_size).id())
                 .collect::<Vec<_>>(),
         );
 
@@ -197,7 +197,7 @@ impl LuminairComponents {
                 AddComponent::new(
                     tree_span_provider,
                     AddEval::new(cl, interaction_elements.node_lookup_elements.clone()),
-                    (int_cl.claimed_sum, None),
+                    int_cl.claimed_sum,
                 )
             })
             .collect();
@@ -210,7 +210,7 @@ impl LuminairComponents {
                 MulComponent::new(
                     tree_span_provider,
                     MulEval::new(cl, interaction_elements.node_lookup_elements.clone()),
-                    (int_cl.claimed_sum, None),
+                    int_cl.claimed_sum,
                 )
             })
             .collect();

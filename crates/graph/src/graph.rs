@@ -13,7 +13,7 @@ use luminair_air::{
 use luminal::prelude::*;
 use stwo_prover::{
     constraint_framework::{
-        preprocessed_columns::gen_is_first, INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX,
+        preprocessed_columns::IsFirst, INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX,
         PREPROCESSED_TRACE_IDX,
     },
     core::{
@@ -25,6 +25,16 @@ use stwo_prover::{
         vcs::blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
     },
 };
+use thiserror::Error;
+
+#[derive(Clone, Debug, Error)]
+pub enum LuminairError {
+    #[error(transparent)]
+    StwoVerifierError(#[from] VerificationError),
+
+    #[error("{0} lookup values do not match.")]
+    InvalidLookup(String),
+}
 
 /// Trait defining the core functionality of a LuminAIR computation graph.
 ///
@@ -44,7 +54,7 @@ pub trait LuminairGraph {
     ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError>;
 
     /// Verifies a proof to ensure integrity of graph’s computation.
-    fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), VerificationError>;
+    fn verify(&self, proof: LuminairProof<Blake2sMerkleHasher>) -> Result<(), LuminairError>;
 }
 
 impl LuminairGraph for Graph {
@@ -215,7 +225,7 @@ impl LuminairGraph for Graph {
             is_first_log_sizes
                 .iter()
                 .copied()
-                .map(gen_is_first::<SimdBackend>),
+                .map(|log_size| IsFirst::new(log_size).gen_column_simd()),
         );
 
         // Commit the preprocessed trace
@@ -322,7 +332,7 @@ impl LuminairGraph for Graph {
             proof,
             execution_resources,
         }: LuminairProof<Blake2sMerkleHasher>,
-    ) -> Result<(), VerificationError> {
+    ) -> Result<(), LuminairError> {
         // ┌──────────────────────────┐
         // │     Protocol Setup       │
         // └──────────────────────────┘
@@ -361,7 +371,7 @@ impl LuminairGraph for Graph {
 
         // Check that the lookup sum is valid, otherwise throw
         if !lookup_sum_valid(&interaction_claim) {
-            return Err(VerificationError::InvalidLookup(
+            return Err(LuminairError::InvalidLookup(
                 "Invalid LogUp sum".to_string(),
             ));
         };
@@ -385,6 +395,8 @@ impl LuminairGraph for Graph {
         );
         let components = component_builder.components();
 
-        verify(&components, channel, commitment_scheme_verifier, proof)
+        verify(&components, channel, commitment_scheme_verifier, proof)?;
+
+        Ok(())
     }
 }
