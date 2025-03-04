@@ -14,6 +14,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "zmalatrax",
+      "name": "malatrax",
+      "avatar_url": "https://avatars.githubusercontent.com/u/71888134?v=4",
+      "profile": "https://audithub.app",
+      "contributions": [
+        "doc"
+      ]
     }
   ],
   "contributorsPerLine": 7,
