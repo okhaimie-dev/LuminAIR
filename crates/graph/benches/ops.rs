@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, PlotConfiguration};
 use luminair_graph::{graph::LuminairGraph, StwoCompiler};
 use luminal::prelude::*;
 use rand::rngs::StdRng;
@@ -29,45 +29,47 @@ macro_rules! create_graph {
 }
 
 // =============== ADD OPERATOR BENCHMARKS ===============
+fn benchmark_add(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Add Operator");
+    group
+        .plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
 
-/// Benchmark for Add operator: trace generation.
-fn benchmark_add_trace_generation(c: &mut Criterion) {
-    c.bench_function(
-        "Trace Generation of Add operator on tensors (32, 32), (32, 32)",
-        |b| {
+    // Define the sizes to benchmark
+    let size = (32, 32);
+    let size_str = "(32, 32)";
+
+    // Trace generation benchmark
+    group.bench_with_input(
+        BenchmarkId::new("Trace Generation", size_str),
+        &size,
+        |b, &_size| {
             b.iter(|| {
                 let mut graph = create_graph!(|a, b| a + b, (32, 32), (32, 32));
                 let _trace = graph.gen_trace();
             })
         },
     );
-}
 
-/// Benchmark for Add operator: proof generation.
-fn benchmark_add_prove(c: &mut Criterion) {
-    c.bench_function(
-        "Proving of Add operator on tensors (32, 32), (32, 32)",
-        |b| {
-            b.iter_with_setup(
-                || {
-                    // Setup: Create graph and generate trace
-                    let mut graph = create_graph!(|a, b| a + b, (32, 32), (32, 32));
-                    let trace = graph.gen_trace();
-                    (graph, trace)
-                },
-                |(mut graph, trace)| {
-                    let _proof = graph.prove(trace).expect("Proof generation failed");
-                },
-            )
-        },
-    );
-}
+    // Proof generation benchmark
+    group.bench_with_input(BenchmarkId::new("Proving", size_str), &size, |b, &_size| {
+        b.iter_with_setup(
+            || {
+                // Setup: Create graph and generate trace
+                let mut graph = create_graph!(|a, b| a + b, (32, 32), (32, 32));
+                let trace = graph.gen_trace();
+                (graph, trace)
+            },
+            |(mut graph, trace)| {
+                let _proof = graph.prove(trace).expect("Proof generation failed");
+            },
+        )
+    });
 
-/// Benchmark for Add operator: proof verification.
-fn benchmark_add_verify(c: &mut Criterion) {
-    c.bench_function(
-        "Proof verification of Add operator on tensors (32, 32), (32, 32)",
-        |b| {
+    // Verification benchmark
+    group.bench_with_input(
+        BenchmarkId::new("Verification", size_str),
+        &size,
+        |b, &_size| {
             b.iter_with_setup(
                 || {
                     // Setup: Create graph, generate trace, and create proof
@@ -82,48 +84,52 @@ fn benchmark_add_verify(c: &mut Criterion) {
             )
         },
     );
+
+    group.finish();
 }
 
 // =============== MUL OPERATOR BENCHMARKS ===============
+fn benchmark_mul(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Mul Operator");
+    group
+        .plot_config(PlotConfiguration::default().summary_scale(criterion::AxisScale::Logarithmic));
 
-/// Benchmark for Mul operator: trace generation.
-fn benchmark_mul_trace_generation(c: &mut Criterion) {
-    c.bench_function(
-        "Trace Generation of Mul operator on tensors (32, 32), (32, 32)",
-        |b| {
+    // Define the sizes to benchmark
+    let size = (32, 32);
+    let size_str = "(32, 32)";
+
+    // Trace generation benchmark
+    group.bench_with_input(
+        BenchmarkId::new("Trace Generation", size_str),
+        &size,
+        |b, &_size| {
             b.iter(|| {
                 let mut graph = create_graph!(|a, b| a * b, (32, 32), (32, 32));
                 let _trace = graph.gen_trace();
             })
         },
     );
-}
 
-/// Benchmark for Mul operator: proof generation.
-fn benchmark_mul_prove(c: &mut Criterion) {
-    c.bench_function(
-        "Proving of Mul operator on tensors (32, 32), (32, 32)",
-        |b| {
-            b.iter_with_setup(
-                || {
-                    // Setup: Create graph and generate trace
-                    let mut graph = create_graph!(|a, b| a * b, (32, 32), (32, 32));
-                    let trace = graph.gen_trace();
-                    (graph, trace)
-                },
-                |(mut graph, trace)| {
-                    let _proof = graph.prove(trace).expect("Proof generation failed");
-                },
-            )
-        },
-    );
-}
+    // Proof generation benchmark
+    group.bench_with_input(BenchmarkId::new("Proving", size_str), &size, |b, &_size| {
+        b.iter_with_setup(
+            || {
+                // Setup: Create graph and generate trace
+                let mut graph = create_graph!(|a, b| a * b, (32, 32), (32, 32));
+                let trace = graph.gen_trace();
+                (graph, trace)
+            },
+            |(mut graph, trace)| {
+                let _proof = graph.prove(trace).expect("Proof generation failed");
+            },
+        )
+    });
 
-/// Benchmark for Mul operator: proof verification.
-fn benchmark_mul_verify(c: &mut Criterion) {
-    c.bench_function(
-        "Proof verification of Mul operator on tensors (32, 32), (32, 32)",
-        |b| {
+    // Verification benchmark
+    group.bench_with_input(
+        BenchmarkId::new("Verification", size_str),
+        &size,
+        |b, &_size| {
             b.iter_with_setup(
                 || {
                     // Setup: Create graph, generate trace, and create proof
@@ -138,15 +144,9 @@ fn benchmark_mul_verify(c: &mut Criterion) {
             )
         },
     );
+
+    group.finish();
 }
 
-criterion_group!(
-    benches,
-    benchmark_add_trace_generation,
-    benchmark_add_prove,
-    benchmark_add_verify,
-    benchmark_mul_trace_generation,
-    benchmark_mul_prove,
-    benchmark_mul_verify,
-);
+criterion_group!(benches, benchmark_add, benchmark_mul,);
 criterion_main!(benches);
