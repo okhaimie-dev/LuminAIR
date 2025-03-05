@@ -272,10 +272,6 @@ impl Compiler for PrimitiveCompiler {
                 *op_ref = LuminairMul::new().into_operator()
             } else if is::<luminal::op::Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
-            } else {
-                let is_function = is::<luminal::op::Function>(op);
-                println!("Is it Function: {:?}", is_function);
-                panic!("Operator not implemented yet!")
             }
         }
     }

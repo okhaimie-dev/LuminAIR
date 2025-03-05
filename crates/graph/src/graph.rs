@@ -1,4 +1,4 @@
-use crate::{data::StwoData, op::HasProcessTrace};
+use crate::op::HasProcessTrace;
 use luminair_air::{
     components::{
         add::{self, table::AddColumn},
@@ -43,9 +43,6 @@ pub enum LuminairError {
 pub trait LuminairGraph {
     /// Generates an execution trace for the graph’s computation.
     fn gen_trace(&mut self) -> LuminairPie;
-
-    /// Retrieves the output of a node as a vector of `f32` values.
-    fn get_output(&mut self, id: NodeIndex) -> Vec<f32>;
 
     /// Generates a proof of the graph’s execution using the provided trace.
     fn prove(
@@ -176,15 +173,6 @@ impl LuminairGraph for Graph {
                 max_log_size,
             },
         }
-    }
-
-    fn get_output(&mut self, id: NodeIndex) -> Vec<f32> {
-        if let Some(tensor) = self.tensors.remove(&(id, 0)) {
-            if let Some(data) = tensor.downcast_ref::<StwoData>() {
-                return data.to_f32();
-            }
-        }
-        panic!("No StwoData found for final output conversion");
     }
 
     fn prove(
