@@ -7,6 +7,7 @@ use luminair_air::{
 use luminal::prelude::*;
 
 pub(crate) mod prim;
+pub(crate) mod other;
 
 /// Defines an operator that generates execution traces for proof generation.
 ///

@@ -13,6 +13,7 @@ rayon.workspace = true
 numerair.workspace = true
 thiserror.workspace = true
 luminair_air = { path = "../air" }
+itertools = "0.14.0"
 
 [dev-dependencies]
 luminal_cpu = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "80ae0fd" }
