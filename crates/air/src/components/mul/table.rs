@@ -1,8 +1,9 @@
 use crate::{
     components::{InteractionClaim, MulClaim, NodeElements, TraceColumn, TraceError, TraceEval},
     pie::NodeInfo,
-    utils::calculate_log_size,
+    utils::{calculate_log_size, get_index},
 };
+use luminal::shape::Expression;
 use num_traits::{One, Zero};
 use numerair::packed::FixedPackedBaseField;
 use serde::{Deserialize, Serialize};
@@ -22,13 +23,14 @@ use stwo_prover::{
 pub fn trace_evaluation(
     lhs: &[FixedPackedBaseField],
     rhs: &[FixedPackedBaseField],
+    lexpr: &(Expression, Expression),
+    rexpr: &(Expression, Expression),
+    stack: &mut Vec<i64>,
+    out_data: &mut Vec<FixedPackedBaseField>,
     node_info: &NodeInfo,
-) -> (TraceEval, MulClaim, Vec<FixedPackedBaseField>) {
-    // Calculate actual size needed
-    let actual_size = lhs.len().max(rhs.len());
-
+) -> (TraceEval, MulClaim) {
     // Calculate log size
-    let log_size = calculate_log_size(actual_size);
+    let log_size = calculate_log_size(out_data.len());
 
     // Calculate trace size
     let trace_size = 1 << log_size;
@@ -39,9 +41,6 @@ pub fn trace_evaluation(
     // Instantiate trace
     let mut trace = Vec::with_capacity(MulColumn::count().0);
 
-    // Instantiate output vector
-    let mut output_vec = Vec::with_capacity(actual_size);
-
     // Create columns
     let mut lhs_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
     let mut rhs_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
@@ -50,9 +49,9 @@ pub fn trace_evaluation(
 
     // Fill columns
     for i in 0..trace_size {
-        if i < actual_size {
-            let lhs_val = lhs[i % lhs.len()];
-            let rhs_val = rhs[i % rhs.len()];
+        if i < out_data.len() {
+            let lhs_val = get_index(lhs, lexpr, stack, i);
+            let rhs_val = get_index(rhs, rexpr, stack, i);
             let (out_val, rem_val) = lhs_val * rhs_val;
 
             lhs_column.set(i, lhs_val.0.to_array()[0]);
@@ -60,7 +59,9 @@ pub fn trace_evaluation(
             out_column.set(i, out_val.0.to_array()[0]);
             rem_column.set(i, rem_val.0.to_array()[0]);
 
-            output_vec.push(out_val);
+            out_data[i] = out_val
+        } else {
+            break;
         }
     }
 
@@ -70,11 +71,7 @@ pub fn trace_evaluation(
     trace.push(CircleEvaluation::new(domain, out_column));
     trace.push(CircleEvaluation::new(domain, rem_column));
 
-    (
-        trace,
-        MulClaim::new(log_size, node_info.clone()),
-        output_vec,
-    )
+    (trace, MulClaim::new(log_size, node_info.clone()))
 }
 
 /// Enum representing the column indices in the Mul trace.

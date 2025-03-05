@@ -17,11 +17,47 @@ macro_rules! single_binary_test {
                 let mut cx = Graph::new();
                 let a = cx.tensor(($a_rows, $a_cols)).set(a_data.clone());
                 let b = cx.tensor(($b_rows, $b_cols)).set(b_data.clone());
+
+                // Use expand when dimensions don't match
+                let a_expanded = if $a_rows != $b_rows || $a_cols != $b_cols {
+                    if $a_rows == 1 && $a_cols == 1 {
+                        // Scalar broadcasting to match b's shape
+                        a.expand_to(($b_rows, $b_cols))
+                    } else if $a_rows == 1 {
+                        // Row vector broadcasting
+                        a.expand(0, $b_rows)
+                    } else if $a_cols == 1 {
+                        // Column vector broadcasting
+                        a.expand(1, $b_cols)
+                    } else {
+                        a
+                    }
+                } else {
+                    a
+                };
+
+                let b_expanded = if $a_rows != $b_rows || $a_cols != $b_cols {
+                    if $b_rows == 1 && $b_cols == 1 {
+                        // Scalar broadcasting to match a's shape
+                        b.expand_to(($a_rows, $a_cols))
+                    } else if $b_rows == 1 {
+                        // Row vector broadcasting
+                        b.expand(0, $a_rows)
+                    } else if $b_cols == 1 {
+                        // Column vector broadcasting
+                        b.expand(1, $a_cols)
+                    } else {
+                        b
+                    }
+                } else {
+                    b
+                };
+
                 let f: fn(GraphTensor, GraphTensor) -> GraphTensor = $func;
-                let mut c = f(a, b).retrieve();
+                let mut c = f(a_expanded, b_expanded).retrieve();
 
                 // Compilation and execution using StwoCompiler
-                let _ = cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut c);
+                cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut c);
                 let trace = cx.gen_trace();
                 let proof = cx.prove(trace).expect("Proof generation failed");
                 cx.verify(proof).expect("Proof verification failed");
@@ -32,8 +68,38 @@ macro_rules! single_binary_test {
                 let mut cx_cpu = Graph::new();
                 let a_cpu = cx_cpu.tensor(($a_rows, $a_cols)).set(a_data);
                 let b_cpu = cx_cpu.tensor(($b_rows, $b_cols)).set(b_data);
-                let mut c_cpu = f(a_cpu, b_cpu).retrieve();
-                let _ = cx_cpu.compile(<(GenericCompiler, CPUCompiler)>::default(), &mut c_cpu);
+
+                // Apply the same broadcasting logic to the CPU test
+                let a_cpu_expanded = if $a_rows != $b_rows || $a_cols != $b_cols {
+                    if $a_rows == 1 && $a_cols == 1 {
+                        a_cpu.expand_to(($b_rows, $b_cols))
+                    } else if $a_rows == 1 {
+                        a_cpu.expand(0, $b_rows)
+                    } else if $a_cols == 1 {
+                        a_cpu.expand(1, $b_cols)
+                    } else {
+                        a_cpu
+                    }
+                } else {
+                    a_cpu
+                };
+
+                let b_cpu_expanded = if $a_rows != $b_rows || $a_cols != $b_cols {
+                    if $b_rows == 1 && $b_cols == 1 {
+                        b_cpu.expand_to(($a_rows, $a_cols))
+                    } else if $b_rows == 1 {
+                        b_cpu.expand(0, $a_rows)
+                    } else if $b_cols == 1 {
+                        b_cpu.expand(1, $a_cols)
+                    } else {
+                        b_cpu
+                    }
+                } else {
+                    b_cpu
+                };
+
+                let mut c_cpu = f(a_cpu_expanded, b_cpu_expanded).retrieve();
+                cx_cpu.compile(<(GenericCompiler, CPUCompiler)>::default(), &mut c_cpu);
                 cx_cpu.execute();
                 // Retrieve CPU output
                 let cpu_output = c_cpu.data();
@@ -54,14 +120,12 @@ macro_rules! binary_test {
         $crate::single_binary_test!($func, $name, $type, (32, 32), (32, 32));
         // Test with tensors that have uneven dimensions
         $crate::single_binary_test!($func, $name, $type, (17, 13), (17, 13));
-
-        // TODO(@raphaelDkn): fix broadcasting rules.
         // Test broadcasting a scalar (1,1) to a larger tensor
-        // $crate::single_binary_test!($func, $name, $type, (1, 1), (5, 5));
+        $crate::single_binary_test!($func, $name, $type, (1, 1), (5, 5));
         // Test broadcasting a row vector to a matrix
-        // $crate::single_binary_test!($func, $name, $type, (1, 4), (3, 4));
+        $crate::single_binary_test!($func, $name, $type, (1, 4), (3, 4));
         // Test broadcasting a column vector to a matrix
-        // $crate::single_binary_test!($func, $name, $type, (3, 1), (3, 4));
+        $crate::single_binary_test!($func, $name, $type, (3, 1), (3, 4));
     };
 }
 

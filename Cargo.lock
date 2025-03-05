@@ -1210,6 +1210,7 @@ dependencies = [
  "luminair_air",
  "luminal",
  "luminal_cpu",
+ "num-traits",
  "numerair",
  "once_cell",
  "paste",
@@ -1363,7 +1364,7 @@ dependencies = [
 [[package]]
 name = "numerair"
 version = "0.1.0"
-source = "git+https://github.com/gizatechxyz/NumerAir.git?rev=b89fe29#b89fe29c58f431f364b406f46593ef879159a843"
+source = "git+https://github.com/gizatechxyz/NumerAir.git?rev=fbd647b#fbd647b54597bd7acc581303a1482827db4f125a"
 dependencies = [
  "bytemuck",
  "lazy_static",
