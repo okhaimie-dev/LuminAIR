@@ -43,30 +43,30 @@ pub fn trace_evaluation(
     // Instantiate output vector
     let mut output_vec = Vec::with_capacity(actual_size);
 
+    // Create columns
+    let mut lhs_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
+    let mut rhs_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
+    let mut out_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
+
     // Fill columns
-    for column_idx in 0..AddColumn::count().0 {
-        let mut column = Col::<SimdBackend, BaseField>::zeros(trace_size);
+    for i in 0..trace_size {
+        if i < actual_size {
+            let lhs_val = lhs[i % lhs.len()];
+            let rhs_val = rhs[i % rhs.len()];
+            let out_val = lhs_val + rhs_val;
 
-        for i in 0..trace_size {
-            if i < actual_size {
-                let lhs_val = lhs[i % lhs.len()];
-                let rhs_val = rhs[i % rhs.len()];
-                let out_val = lhs_val + rhs_val;
+            lhs_column.set(i, lhs_val.0.to_array()[0]);
+            rhs_column.set(i, rhs_val.0.to_array()[0]);
+            out_column.set(i, out_val.0.to_array()[0]);
 
-                match column_idx {
-                    0 => column.set(i, lhs_val.0.to_array()[0]),
-                    1 => column.set(i, rhs_val.0.to_array()[0]),
-                    2 => {
-                        column.set(i, out_val.0.to_array()[0]);
-                        output_vec.push(out_val);
-                    }
-                    _ => unreachable!(),
-                }
-            }
+            output_vec.push(out_val);
         }
-
-        trace.push(CircleEvaluation::new(domain, column));
     }
+
+    // Add columns to the trace
+    trace.push(CircleEvaluation::new(domain.clone(), lhs_column));
+    trace.push(CircleEvaluation::new(domain.clone(), rhs_column));
+    trace.push(CircleEvaluation::new(domain, out_column));
 
     (
         trace,
