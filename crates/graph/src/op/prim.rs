@@ -12,6 +12,7 @@ use luminal::{
     op::{Function as LFunction, *},
     prelude::{petgraph::visit::EdgeRef, *},
 };
+use numerair::packed::FixedPackedBaseField;
 
 use crate::{
     data::StwoData,
@@ -65,6 +66,38 @@ impl Operator for CopyFromStwo {
         // Convert StwoData to Vec<f32>
         let data = inp[0].0.borrowed().downcast_ref::<StwoData>().unwrap();
         vec![Tensor::new(data.to_f32())]
+    }
+}
+
+// ================== CONSTANT ================
+
+/// Implements a constant operator for LuminAIR.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LuminairConstant {
+    pub value: ConstantValue,
+}
+
+impl LuminairConstant {
+    /// Creates a new LuminairConstant with the given value.
+    pub fn new(value: ConstantValue) -> Self {
+        Self { value }
+    }
+}
+
+impl Operator for LuminairConstant {
+    fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        // Create a new tensor with the constant value
+        let value = match &self.value {
+            ConstantValue::Float(f) => *f,
+            ConstantValue::Expression(_expr) => {
+                panic!("Dynamic expressions not yet supported")
+            }
+        };
+
+        // Create and return a single element with the constant value
+        let mut data = Vec::with_capacity(1);
+        data.push(FixedPackedBaseField::broadcast_from_f64(value as f64));
+        vec![Tensor::new(StwoData(Arc::new(data)))]
     }
 }
 
@@ -266,7 +299,9 @@ impl Compiler for PrimitiveCompiler {
             let op = graph.node_weight(id).unwrap().as_any().type_id();
             let op_ref = graph.graph.node_weight_mut(id).unwrap();
 
-            if is::<luminal::op::Add>(op) {
+            if let Some(c) = op_ref.as_any().downcast_ref::<luminal::op::Constant>() {
+                *op_ref = Box::new(LuminairConstant::new(c.0.clone()));
+            } else if is::<luminal::op::Add>(op) {
                 *op_ref = LuminairAdd::new().into_operator()
             } else if is::<luminal::op::Mul>(op) {
                 *op_ref = LuminairMul::new().into_operator()

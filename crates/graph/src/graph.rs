@@ -1,5 +1,5 @@
 use crate::op::{
-    prim::{CopyFromStwo, CopyToStwo},
+    prim::{CopyFromStwo, CopyToStwo, LuminairConstant},
     HasProcessTrace,
 };
 use luminair_air::{
@@ -89,21 +89,28 @@ impl LuminairGraph for Graph {
             let input_info = src_ids
                 .iter()
                 .map(|(id, _, _)| {
-                    let node_is_function = self.node_weight(*id).unwrap().as_any().is::<Function>();
-                    let node_is_copy_to =
-                        self.node_weight(*id).unwrap().as_any().is::<CopyToStwo>();
+                    let node_weight = self.node_weight(*id).unwrap();
+                    let node_is_function = node_weight.as_any().is::<Function>();
+                    let node_is_constant = node_weight.as_any().is::<LuminairConstant>()
+                        || node_weight.as_any().is::<luminal::op::Constant>();
+                    let node_is_copy_to = node_weight.as_any().is::<CopyToStwo>();
 
-                    // Check if this is a CopyToStwo that wraps a Function node
-                    let is_copy_of_function = if node_is_copy_to {
+                    // Check if this is a CopyToStwo that wraps a Function node or a Constant
+                    let is_copy_of_initializer = if node_is_copy_to {
                         self.get_sources(*id).iter().any(|(src_id, _, _)| {
-                            self.node_weight(*src_id).unwrap().as_any().is::<Function>()
+                            let src_weight = self.node_weight(*src_id).unwrap();
+                            src_weight.as_any().is::<Function>()
+                                || src_weight.as_any().is::<LuminairConstant>()
+                                || src_weight.as_any().is::<luminal::op::Constant>()
                         })
                     } else {
                         false
                     };
 
                     InputInfo {
-                        is_initializer: node_is_function || is_copy_of_function,
+                        is_initializer: node_is_function
+                            || node_is_constant
+                            || is_copy_of_initializer,
                     }
                 })
                 .collect::<Vec<_>>();
