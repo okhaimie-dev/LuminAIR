@@ -19,14 +19,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut e);
     println!("Graph compiled successfully. ✅");
 
-    // cx.display();
-
     // ======= Execute graph & generate trace =======
     println!("Executing graph and generating execution trace...");
     let trace = cx.gen_trace();
     println!("Execution trace generated successfully. ✅");
-    let result = cx.get_output(e.id);
-    println!("Final result: {:?}", result);
+    println!("Final result: {:?}", e);
 
     // ======= Prove & Verify =======
     println!("Generating proof for execution trace...");

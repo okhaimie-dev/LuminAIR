@@ -1,4 +1,7 @@
-use crate::{data::StwoData, op::HasProcessTrace};
+use crate::op::{
+    prim::{CopyFromStwo, CopyToStwo},
+    HasProcessTrace,
+};
 use luminair_air::{
     components::{
         add::{self, table::AddColumn},
@@ -10,7 +13,10 @@ use luminair_air::{
     utils::{get_is_first_log_sizes, lookup_sum_valid},
     LuminairClaim, LuminairInteractionClaim, LuminairProof,
 };
-use luminal::prelude::*;
+use luminal::{
+    op::*,
+    prelude::{petgraph::visit::EdgeRef, *},
+};
 use stwo_prover::{
     constraint_framework::{
         preprocessed_columns::IsFirst, INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX,
@@ -43,9 +49,6 @@ pub enum LuminairError {
 pub trait LuminairGraph {
     /// Generates an execution trace for the graph’s computation.
     fn gen_trace(&mut self) -> LuminairPie;
-
-    /// Retrieves the output of a node as a vector of `f32` values.
-    fn get_output(&mut self, id: NodeIndex) -> Vec<f32>;
 
     /// Generates a proof of the graph’s execution using the provided trace.
     fn prove(
@@ -85,14 +88,44 @@ impl LuminairGraph for Graph {
             // Gather input source information
             let input_info = src_ids
                 .iter()
-                .map(|(id, _, _)| InputInfo {
-                    is_initializer: self.node_weight(*id).unwrap().as_any().is::<Function>(),
+                .map(|(id, _, _)| {
+                    let node_is_function = self.node_weight(*id).unwrap().as_any().is::<Function>();
+                    let node_is_copy_to =
+                        self.node_weight(*id).unwrap().as_any().is::<CopyToStwo>();
+
+                    // Check if this is a CopyToStwo that wraps a Function node
+                    let is_copy_of_function = if node_is_copy_to {
+                        self.get_sources(*id).iter().any(|(src_id, _, _)| {
+                            self.node_weight(*src_id).unwrap().as_any().is::<Function>()
+                        })
+                    } else {
+                        false
+                    };
+
+                    InputInfo {
+                        is_initializer: node_is_function || is_copy_of_function,
+                    }
                 })
                 .collect::<Vec<_>>();
 
-            // Get output source information
+            // Get output source information - check if this node is a final output
+            // or if it feeds into a CopyFromStwo that's a final output
+            let is_direct_output = self.to_retrieve.contains_key(&node);
+            let is_output_via_copy = self
+                .graph
+                .edges_directed(*node, petgraph::Direction::Outgoing)
+                .any(|e| {
+                    let target = e.target();
+                    self.to_retrieve.contains_key(&target)
+                        && self
+                            .node_weight(target)
+                            .unwrap()
+                            .as_any()
+                            .is::<CopyFromStwo>()
+                });
+
             let output_info = OutputInfo {
-                is_final_output: self.to_retrieve.contains_key(&node),
+                is_final_output: is_direct_output || is_output_via_copy,
             };
 
             let node_info = NodeInfo {
@@ -176,15 +209,6 @@ impl LuminairGraph for Graph {
                 max_log_size,
             },
         }
-    }
-
-    fn get_output(&mut self, id: NodeIndex) -> Vec<f32> {
-        if let Some(tensor) = self.tensors.remove(&(id, 0)) {
-            if let Some(data) = tensor.downcast_ref::<StwoData>() {
-                return data.to_f32();
-            }
-        }
-        panic!("No StwoData found for final output conversion");
     }
 
     fn prove(
