@@ -12,11 +12,12 @@ use luminal::{
     op::{Function as LFunction, *},
     prelude::{petgraph::visit::EdgeRef, *},
 };
+use num_traits::Zero;
 use numerair::packed::FixedPackedBaseField;
 
 use crate::{
     data::StwoData,
-    utils::{get_data, is},
+    utils::{get_buffer_from_tensor,  is},
 };
 
 use super::{IntoOperator, LuminairOperator};
@@ -121,20 +122,32 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
         inp: Vec<(InputTensor, ShapeTracker)>,
         node_info: &NodeInfo,
     ) -> (TraceEval, Claim<AddColumn>, Vec<Tensor>) {
-        // Get data
-        let (lhs_tensor, _) = &inp[0];
-        let (rhs_tensor, _) = &inp[1];
+        let (lhs, rhs) = (
+            get_buffer_from_tensor(&inp[0].0),
+            get_buffer_from_tensor(&inp[1].0),
+        );
+        let lexpr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
+        let rexpr = (inp[1].1.index_expression(), inp[1].1.valid_expression());
 
-        let lhs = get_data(lhs_tensor);
-        let rhs = get_data(rhs_tensor);
+        let mut stack: Vec<i64> = vec![];
+        let mut out_data =
+            vec![FixedPackedBaseField::zero(); inp[0].1.n_elements().to_usize().unwrap()];
 
-        // Generate trace, claim, and get result tensor
-        let (main_trace, claim, output) = add::table::trace_evaluation(&lhs.0, &rhs.0, node_info);
+        // Generate trace and claim
+        let (main_trace, claim) = add::table::trace_evaluation(
+            &lhs.0,
+            &rhs.0,
+            &lexpr,
+            &rexpr,
+            &mut stack,
+            &mut out_data,
+            node_info,
+        );
 
         (
             main_trace,
             claim,
-            vec![Tensor::new(StwoData(Arc::new(output)))],
+            vec![Tensor::new(StwoData(Arc::new(out_data)))],
         )
     }
 }
@@ -163,20 +176,32 @@ impl LuminairOperator<MulColumn> for LuminairMul {
         inp: Vec<(InputTensor, ShapeTracker)>,
         node_info: &NodeInfo,
     ) -> (TraceEval, Claim<MulColumn>, Vec<Tensor>) {
-        // Get data
-        let (lhs_tensor, _) = &inp[0];
-        let (rhs_tensor, _) = &inp[1];
+        let (lhs, rhs) = (
+            get_buffer_from_tensor(&inp[0].0),
+            get_buffer_from_tensor(&inp[1].0),
+        );
+        let lexpr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
+        let rexpr = (inp[1].1.index_expression(), inp[1].1.valid_expression());
 
-        let lhs = get_data(lhs_tensor);
-        let rhs = get_data(rhs_tensor);
+        let mut stack: Vec<i64> = vec![];
+        let mut out_data =
+            vec![FixedPackedBaseField::zero(); inp[0].1.n_elements().to_usize().unwrap()];
 
-        // Generate trace, claim, and get result tensor
-        let (main_trace, claim, output) = mul::table::trace_evaluation(&lhs.0, &rhs.0, node_info);
+        // Generate trace and claim
+        let (main_trace, claim) = mul::table::trace_evaluation(
+            &lhs.0,
+            &rhs.0,
+            &lexpr,
+            &rexpr,
+            &mut stack,
+            &mut out_data,
+            node_info,
+        );
 
         (
             main_trace,
             claim,
-            vec![Tensor::new(StwoData(Arc::new(output)))],
+            vec![Tensor::new(StwoData(Arc::new(out_data)))],
         )
     }
 }
