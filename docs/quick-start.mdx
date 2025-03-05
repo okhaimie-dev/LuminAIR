@@ -65,9 +65,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   // This is when the actual computation happens.
   let trace = cx.gen_trace();
 
-  // Retrieve and display the final result.
-  let result = cx.get_final_output(e.id);
-  println!("Final result: {:?}", result);
+  // Display the final result.
+  println!("Final result: {:?}", e);
 }
 ```
 The actual computation happens during trace generation (`gen_trace()`).
