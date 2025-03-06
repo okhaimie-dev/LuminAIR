@@ -2,6 +2,7 @@ use add::{
     component::{AddComponent, AddEval},
     table::AddColumn,
 };
+use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::{preprocessed_columns::IsFirst, TraceLocationAllocator},
@@ -18,7 +19,7 @@ use stwo_prover::{
 };
 use thiserror::Error;
 
-use crate::{pie::NodeInfo, LuminairClaim, LuminairInteractionClaim};
+use crate::{pie::NodeInfo, LuminairClaim};
 
 pub mod add;
 
@@ -166,12 +167,7 @@ pub struct LuminairComponents {
 
 impl LuminairComponents {
     /// Initializes components from claims and interaction elements.
-    pub fn new(
-        claims: &LuminairClaim,
-        interaction_elements: &LuminairInteractionElements,
-        interaction_claim: &LuminairInteractionClaim,
-        is_first_log_sizes: &[u32],
-    ) -> Self {
+    pub fn new(claims: &LuminairClaim, is_first_log_sizes: &[u32]) -> Self {
         let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
             &is_first_log_sizes
                 .iter()
@@ -183,14 +179,7 @@ impl LuminairComponents {
         let add_components = claims
             .add
             .iter()
-            .zip(interaction_claim.add.iter())
-            .map(|(cl, int_cl)| {
-                AddComponent::new(
-                    tree_span_provider,
-                    AddEval::new(cl, interaction_elements.node_lookup_elements.clone()),
-                    int_cl.claimed_sum,
-                )
-            })
+            .map(|cl| AddComponent::new(tree_span_provider, AddEval::new(cl), SecureField::zero()))
             .collect();
 
         Self {

@@ -19,7 +19,6 @@ pub mod utils;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairProof<H: MerkleHasher> {
     pub claim: LuminairClaim,
-    pub interaction_claim: LuminairInteractionClaim,
     pub proof: StarkProof<H>,
     pub execution_resources: ExecutionResources,
 }
