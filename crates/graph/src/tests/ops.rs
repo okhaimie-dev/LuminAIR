@@ -8,4 +8,3 @@ use rand::{rngs::StdRng, SeedableRng};
 
 // =============== BINARY ===============
 binary_test!(|a, b| a + b, test_add, f32);
-binary_test!(|a, b| a * b, test_mul, f32);

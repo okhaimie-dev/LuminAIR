@@ -2,10 +2,6 @@ use add::{
     component::{AddComponent, AddEval},
     table::AddColumn,
 };
-use mul::{
-    component::{MulComponent, MulEval},
-    table::MulColumn,
-};
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::{preprocessed_columns::IsFirst, TraceLocationAllocator},
@@ -25,7 +21,6 @@ use thiserror::Error;
 use crate::{pie::NodeInfo, LuminairClaim, LuminairInteractionClaim};
 
 pub mod add;
-pub mod mul;
 
 /// Errors related to trace operations.
 #[derive(Debug, Error, Eq, PartialEq)]
@@ -40,8 +35,6 @@ pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitRever
 
 /// Claim for the Add trace.
 pub type AddClaim = Claim<AddColumn>;
-/// Claim for the Mul trace.
-pub type MulClaim = Claim<MulColumn>;
 
 /// Represents columns of a trace.
 pub trait TraceColumn {
@@ -116,7 +109,6 @@ impl<T: TraceColumn> Claim<T> {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum ClaimType {
     Add(Claim<AddColumn>),
-    Mul(Claim<MulColumn>),
 }
 
 /// The claim of the interaction phase 2 (with the logUp protocol).
@@ -170,7 +162,6 @@ impl LuminairInteractionElements {
 /// and by the verifier as a `Component`.
 pub struct LuminairComponents {
     add: Vec<AddComponent>,
-    mul: Vec<MulComponent>,
 }
 
 impl LuminairComponents {
@@ -202,22 +193,8 @@ impl LuminairComponents {
             })
             .collect();
 
-        let mul_components = claims
-            .mul
-            .iter()
-            .zip(interaction_claim.mul.iter())
-            .map(|(cl, int_cl)| {
-                MulComponent::new(
-                    tree_span_provider,
-                    MulEval::new(cl, interaction_elements.node_lookup_elements.clone()),
-                    int_cl.claimed_sum,
-                )
-            })
-            .collect();
-
         Self {
             add: add_components,
-            mul: mul_components,
         }
     }
 
@@ -226,20 +203,11 @@ impl LuminairComponents {
         self.add
             .iter()
             .map(|c| c as &dyn ComponentProver<SimdBackend>)
-            .chain(
-                self.mul
-                    .iter()
-                    .map(|c| c as &dyn ComponentProver<SimdBackend>),
-            )
             .collect()
     }
 
     /// Returns the `Component` of each components used by the verifier.
     pub fn components(&self) -> Vec<&dyn Component> {
-        self.add
-            .iter()
-            .map(|c| c as &dyn Component)
-            .chain(self.mul.iter().map(|c| c as &dyn Component))
-            .collect()
+        self.add.iter().map(|c| c as &dyn Component).collect()
     }
 }

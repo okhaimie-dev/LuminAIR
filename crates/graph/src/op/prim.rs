@@ -1,7 +1,6 @@
 use luminair_air::{
     components::{
         add::{self, table::AddColumn},
-        mul::{self, table::MulColumn},
         Claim, TraceEval,
     },
     pie::NodeInfo,
@@ -157,59 +156,6 @@ impl Operator for LuminairAdd {
     }
 }
 
-/// Implements element-wise multiplication for LuminAIR.
-#[derive(Debug, Clone, Default, PartialEq)]
-struct LuminairMul {}
-
-impl LuminairMul {
-    /// Creates a new `LuminairMul` instance.
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl LuminairOperator<MulColumn> for LuminairMul {
-    fn process_trace(
-        &mut self,
-        inp: Vec<(InputTensor, ShapeTracker)>,
-        node_info: &NodeInfo,
-    ) -> (TraceEval, Claim<MulColumn>, Vec<Tensor>) {
-        let (lhs, rhs) = (
-            get_buffer_from_tensor(&inp[0].0),
-            get_buffer_from_tensor(&inp[1].0),
-        );
-        let lexpr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
-        let rexpr = (inp[1].1.index_expression(), inp[1].1.valid_expression());
-
-        let mut stack: Vec<i64> = vec![];
-        let mut out_data = vec![Fixed::zero(); inp[0].1.n_elements().to_usize().unwrap()];
-
-        // Generate trace and claim
-        let (main_trace, claim) = mul::table::trace_evaluation(
-            &lhs.0,
-            &rhs.0,
-            &lexpr,
-            &rexpr,
-            &mut stack,
-            &mut out_data,
-            node_info,
-        );
-
-        (
-            main_trace,
-            claim,
-            vec![Tensor::new(StwoData(Arc::new(out_data)))],
-        )
-    }
-}
-
-impl Operator for LuminairMul {
-    /// This method is not used as `process_trace` handles all computation for this operator.
-    fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        unimplemented!()
-    }
-}
-
 // ================== COMPILER ==================
 
 /// Compiles primitive operations into provable forms for LuminAIR.
@@ -325,8 +271,6 @@ impl Compiler for PrimitiveCompiler {
                 *op_ref = Box::new(LuminairConstant::new(c.0.clone()));
             } else if is::<luminal::op::Add>(op) {
                 *op_ref = LuminairAdd::new().into_operator()
-            } else if is::<luminal::op::Mul>(op) {
-                *op_ref = LuminairMul::new().into_operator()
             } else if is::<luminal::op::Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
             }
