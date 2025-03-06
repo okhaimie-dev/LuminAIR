@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use luminair_air::{
     components::{
         add::{self, table::AddColumn},
@@ -12,12 +10,13 @@ use luminal::{
     op::{Function as LFunction, *},
     prelude::{petgraph::visit::EdgeRef, *},
 };
-use num_traits::Zero;
-use numerair::packed::FixedPackedBaseField;
+use num_traits::identities::Zero;
+use numerair::Fixed;
+use std::sync::Arc;
 
 use crate::{
     data::StwoData,
-    utils::{get_buffer_from_tensor,  is},
+    utils::{get_buffer_from_tensor, is},
 };
 
 use super::{IntoOperator, LuminairOperator};
@@ -97,7 +96,7 @@ impl Operator for LuminairConstant {
 
         // Create and return a single element with the constant value
         let mut data = Vec::with_capacity(1);
-        data.push(FixedPackedBaseField::broadcast_from_f64(value as f64));
+        data.push(Fixed::from_f64(value as f64));
         vec![Tensor::new(StwoData(Arc::new(data)))]
     }
 }
@@ -130,8 +129,7 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
         let rexpr = (inp[1].1.index_expression(), inp[1].1.valid_expression());
 
         let mut stack: Vec<i64> = vec![];
-        let mut out_data =
-            vec![FixedPackedBaseField::zero(); inp[0].1.n_elements().to_usize().unwrap()];
+        let mut out_data = vec![Fixed::zero(); inp[0].1.n_elements().to_usize().unwrap()];
 
         // Generate trace and claim
         let (main_trace, claim) = add::table::trace_evaluation(
@@ -184,8 +182,7 @@ impl LuminairOperator<MulColumn> for LuminairMul {
         let rexpr = (inp[1].1.index_expression(), inp[1].1.valid_expression());
 
         let mut stack: Vec<i64> = vec![];
-        let mut out_data =
-            vec![FixedPackedBaseField::zero(); inp[0].1.n_elements().to_usize().unwrap()];
+        let mut out_data = vec![Fixed::zero(); inp[0].1.n_elements().to_usize().unwrap()];
 
         // Generate trace and claim
         let (main_trace, claim) = mul::table::trace_evaluation(

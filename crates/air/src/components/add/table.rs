@@ -1,6 +1,6 @@
 use luminal::shape::Expression;
 use num_traits::{One, Zero};
-use numerair::packed::FixedPackedBaseField;
+use numerair::Fixed;
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::{logup::LogupTraceGenerator, Relation},
@@ -22,12 +22,12 @@ use crate::{
 
 /// Generates the main trace for element-wise addition of two tensors.
 pub fn trace_evaluation(
-    lhs: &[FixedPackedBaseField],
-    rhs: &[FixedPackedBaseField],
+    lhs: &[Fixed],
+    rhs: &[Fixed],
     lexpr: &(Expression, Expression),
     rexpr: &(Expression, Expression),
     stack: &mut Vec<i64>,
-    out_data: &mut Vec<FixedPackedBaseField>,
+    out_data: &mut Vec<Fixed>,
     node_info: &NodeInfo,
 ) -> (TraceEval, AddClaim) {
     // Calculate log size
@@ -54,9 +54,9 @@ pub fn trace_evaluation(
             let rhs_val = get_index(rhs, rexpr, stack, i);
             let out_val = lhs_val + rhs_val;
 
-            lhs_column.set(i, lhs_val.0.to_array()[0]);
-            rhs_column.set(i, rhs_val.0.to_array()[0]);
-            out_column.set(i, out_val.0.to_array()[0]);
+            lhs_column.set(i, lhs_val.to_m31());
+            rhs_column.set(i, rhs_val.to_m31());
+            out_column.set(i, out_val.to_m31());
 
             out_data[i] = out_val
         } else {
