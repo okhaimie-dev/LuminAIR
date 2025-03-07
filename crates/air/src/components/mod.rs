@@ -2,6 +2,10 @@ use add::{
     component::{AddComponent, AddEval},
     table::AddColumn,
 };
+use log2::{
+    component::{Log2Component, Log2Eval},
+    table::Log2Column,
+};
 use mul::{
     component::{MulComponent, MulEval},
     table::MulColumn,
@@ -25,6 +29,7 @@ use thiserror::Error;
 use crate::{pie::NodeInfo, LuminairClaim, LuminairInteractionClaim};
 
 pub mod add;
+pub mod log2;
 pub mod mul;
 
 /// Errors related to trace operations.
@@ -40,6 +45,8 @@ pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitRever
 
 /// Claim for the Add trace.
 pub type AddClaim = Claim<AddColumn>;
+/// Claim for the Log2 trace.
+pub type Log2Claim = Claim<Log2Column>;
 /// Claim for the Mul trace.
 pub type MulClaim = Claim<MulColumn>;
 
@@ -116,6 +123,7 @@ impl<T: TraceColumn> Claim<T> {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum ClaimType {
     Add(Claim<AddColumn>),
+    Log2(Claim<Log2Column>),
     Mul(Claim<MulColumn>),
 }
 
@@ -170,6 +178,7 @@ impl LuminairInteractionElements {
 /// and by the verifier as a `Component`.
 pub struct LuminairComponents {
     add: Vec<AddComponent>,
+    log2: Vec<Log2Component>,
     mul: Vec<MulComponent>,
 }
 
@@ -202,6 +211,19 @@ impl LuminairComponents {
             })
             .collect();
 
+        let log2_components = claims
+            .log2
+            .iter()
+            .zip(interaction_claim.log2.iter())
+            .map(|(cl, int_cl)| {
+                Log2Component::new(
+                    tree_span_provider,
+                    Log2Eval::new(cl, interaction_elements.node_lookup_elements.clone()),
+                    int_cl.claimed_sum,
+                )
+            })
+            .collect();
+
         let mul_components = claims
             .mul
             .iter()
@@ -217,6 +239,7 @@ impl LuminairComponents {
 
         Self {
             add: add_components,
+            log2: log2_components,
             mul: mul_components,
         }
     }

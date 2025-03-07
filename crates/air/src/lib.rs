@@ -1,7 +1,7 @@
 #![feature(trait_upcasting)]
 
 use ::serde::{Deserialize, Serialize};
-use components::{AddClaim, InteractionClaim, MulClaim};
+use components::{AddClaim, InteractionClaim, Log2Claim, MulClaim};
 use pie::ExecutionResources;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
 use stwo_prover::core::{
@@ -28,6 +28,7 @@ pub struct LuminairProof<H: MerkleHasher> {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairClaim {
     pub add: Vec<AddClaim>,
+    pub log2: Vec<Log2Claim>,
     pub mul: Vec<MulClaim>,
     pub is_first_log_sizes: Vec<u32>,
 }
@@ -37,6 +38,7 @@ impl LuminairClaim {
     pub fn init(is_first_log_sizes: Vec<u32>) -> Self {
         Self {
             add: vec![],
+            log2: vec![],
             mul: vec![],
             is_first_log_sizes,
         }
@@ -45,6 +47,7 @@ impl LuminairClaim {
     /// Mixes claim data into a Fiat-Shamir channel for proof binding.
     pub fn mix_into(&self, channel: &mut impl Channel) {
         self.add.iter().for_each(|c| c.mix_into(channel));
+        self.log2.iter().for_each(|c| c.mix_into(channel));
         self.mul.iter().for_each(|c| c.mix_into(channel));
     }
 
@@ -69,6 +72,7 @@ impl LuminairClaim {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairInteractionClaim {
     pub add: Vec<InteractionClaim>,
+    pub log2: Vec<InteractionClaim>,
     pub mul: Vec<InteractionClaim>,
 }
 
@@ -77,6 +81,7 @@ impl LuminairInteractionClaim {
     pub fn init() -> Self {
         Self {
             add: vec![],
+            log2: vec![],
             mul: vec![],
         }
     }
@@ -84,6 +89,7 @@ impl LuminairInteractionClaim {
     /// Mixes interaction claim data into a Fiat-Shamir channel.
     pub fn mix_into(&self, channel: &mut impl Channel) {
         self.add.iter().for_each(|c| c.mix_into(channel));
+        self.log2.iter().for_each(|c| c.mix_into(channel));
         self.mul.iter().for_each(|c| c.mix_into(channel));
     }
 }

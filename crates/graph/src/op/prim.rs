@@ -1,6 +1,7 @@
 use luminair_air::{
     components::{
         add::{self, table::AddColumn},
+        log2::{self, table::Log2Column},
         mul::{self, table::MulColumn},
         Claim, TraceEval,
     },
@@ -151,6 +152,48 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
 }
 
 impl Operator for LuminairAdd {
+    /// This method is not used as `process_trace` handles all computation for this operator.
+    fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        unimplemented!()
+    }
+}
+
+/// Implements element-wise base-2 logarithm for LuminAIR.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct LuminairLog2 {}
+
+impl LuminairLog2 {
+    /// Creates a new `LuminairLog2` instance.
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl LuminairOperator<Log2Column> for LuminairLog2 {
+    fn process_trace(
+        &mut self,
+        inp: Vec<(InputTensor, ShapeTracker)>,
+        node_info: &NodeInfo,
+    ) -> (TraceEval, Claim<Log2Column>, Vec<Tensor>) {
+        let input = get_buffer_from_tensor(&inp[0].0);
+        let expr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
+
+        let mut stack: Vec<i64> = vec![];
+        let mut out_data = vec![Fixed::zero(); inp[0].1.n_elements().to_usize().unwrap()];
+
+        // Generate trace and claim
+        let (main_trace, claim) =
+            log2::table::trace_evaluation(&input.0, &expr, &mut stack, &mut out_data, node_info);
+
+        (
+            main_trace,
+            claim,
+            vec![Tensor::new(StwoData(Arc::new(out_data)))],
+        )
+    }
+}
+
+impl Operator for LuminairLog2 {
     /// This method is not used as `process_trace` handles all computation for this operator.
     fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
         unimplemented!()
@@ -325,6 +368,8 @@ impl Compiler for PrimitiveCompiler {
                 *op_ref = Box::new(LuminairConstant::new(c.0.clone()));
             } else if is::<luminal::op::Add>(op) {
                 *op_ref = LuminairAdd::new().into_operator()
+            } else if is::<luminal::op::Log2>(op) {
+                *op_ref = LuminairLog2::new().into_operator()
             } else if is::<luminal::op::Mul>(op) {
                 *op_ref = LuminairMul::new().into_operator()
             } else if is::<luminal::op::Contiguous>(op) {
