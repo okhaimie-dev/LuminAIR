@@ -158,48 +158,6 @@ impl Operator for LuminairAdd {
     }
 }
 
-/// Implements element-wise base-2 logarithm for LuminAIR.
-#[derive(Debug, Clone, Default, PartialEq)]
-struct LuminairLog2 {}
-
-impl LuminairLog2 {
-    /// Creates a new `LuminairLog2` instance.
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl LuminairOperator<Log2Column> for LuminairLog2 {
-    fn process_trace(
-        &mut self,
-        inp: Vec<(InputTensor, ShapeTracker)>,
-        node_info: &NodeInfo,
-    ) -> (TraceEval, Claim<Log2Column>, Vec<Tensor>) {
-        let input = get_buffer_from_tensor(&inp[0].0);
-        let expr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
-
-        let mut stack: Vec<i64> = vec![];
-        let mut out_data = vec![Fixed::zero(); inp[0].1.n_elements().to_usize().unwrap()];
-
-        // Generate trace and claim
-        let (main_trace, claim) =
-            log2::table::trace_evaluation(&input.0, &expr, &mut stack, &mut out_data, node_info);
-
-        (
-            main_trace,
-            claim,
-            vec![Tensor::new(StwoData(Arc::new(out_data)))],
-        )
-    }
-}
-
-impl Operator for LuminairLog2 {
-    /// This method is not used as `process_trace` handles all computation for this operator.
-    fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
-        unimplemented!()
-    }
-}
-
 /// Implements element-wise multiplication for LuminAIR.
 #[derive(Debug, Clone, Default, PartialEq)]
 struct LuminairMul {}
@@ -247,6 +205,50 @@ impl LuminairOperator<MulColumn> for LuminairMul {
 }
 
 impl Operator for LuminairMul {
+    /// This method is not used as `process_trace` handles all computation for this operator.
+    fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        unimplemented!()
+    }
+}
+
+// ================== UNARY ==================
+
+/// Implements element-wise base-2 logarithm for LuminAIR.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct LuminairLog2 {}
+
+impl LuminairLog2 {
+    /// Creates a new `LuminairLog2` instance.
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl LuminairOperator<Log2Column> for LuminairLog2 {
+    fn process_trace(
+        &mut self,
+        inp: Vec<(InputTensor, ShapeTracker)>,
+        node_info: &NodeInfo,
+    ) -> (TraceEval, Claim<Log2Column>, Vec<Tensor>) {
+        let input = get_buffer_from_tensor(&inp[0].0);
+        let expr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
+
+        let mut stack: Vec<i64> = vec![];
+        let mut out_data = vec![Fixed::zero(); inp[0].1.n_elements().to_usize().unwrap()];
+
+        // Generate trace and claim
+        let (main_trace, claim) =
+            log2::table::trace_evaluation(&input.0, &expr, &mut stack, &mut out_data, node_info);
+
+        (
+            main_trace,
+            claim,
+            vec![Tensor::new(StwoData(Arc::new(out_data)))],
+        )
+    }
+}
+
+impl Operator for LuminairLog2 {
     /// This method is not used as `process_trace` handles all computation for this operator.
     fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
         unimplemented!()
