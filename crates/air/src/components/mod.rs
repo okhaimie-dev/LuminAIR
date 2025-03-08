@@ -19,7 +19,7 @@ use stwo_prover::{
 };
 use thiserror::Error;
 
-use crate::{pie::NodeInfo, LuminairClaim};
+use crate::LuminairClaim;
 
 pub mod add;
 
@@ -51,18 +51,15 @@ pub trait TraceColumn {
 pub struct Claim<T: TraceColumn> {
     /// Logarithmic size (base 2) of the trace.
     pub log_size: u32,
-    /// Information about the node in the computational graph.
-    pub node_info: NodeInfo,
     /// Phantom data to associate with the trace column type.
     _marker: std::marker::PhantomData<T>,
 }
 
 impl<T: TraceColumn> Claim<T> {
     /// Creates a new claim with the given log size and node information.
-    pub const fn new(log_size: u32, node_info: NodeInfo) -> Self {
+    pub const fn new(log_size: u32) -> Self {
         Self {
             log_size,
-            node_info,
             _marker: std::marker::PhantomData,
         }
     }
@@ -85,24 +82,6 @@ impl<T: TraceColumn> Claim<T> {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         // Mix log_size
         channel.mix_u64(self.log_size.into());
-
-        // Mix number of inputs
-        channel.mix_u64(self.node_info.inputs.len() as u64);
-
-        // Mix input flags
-        for input in &self.node_info.inputs {
-            channel.mix_u64(if input.is_initializer { 1 } else { 0 });
-        }
-
-        // Mix output flag
-        channel.mix_u64(if self.node_info.output.is_final_output {
-            1
-        } else {
-            0
-        });
-
-        // Mix consumer count
-        channel.mix_u64(self.node_info.num_consumers as u64);
     }
 }
 

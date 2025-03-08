@@ -3,7 +3,10 @@ use crate::op::{
     HasProcessTrace,
 };
 use luminair_air::{
-    components::{add::table::AddColumn, ClaimType, LuminairComponents},
+    components::{
+        add::table::{AddColumn, AddTable},
+        ClaimType, LuminairComponents, TraceError,
+    },
     pie::{ExecutionResources, InputInfo, LuminairPie, NodeInfo, OpCounter, OutputInfo, Trace},
     serde::SerializableTrace,
     utils::get_is_first_log_sizes,
@@ -43,7 +46,7 @@ pub enum LuminairError {
 /// generation and verification using Stwo.
 pub trait LuminairGraph {
     /// Generates an execution trace for the graph’s computation.
-    fn gen_trace(&mut self) -> LuminairPie;
+    fn gen_trace(&mut self) -> Result<LuminairPie, TraceError>;
 
     /// Generates a proof of the graph’s execution using the provided trace.
     fn prove(
@@ -56,7 +59,7 @@ pub trait LuminairGraph {
 }
 
 impl LuminairGraph for Graph {
-    fn gen_trace(&mut self) -> LuminairPie {
+    fn gen_trace(&mut self) -> Result<LuminairPie, TraceError> {
         // Track the number of views pointing to each tensor so we know when to clear
         if self.linearized_graph.is_none() {
             self.toposort();
@@ -70,7 +73,8 @@ impl LuminairGraph for Graph {
         // Initializes operator counter
         let mut op_counter = OpCounter::default();
 
-        let mut max_log_size = 0;
+        // Initilializes table for each operator
+        let mut add_table = AddTable::new();
 
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
@@ -145,20 +149,16 @@ impl LuminairGraph for Graph {
             let node_op = &mut *self.graph.node_weight_mut(*node).unwrap();
 
             let tensors =
-                if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
-                    let (trace, claim, tensors) =
-                        <Box<dyn Operator> as HasProcessTrace<AddColumn>>::call_process_trace(
-                            node_op, srcs, &node_info,
-                        )
-                        .unwrap();
-
-                    max_log_size = max_log_size.max(claim.log_size);
-
-                    traces.push(Trace {
-                        eval: SerializableTrace::from(&trace),
-                        claim: ClaimType::Add(claim),
-                        node_info,
-                    });
+                if <Box<dyn Operator> as HasProcessTrace<AddColumn, AddTable>>::has_process_trace(
+                    node_op,
+                ) {
+                    let tensors = <Box<dyn Operator> as HasProcessTrace<
+                        AddColumn,
+                        AddTable,
+                    >>::call_process_trace(
+                        node_op, srcs, &mut add_table
+                    )
+                    .unwrap();
                     *op_counter.add.get_or_insert(0) += 1;
 
                     tensors
@@ -179,100 +179,29 @@ impl LuminairGraph for Graph {
 
         self.reset();
 
-        // Sort traces to match the order of components
-        traces.sort_by_key(|trace| match trace.claim {
-            ClaimType::Add(_) => 0,
-        });
+        // Convert tables to traces
+        let (add_trace, add_claim) = add_table.trace_evaluation()?;
+        let max_log_size = add_table.table.len() as u32;
 
-        LuminairPie {
+        traces.push(Trace::new(
+            SerializableTrace::from(&add_trace),
+            ClaimType::Add(add_claim),
+        ));
+
+        Ok(LuminairPie {
             traces,
             execution_resources: ExecutionResources {
                 op_counter,
                 max_log_size,
             },
-        }
+        })
     }
 
     fn prove(
         &mut self,
         pie: LuminairPie,
     ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
-        // Track the number of views pointing to each tensor so we know when to clear
-        if self.linearized_graph.is_none() {
-            self.toposort();
-        }
-
-        // ┌──────────────────────────┐
-        // │     Protocol Setup       │
-        // └──────────────────────────┘
-
-        tracing::info!("Protocol Setup");
-        let config = PcsConfig::default();
-        let max_log_size = pie.execution_resources.max_log_size;
-        let is_first_log_sizes = get_is_first_log_sizes(max_log_size);
-        let twiddles = SimdBackend::precompute_twiddles(
-            CanonicCoset::new(max_log_size + config.fri_config.log_blowup_factor + 2)
-                .circle_domain()
-                .half_coset,
-        );
-        let channel = &mut Blake2sChannel::default();
-        let mut commitment_scheme =
-            CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, &twiddles);
-
-        // ┌───────────────────────────────────────────────┐
-        // │   Interaction Phase 0 - Preprocessed Trace    │
-        // └───────────────────────────────────────────────┘
-
-        tracing::info!("Preprocessed Trace");
-        // Generate all preprocessed columns
-        let mut tree_builder = commitment_scheme.tree_builder();
-
-        tree_builder.extend_evals(
-            is_first_log_sizes
-                .iter()
-                .copied()
-                .map(|log_size| IsFirst::new(log_size).gen_column_simd()),
-        );
-
-        // Commit the preprocessed trace
-        tree_builder.commit(channel);
-
-        // ┌───────────────────────────────────────┐
-        // │    Interaction Phase 1 - Main Trace   │
-        // └───────────────────────────────────────┘
-
-        tracing::info!("Main Trace");
-        let mut tree_builder = commitment_scheme.tree_builder();
-        let mut main_claim = LuminairClaim::init(is_first_log_sizes.clone());
-
-        for trace in pie.traces.clone().into_iter() {
-            tree_builder.extend_evals(trace.eval.to_trace());
-
-            match trace.claim {
-                ClaimType::Add(claim) => main_claim.add.push(claim),
-            }
-        }
-
-        // Mix the claim into the Fiat-Shamir channel.
-        main_claim.mix_into(channel);
-        // Commit the main trace.
-        tree_builder.commit(channel);
-
-        // ┌──────────────────────────┐
-        // │     Proof Generation     │
-        // └──────────────────────────┘
-        tracing::info!("Proof Generation");
-        let component_builder = LuminairComponents::new(&main_claim, &is_first_log_sizes);
-        let components = component_builder.provers();
-        let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
-
-        self.reset();
-
-        Ok(LuminairProof {
-            claim: main_claim,
-            proof,
-            execution_resources: pie.execution_resources,
-        })
+   todo!()
     }
 
     fn verify(
@@ -283,45 +212,6 @@ impl LuminairGraph for Graph {
             execution_resources,
         }: LuminairProof<Blake2sMerkleHasher>,
     ) -> Result<(), LuminairError> {
-        // ┌──────────────────────────┐
-        // │     Protocol Setup       │
-        // └──────────────────────────┘
-        let config = PcsConfig::default();
-        let channel = &mut Blake2sChannel::default();
-        let commitment_scheme_verifier =
-            &mut CommitmentSchemeVerifier::<Blake2sMerkleChannel>::new(config);
-        let log_sizes = &claim.log_sizes();
-        let is_first_log_sizes = get_is_first_log_sizes(execution_resources.max_log_size);
-
-        // ┌───────────────────────────────────────────────┐
-        // │   Interaction Phase 0 - Preprocessed Trace    │
-        // └───────────────────────────────────────────────┘
-
-        commitment_scheme_verifier.commit(
-            proof.commitments[PREPROCESSED_TRACE_IDX],
-            &log_sizes[PREPROCESSED_TRACE_IDX],
-            channel,
-        );
-
-        // ┌───────────────────────────────────────┐
-        // │    Interaction Phase 1 - Main Trace   │
-        // └───────────────────────────────────────┘
-        claim.mix_into(channel);
-        commitment_scheme_verifier.commit(
-            proof.commitments[ORIGINAL_TRACE_IDX],
-            &log_sizes[ORIGINAL_TRACE_IDX],
-            channel,
-        );
-
-        // ┌──────────────────────────┐
-        // │    Proof Verification    │
-        // └──────────────────────────┘
-
-        let component_builder = LuminairComponents::new(&claim, &is_first_log_sizes);
-        let components = component_builder.components();
-
-        verify(&components, channel, commitment_scheme_verifier, proof)?;
-
-        Ok(())
+      todo!()
     }
 }

@@ -1,10 +1,4 @@
-use luminair_air::{
-    components::{
-        add::{self, table::AddColumn},
-        Claim, TraceEval,
-    },
-    pie::NodeInfo,
-};
+use luminair_air::components::add::table::{AddColumn, AddTable, AddTableRow};
 use luminal::{
     op::{Function as LFunction, *},
     prelude::{petgraph::visit::EdgeRef, *},
@@ -15,7 +9,7 @@ use std::sync::Arc;
 
 use crate::{
     data::StwoData,
-    utils::{get_buffer_from_tensor, is},
+    utils::{get_buffer_from_tensor, get_index, is},
 };
 
 use super::{IntoOperator, LuminairOperator};
@@ -113,13 +107,13 @@ impl LuminairAdd {
     }
 }
 
-impl LuminairOperator<AddColumn> for LuminairAdd {
+impl LuminairOperator<AddColumn, AddTable> for LuminairAdd {
     /// Processes two input tensors, generating a trace, claim, and output tensor.
     fn process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
-        node_info: &NodeInfo,
-    ) -> (TraceEval, Claim<AddColumn>, Vec<Tensor>) {
+        table: &mut AddTable,
+    ) -> Vec<Tensor> {
         let (lhs, rhs) = (
             get_buffer_from_tensor(&inp[0].0),
             get_buffer_from_tensor(&inp[1].0),
@@ -130,22 +124,19 @@ impl LuminairOperator<AddColumn> for LuminairAdd {
         let mut stack: Vec<i64> = vec![];
         let mut out_data = vec![Fixed::zero(); inp[0].1.n_elements().to_usize().unwrap()];
 
-        // Generate trace and claim
-        let (main_trace, claim) = add::table::trace_evaluation(
-            &lhs.0,
-            &rhs.0,
-            &lexpr,
-            &rexpr,
-            &mut stack,
-            &mut out_data,
-            node_info,
-        );
+        for (i, out) in out_data.iter_mut().enumerate() {
+            let lhs_val = get_index(lhs, &lexpr, &mut stack, i);
+            let rhs_val = get_index(rhs, &rexpr, &mut stack, i);
+            let out_val = lhs_val + rhs_val;
+            *out = out_val;
+            table.add_row(AddTableRow {
+                lhs: lhs_val.to_m31(),
+                rhs: rhs_val.to_m31(),
+                out: out_val.to_m31(),
+            })
+        }
 
-        (
-            main_trace,
-            claim,
-            vec![Tensor::new(StwoData(Arc::new(out_data)))],
-        )
+        vec![Tensor::new(StwoData(Arc::new(out_data)))]
     }
 }
 

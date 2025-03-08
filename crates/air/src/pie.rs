@@ -14,7 +14,12 @@ pub struct LuminairPie {
 pub struct Trace {
     pub eval: SerializableTrace,
     pub claim: ClaimType,
-    pub node_info: NodeInfo,
+}
+
+impl Trace {
+    pub fn new(eval: SerializableTrace, claim: ClaimType) -> Self {
+        Self { eval, claim }
+    }
 }
 
 /// Holds resource usage data for the execution.

@@ -1,68 +1,78 @@
-use luminal::shape::Expression;
-use numerair::Fixed;
 use serde::{Deserialize, Serialize};
 use stwo_prover::core::{
-    backend::{simd::SimdBackend, Col, Column},
+    backend::{simd::column::BaseColumn, Column},
     fields::m31::BaseField,
     poly::circle::{CanonicCoset, CircleEvaluation},
 };
 
 use crate::{
-    components::{AddClaim, TraceColumn, TraceEval},
-    pie::NodeInfo,
-    utils::{calculate_log_size, get_index},
+    components::{AddClaim, TraceColumn, TraceError, TraceEval},
+    utils::calculate_log_size,
 };
 
-/// Generates the main trace for element-wise addition of two tensors.
-pub fn trace_evaluation(
-    lhs: &[Fixed],
-    rhs: &[Fixed],
-    lexpr: &(Expression, Expression),
-    rexpr: &(Expression, Expression),
-    stack: &mut Vec<i64>,
-    out_data: &mut Vec<Fixed>,
-    node_info: &NodeInfo,
-) -> (TraceEval, AddClaim) {
-    // Calculate log size
-    let log_size = calculate_log_size(out_data.len());
+/// Represents the trace for the Add component, containing the required registers for its
+/// constraints.
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct AddTable {
+    /// A vector of [`AddTableRow`] representing the table rows.
+    pub table: Vec<AddTableRow>,
+}
 
-    // Calculate trace size
-    let trace_size = 1 << log_size;
+/// Represents a single row of the [`AddTable`]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct AddTableRow {
+    pub lhs: BaseField,
+    pub rhs: BaseField,
+    pub out: BaseField,
+}
 
-    // Create domain
-    let domain = CanonicCoset::new(log_size).circle_domain();
-
-    // Instantiate trace
-    let mut trace = Vec::with_capacity(AddColumn::count().0);
-
-    // Create columns
-    let mut lhs_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
-    let mut rhs_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
-    let mut out_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
-
-    // Fill columns
-    for i in 0..trace_size {
-        if i < out_data.len() {
-            let lhs_val = get_index(lhs, lexpr, stack, i);
-            let rhs_val = get_index(rhs, rexpr, stack, i);
-            let out_val = lhs_val + rhs_val;
-
-            lhs_column.set(i, lhs_val.to_m31());
-            rhs_column.set(i, rhs_val.to_m31());
-            out_column.set(i, out_val.to_m31());
-
-            out_data[i] = out_val
-        } else {
-            break;
-        }
+impl AddTable {
+    /// Creates a new, empty [`AddTable`].
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    // Add columns to the trace
-    trace.push(CircleEvaluation::new(domain.clone(), lhs_column));
-    trace.push(CircleEvaluation::new(domain.clone(), rhs_column));
-    trace.push(CircleEvaluation::new(domain, out_column));
+    /// Adds a new row to the Add Table.
+    pub fn add_row(&mut self, row: AddTableRow) {
+        self.table.push(row);
+    }
 
-    (trace, AddClaim::new(log_size, node_info.clone()))
+    /// Transforms the [`AddTable`] into [`TraceEval`] to be commited
+    /// when generating a STARK proof.
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, AddClaim), TraceError> {
+        let n_rows = self.table.len();
+        if n_rows == 0 {
+            return Err(TraceError::EmptyTrace);
+        }
+        // Calculate log size
+        let log_size = calculate_log_size(n_rows);
+
+        // Calculate trace size
+        let trace_size = 1 << log_size;
+
+        // Create columns
+        let mut lhs_col = BaseColumn::zeros(trace_size);
+        let mut rhs_col = BaseColumn::zeros(trace_size);
+        let mut out_col = BaseColumn::zeros(trace_size);
+
+        // Fill columns
+        for (vec_row, row) in self.table.iter().enumerate() {
+            lhs_col.set(vec_row, row.lhs);
+            rhs_col.set(vec_row, row.rhs);
+            out_col.set(vec_row, row.out);
+        }
+
+        // Create domain
+        let domain = CanonicCoset::new(log_size).circle_domain();
+
+        // Create trace
+        let mut trace = Vec::with_capacity(AddColumn::count().0);
+        trace.push(CircleEvaluation::new(domain, lhs_col));
+        trace.push(CircleEvaluation::new(domain, rhs_col));
+        trace.push(CircleEvaluation::new(domain, out_col));
+
+        Ok((trace, AddClaim::new(log_size)))
+    }
 }
 
 /// Enum representing the column indices in the Add trace.
@@ -88,7 +98,6 @@ impl AddColumn {
         }
     }
 }
-
 impl TraceColumn for AddColumn {
     /// Returns the number of columns in the main trace and interaction trace.
     ///     
