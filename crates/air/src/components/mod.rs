@@ -47,7 +47,7 @@ pub trait TraceColumn {
 }
 
 /// Represents a claim.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Claim<T: TraceColumn> {
     /// Logarithmic size (base 2) of the trace.
     pub log_size: u32,
@@ -141,12 +141,12 @@ impl LuminairInteractionElements {
 /// Components are used by the prover as a `ComponentProver`,
 /// and by the verifier as a `Component`.
 pub struct LuminairComponents {
-    add: Vec<AddComponent>,
+    add: Option<AddComponent>,
 }
 
 impl LuminairComponents {
     /// Initializes components from claims and interaction elements.
-    pub fn new(claims: &LuminairClaim, is_first_log_sizes: &[u32]) -> Self {
+    pub fn new(claim: &LuminairClaim, is_first_log_sizes: &[u32]) -> Self {
         let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
             &is_first_log_sizes
                 .iter()
@@ -155,27 +155,32 @@ impl LuminairComponents {
                 .collect::<Vec<_>>(),
         );
 
-        let add_components = claims
-            .add
-            .iter()
-            .map(|cl| AddComponent::new(tree_span_provider, AddEval::new(cl), SecureField::zero()))
-            .collect();
+        let add = if let Some(ref add_claim) = claim.add {
+            Some(AddComponent::new(
+                tree_span_provider,
+                AddEval::new(&add_claim),
+                SecureField::zero(),
+            ))
+        } else {
+            None
+        };
 
-        Self {
-            add: add_components,
-        }
+        Self { add }
     }
 
     /// Returns the `ComponentProver` of each components, used by the prover.
     pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
         self.add
             .iter()
-            .map(|c| c as &dyn ComponentProver<SimdBackend>)
+            .map(|component| component as &dyn ComponentProver<SimdBackend>)
             .collect()
     }
 
     /// Returns the `Component` of each components used by the verifier.
     pub fn components(&self) -> Vec<&dyn Component> {
-        self.add.iter().map(|c| c as &dyn Component).collect()
+        self.provers()
+            .into_iter()
+            .map(|component| component as &dyn Component)
+            .collect()
     }
 }

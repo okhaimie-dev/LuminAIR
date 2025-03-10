@@ -76,6 +76,8 @@ impl LuminairGraph for Graph {
         // Initilializes table for each operator
         let mut add_table = AddTable::new();
 
+        let mut max_log_size = 0;
+
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
                 continue;
@@ -181,7 +183,7 @@ impl LuminairGraph for Graph {
 
         // Convert tables to traces
         let (add_trace, add_claim) = add_table.trace_evaluation()?;
-        let max_log_size = add_table.table.len() as u32;
+        max_log_size = max_log_size.max(add_claim.log_size);
 
         traces.push(Trace::new(
             SerializableTrace::from(&add_trace),
@@ -201,7 +203,75 @@ impl LuminairGraph for Graph {
         &mut self,
         pie: LuminairPie,
     ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
-   todo!()
+        // ┌──────────────────────────┐
+        // │     Protocol Setup       │
+        // └──────────────────────────┘
+        tracing::info!("Protocol Setup");
+        let config = PcsConfig::default();
+        let max_log_size = pie.execution_resources.max_log_size;
+        let is_first_log_sizes = get_is_first_log_sizes(max_log_size);
+        let twiddles = SimdBackend::precompute_twiddles(
+            CanonicCoset::new(max_log_size + config.fri_config.log_blowup_factor + 2)
+                .circle_domain()
+                .half_coset,
+        );
+        let channel = &mut Blake2sChannel::default();
+        let mut commitment_scheme =
+            CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, &twiddles);
+
+        // ┌───────────────────────────────────────────────┐
+        // │   Interaction Phase 0 - Preprocessed Trace    │
+        // └───────────────────────────────────────────────┘
+
+        tracing::info!("Preprocessed Trace");
+        // Generate all preprocessed columns
+        let mut tree_builder = commitment_scheme.tree_builder();
+
+        tree_builder.extend_evals(
+            is_first_log_sizes
+                .iter()
+                .copied()
+                .map(|log_size| IsFirst::new(log_size).gen_column_simd()),
+        );
+
+        // Commit the preprocessed trace
+        tree_builder.commit(channel);
+
+        // ┌───────────────────────────────────────┐
+        // │    Interaction Phase 1 - Main Trace   │
+        // └───────────────────────────────────────┘
+
+        tracing::info!("Main Trace");
+        let mut tree_builder = commitment_scheme.tree_builder();
+        let mut main_claim = LuminairClaim::new(is_first_log_sizes.clone());
+
+        for trace in pie.traces.clone().into_iter() {
+            // Add the components' trace evaluation to the commit tree.
+            tree_builder.extend_evals(trace.eval.to_trace());
+
+            match trace.claim {
+                ClaimType::Add(claim) => main_claim.add = Some(claim),
+            }
+        }
+
+        // Mix the claim into the Fiat-Shamir channel.
+        main_claim.mix_into(channel);
+        // Commit the main trace.
+        tree_builder.commit(channel);
+
+        // ┌──────────────────────────┐
+        // │     Proof Generation     │
+        // └──────────────────────────┘
+        tracing::info!("Proof Generation");
+        let component_builder = LuminairComponents::new(&main_claim, &is_first_log_sizes);
+        let components = component_builder.provers();
+        let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
+
+        Ok(LuminairProof {
+            claim: main_claim,
+            proof,
+            execution_resources: pie.execution_resources,
+        })
     }
 
     fn verify(
@@ -212,6 +282,6 @@ impl LuminairGraph for Graph {
             execution_resources,
         }: LuminairProof<Blake2sMerkleHasher>,
     ) -> Result<(), LuminairError> {
-      todo!()
+        todo!()
     }
 }

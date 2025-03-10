@@ -15,15 +15,7 @@ pub fn calculate_log_size(max_size: usize) -> u32 {
 pub fn lookup_sum_valid(interaction_claim: &LuminairInteractionClaim) -> bool {
     let mut sum = PackedSecureField::zero();
 
-    interaction_claim
-        .add
-        .iter()
-        .for_each(|c| sum += c.claimed_sum.into());
-
-    interaction_claim
-        .mul
-        .iter()
-        .for_each(|c| sum += c.claimed_sum.into());
+    sum += interaction_claim.add.claimed_sum.into();
 
     sum.is_zero()
 }
