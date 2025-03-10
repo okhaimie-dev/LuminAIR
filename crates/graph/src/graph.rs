@@ -282,6 +282,44 @@ impl LuminairGraph for Graph {
             execution_resources,
         }: LuminairProof<Blake2sMerkleHasher>,
     ) -> Result<(), LuminairError> {
-        todo!()
+        // ┌──────────────────────────┐
+        // │     Protocol Setup       │
+        // └──────────────────────────┘
+        let config = PcsConfig::default();
+        let channel = &mut Blake2sChannel::default();
+        let commitment_scheme_verifier =
+            &mut CommitmentSchemeVerifier::<Blake2sMerkleChannel>::new(config);
+        let log_sizes = &claim.log_sizes();
+        let is_first_log_sizes = get_is_first_log_sizes(execution_resources.max_log_size);
+
+        // ┌───────────────────────────────────────────────┐
+        // │   Interaction Phase 0 - Preprocessed Trace    │
+        // └───────────────────────────────────────────────┘
+
+        commitment_scheme_verifier.commit(
+            proof.commitments[PREPROCESSED_TRACE_IDX],
+            &log_sizes[PREPROCESSED_TRACE_IDX],
+            channel,
+        );
+
+        // ┌───────────────────────────────────────┐
+        // │    Interaction Phase 1 - Main Trace   │
+        // └───────────────────────────────────────┘
+        claim.mix_into(channel);
+        commitment_scheme_verifier.commit(
+            proof.commitments[ORIGINAL_TRACE_IDX],
+            &log_sizes[ORIGINAL_TRACE_IDX],
+            channel,
+        );
+
+        // ┌──────────────────────────┐
+        // │    Proof Verification    │
+        // └──────────────────────────┘
+
+        let component_builder = LuminairComponents::new(&claim, &is_first_log_sizes);
+        let components = component_builder.components();
+        verify(&components, channel, commitment_scheme_verifier, proof)?;
+
+        Ok(())
     }
 }
