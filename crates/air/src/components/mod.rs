@@ -22,7 +22,7 @@ use stwo_prover::{
 };
 use thiserror::Error;
 
-use crate::{pie::NodeInfo, LuminairClaim, LuminairInteractionClaim};
+use crate::{LuminairClaim, LuminairInteractionClaim};
 
 pub mod add;
 pub mod mul;
@@ -53,22 +53,19 @@ pub trait TraceColumn {
 }
 
 /// Represents a claim.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Claim<T: TraceColumn> {
     /// Logarithmic size (base 2) of the trace.
     pub log_size: u32,
-    /// Information about the node in the computational graph.
-    pub node_info: NodeInfo,
     /// Phantom data to associate with the trace column type.
     _marker: std::marker::PhantomData<T>,
 }
 
 impl<T: TraceColumn> Claim<T> {
     /// Creates a new claim with the given log size and node information.
-    pub const fn new(log_size: u32, node_info: NodeInfo) -> Self {
+    pub const fn new(log_size: u32) -> Self {
         Self {
             log_size,
-            node_info,
             _marker: std::marker::PhantomData,
         }
     }
@@ -91,24 +88,6 @@ impl<T: TraceColumn> Claim<T> {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         // Mix log_size
         channel.mix_u64(self.log_size.into());
-
-        // Mix number of inputs
-        channel.mix_u64(self.node_info.inputs.len() as u64);
-
-        // Mix input flags
-        for input in &self.node_info.inputs {
-            channel.mix_u64(if input.is_initializer { 1 } else { 0 });
-        }
-
-        // Mix output flag
-        channel.mix_u64(if self.node_info.output.is_final_output {
-            1
-        } else {
-            0
-        });
-
-        // Mix consumer count
-        channel.mix_u64(self.node_info.num_consumers as u64);
     }
 }
 
@@ -142,7 +121,7 @@ impl InteractionClaim {
 
 // Defines the relation for the node lookup elements.
 // It allows to constrain relationship between nodes.
-relation!(NodeElements, 1);
+relation!(NodeElements, 2);
 
 /// All the interaction elements required by the components during the interaction phase 2.
 ///
@@ -169,14 +148,14 @@ impl LuminairInteractionElements {
 /// Components are used by the prover as a `ComponentProver`,
 /// and by the verifier as a `Component`.
 pub struct LuminairComponents {
-    add: Vec<AddComponent>,
-    mul: Vec<MulComponent>,
+    add: Option<AddComponent>,
+    mul: Option<MulComponent>,
 }
 
 impl LuminairComponents {
     /// Initializes components from claims and interaction elements.
     pub fn new(
-        claims: &LuminairClaim,
+        claim: &LuminairClaim,
         interaction_elements: &LuminairInteractionElements,
         interaction_claim: &LuminairInteractionClaim,
         is_first_log_sizes: &[u32],
@@ -189,57 +168,53 @@ impl LuminairComponents {
                 .collect::<Vec<_>>(),
         );
 
-        let add_components = claims
-            .add
-            .iter()
-            .zip(interaction_claim.add.iter())
-            .map(|(cl, int_cl)| {
-                AddComponent::new(
-                    tree_span_provider,
-                    AddEval::new(cl, interaction_elements.node_lookup_elements.clone()),
-                    int_cl.claimed_sum,
-                )
-            })
-            .collect();
+        let add = if let Some(ref add_claim) = claim.add {
+            Some(AddComponent::new(
+                tree_span_provider,
+                AddEval::new(
+                    &add_claim,
+                    interaction_elements.node_lookup_elements.clone(),
+                ),
+                interaction_claim.add.as_ref().unwrap().claimed_sum,
+            ))
+        } else {
+            None
+        };
 
-        let mul_components = claims
-            .mul
-            .iter()
-            .zip(interaction_claim.mul.iter())
-            .map(|(cl, int_cl)| {
-                MulComponent::new(
-                    tree_span_provider,
-                    MulEval::new(cl, interaction_elements.node_lookup_elements.clone()),
-                    int_cl.claimed_sum,
-                )
-            })
-            .collect();
+        let mul = if let Some(ref mul_claim) = claim.mul {
+            Some(MulComponent::new(
+                tree_span_provider,
+                MulEval::new(
+                    &mul_claim,
+                    interaction_elements.node_lookup_elements.clone(),
+                ),
+                interaction_claim.mul.as_ref().unwrap().claimed_sum,
+            ))
+        } else {
+            None
+        };
 
-        Self {
-            add: add_components,
-            mul: mul_components,
-        }
+        Self { add, mul }
     }
 
     /// Returns the `ComponentProver` of each components, used by the prover.
     pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-        self.add
-            .iter()
-            .map(|c| c as &dyn ComponentProver<SimdBackend>)
-            .chain(
-                self.mul
-                    .iter()
-                    .map(|c| c as &dyn ComponentProver<SimdBackend>),
-            )
-            .collect()
+        let mut components: Vec<&dyn ComponentProver<SimdBackend>> = vec![];
+
+        if let Some(ref add_component) = self.add {
+            components.push(add_component);
+        }
+        if let Some(ref mul_component) = self.mul {
+            components.push(mul_component);
+        }
+        components
     }
 
     /// Returns the `Component` of each components used by the verifier.
     pub fn components(&self) -> Vec<&dyn Component> {
-        self.add
-            .iter()
-            .map(|c| c as &dyn Component)
-            .chain(self.mul.iter().map(|c| c as &dyn Component))
+        self.provers()
+            .into_iter()
+            .map(|component| component as &dyn Component)
             .collect()
     }
 }

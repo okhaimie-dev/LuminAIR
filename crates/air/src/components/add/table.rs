@@ -1,13 +1,11 @@
-use luminal::shape::Expression;
-use num_traits::{One, Zero};
-use numerair::Fixed;
+use num_traits::One;
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::{logup::LogupTraceGenerator, Relation},
     core::{
         backend::{
-            simd::{m31::LOG_N_LANES, qm31::PackedSecureField, SimdBackend},
-            Col, Column,
+            simd::{column::BaseColumn, m31::LOG_N_LANES},
+            Column,
         },
         fields::m31::BaseField,
         poly::circle::{CanonicCoset, CircleEvaluation},
@@ -16,92 +14,174 @@ use stwo_prover::{
 
 use crate::{
     components::{AddClaim, InteractionClaim, NodeElements, TraceColumn, TraceError, TraceEval},
-    pie::NodeInfo,
-    utils::{calculate_log_size, get_index},
+    utils::calculate_log_size,
 };
 
-/// Generates the main trace for element-wise addition of two tensors.
-pub fn trace_evaluation(
-    lhs: &[Fixed],
-    rhs: &[Fixed],
-    lexpr: &(Expression, Expression),
-    rexpr: &(Expression, Expression),
-    stack: &mut Vec<i64>,
-    out_data: &mut Vec<Fixed>,
-    node_info: &NodeInfo,
-) -> (TraceEval, AddClaim) {
-    // Calculate log size
-    let log_size = calculate_log_size(out_data.len());
+/// Represents the trace for the Add component, containing the required registers for its
+/// constraints.
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct AddTable {
+    /// A vector of [`AddTableRow`] representing the table rows.
+    pub table: Vec<AddTableRow>,
+}
 
-    // Calculate trace size
-    let trace_size = 1 << log_size;
+/// Represents a single row of the [`AddTable`]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct AddTableRow {
+    pub node_id: BaseField,
+    pub lhs_id: BaseField,
+    pub rhs_id: BaseField,
+    pub idx: BaseField,
+    pub is_last_idx: BaseField,
+    pub next_node_id: BaseField,
+    pub next_lhs_id: BaseField,
+    pub next_rhs_id: BaseField,
+    pub next_idx: BaseField,
+    pub lhs: BaseField,
+    pub rhs: BaseField,
+    pub out: BaseField,
+    pub lhs_mult: BaseField,
+    pub rhs_mult: BaseField,
+    pub out_mult: BaseField,
+}
 
-    // Create domain
-    let domain = CanonicCoset::new(log_size).circle_domain();
-
-    // Instantiate trace
-    let mut trace = Vec::with_capacity(AddColumn::count().0);
-
-    // Create columns
-    let mut lhs_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
-    let mut rhs_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
-    let mut out_column = Col::<SimdBackend, BaseField>::zeros(trace_size);
-
-    // Fill columns
-    for i in 0..trace_size {
-        if i < out_data.len() {
-            let lhs_val = get_index(lhs, lexpr, stack, i);
-            let rhs_val = get_index(rhs, rexpr, stack, i);
-            let out_val = lhs_val + rhs_val;
-
-            lhs_column.set(i, lhs_val.to_m31());
-            rhs_column.set(i, rhs_val.to_m31());
-            out_column.set(i, out_val.to_m31());
-
-            out_data[i] = out_val
-        } else {
-            break;
-        }
+impl AddTable {
+    /// Creates a new, empty [`AddTable`].
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    // Add columns to the trace
-    trace.push(CircleEvaluation::new(domain.clone(), lhs_column));
-    trace.push(CircleEvaluation::new(domain.clone(), rhs_column));
-    trace.push(CircleEvaluation::new(domain, out_column));
+    /// Adds a new row to the Add Table.
+    pub fn add_row(&mut self, row: AddTableRow) {
+        self.table.push(row);
+    }
 
-    (trace, AddClaim::new(log_size, node_info.clone()))
+    /// Transforms the [`AddTable`] into [`TraceEval`] to be commited
+    /// when generating a STARK proof.
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, AddClaim), TraceError> {
+        let n_rows = self.table.len();
+        if n_rows == 0 {
+            return Err(TraceError::EmptyTrace);
+        }
+        // Calculate log size
+        let log_size = calculate_log_size(n_rows);
+
+        // Calculate trace size
+        let trace_size = 1 << log_size;
+
+        // Create columns
+        let mut node_id = BaseColumn::zeros(trace_size);
+        let mut lhs_id = BaseColumn::zeros(trace_size);
+        let mut rhs_id = BaseColumn::zeros(trace_size);
+        let mut idx = BaseColumn::zeros(trace_size);
+        let mut is_last_idx = BaseColumn::zeros(trace_size);
+        let mut next_node_id = BaseColumn::zeros(trace_size);
+        let mut next_lhs_id = BaseColumn::zeros(trace_size);
+        let mut next_rhs_id = BaseColumn::zeros(trace_size);
+        let mut next_idx = BaseColumn::zeros(trace_size);
+        let mut lhs = BaseColumn::zeros(trace_size);
+        let mut rhs = BaseColumn::zeros(trace_size);
+        let mut out = BaseColumn::zeros(trace_size);
+        let mut lhs_mult = BaseColumn::zeros(trace_size);
+        let mut rhs_mult = BaseColumn::zeros(trace_size);
+        let mut out_mult = BaseColumn::zeros(trace_size);
+
+        // Fill columns
+        for (vec_row, row) in self.table.iter().enumerate() {
+            node_id.set(vec_row, row.node_id);
+            lhs_id.set(vec_row, row.lhs_id);
+            rhs_id.set(vec_row, row.rhs_id);
+            idx.set(vec_row, row.idx);
+            is_last_idx.set(vec_row, row.is_last_idx);
+            next_node_id.set(vec_row, row.next_node_id);
+            next_lhs_id.set(vec_row, row.next_lhs_id);
+            next_rhs_id.set(vec_row, row.next_rhs_id);
+            next_idx.set(vec_row, row.next_idx);
+            lhs.set(vec_row, row.lhs);
+            rhs.set(vec_row, row.rhs);
+            out.set(vec_row, row.out);
+            lhs_mult.set(vec_row, row.lhs_mult);
+            rhs_mult.set(vec_row, row.rhs_mult);
+            out_mult.set(vec_row, row.out_mult);
+        }
+
+        for i in self.table.len()..trace_size {
+            is_last_idx.set(i, BaseField::one());
+        }
+
+        // Create domain
+        let domain = CanonicCoset::new(log_size).circle_domain();
+
+        // Create trace
+        let mut trace = Vec::with_capacity(AddColumn::count().0);
+        trace.push(CircleEvaluation::new(domain, node_id));
+        trace.push(CircleEvaluation::new(domain, lhs_id));
+        trace.push(CircleEvaluation::new(domain, rhs_id));
+        trace.push(CircleEvaluation::new(domain, idx));
+        trace.push(CircleEvaluation::new(domain, is_last_idx));
+        trace.push(CircleEvaluation::new(domain, next_node_id));
+        trace.push(CircleEvaluation::new(domain, next_lhs_id));
+        trace.push(CircleEvaluation::new(domain, next_rhs_id));
+        trace.push(CircleEvaluation::new(domain, next_idx));
+        trace.push(CircleEvaluation::new(domain, lhs));
+        trace.push(CircleEvaluation::new(domain, rhs));
+        trace.push(CircleEvaluation::new(domain, out));
+        trace.push(CircleEvaluation::new(domain, lhs_mult));
+        trace.push(CircleEvaluation::new(domain, rhs_mult));
+        trace.push(CircleEvaluation::new(domain, out_mult));
+
+        assert_eq!(trace.len(), AddColumn::count().0);
+
+        Ok((trace, AddClaim::new(log_size)))
+    }
 }
 
 /// Enum representing the column indices in the Add trace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AddColumn {
-    /// Index of the `lhs` register column in the Add trace.
+    NodeId,
+    LhsId,
+    RhsId,
+    Idx,
+    IsLastIdx,
+    NextNodeId,
+    NextLhsId,
+    NextRhsId,
+    NextIdx,
     Lhs,
-
-    /// Index of the `rhs` register column in the Add trace.
     Rhs,
-
-    /// Index of the `out` register column in the Add trace.
     Out,
+    LhsMult,
+    RhsMult,
+    OutMult,
 }
 
 impl AddColumn {
     /// Returns the index of the column in the Add trace.
     pub const fn index(self) -> usize {
         match self {
-            Self::Lhs => 0,
-            Self::Rhs => 1,
-            Self::Out => 2,
+            Self::NodeId => 0,
+            Self::LhsId => 1,
+            Self::RhsId => 2,
+            Self::Idx => 3,
+            Self::IsLastIdx => 4,
+            Self::NextNodeId => 5,
+            Self::NextLhsId => 6,
+            Self::NextRhsId => 7,
+            Self::NextIdx => 8,
+            Self::Lhs => 9,
+            Self::Rhs => 10,
+            Self::Out => 11,
+            Self::LhsMult => 12,
+            Self::RhsMult => 13,
+            Self::OutMult => 14,
         }
     }
 }
-
 impl TraceColumn for AddColumn {
     /// Returns the number of columns in the main trace and interaction trace.
-    ///     
-    /// For the Add component, both the main trace and interaction trace have 3 columns each.
     fn count() -> (usize, usize) {
-        (3, 3)
+        (15, 3)
     }
 }
 
@@ -109,7 +189,6 @@ impl TraceColumn for AddColumn {
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
     lookup_elements: &NodeElements,
-    node_info: &NodeInfo,
 ) -> Result<(TraceEval, InteractionClaim), TraceError> {
     if main_trace_eval.is_empty() {
         return Err(TraceError::EmptyTrace);
@@ -119,49 +198,58 @@ pub fn interaction_trace_evaluation(
     let mut logup_gen = LogupTraceGenerator::new(log_size);
 
     // Create trace for LHS
-    let lhs_col = &main_trace_eval[AddColumn::Lhs.index()].data;
-    let mut col_lhs = logup_gen.new_col();
+    let lhs_main_col = &main_trace_eval[AddColumn::Lhs.index()].data;
+    let lhs_id_col = &main_trace_eval[AddColumn::LhsId.index()].data;
+    let lhs_mult_col = &main_trace_eval[AddColumn::LhsMult.index()].data;
+    let mut lhs_int_col = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
-        let lhs = lhs_col[row];
-        let multiplicity = if node_info.inputs[0].is_initializer {
-            PackedSecureField::zero()
-        } else {
-            -PackedSecureField::one()
-        };
+        let lhs = lhs_main_col[row];
+        let id = lhs_id_col[row];
+        let multiplicity = lhs_mult_col[row];
 
-        col_lhs.write_frac(row, multiplicity, lookup_elements.combine(&[lhs]));
+        lhs_int_col.write_frac(
+            row,
+            multiplicity.into(),
+            lookup_elements.combine(&[lhs, id]),
+        );
     }
-    col_lhs.finalize_col();
+    lhs_int_col.finalize_col();
 
     // Create trace for RHS
-    let rhs_col = &main_trace_eval[AddColumn::Rhs.index()].data;
-    let mut col_rhs = logup_gen.new_col();
+    let rhs_main_col = &main_trace_eval[AddColumn::Rhs.index()].data;
+    let rhs_id_col = &main_trace_eval[AddColumn::RhsId.index()].data;
+    let rhs_mult_col = &main_trace_eval[AddColumn::RhsMult.index()].data;
+    let mut rhs_int_col = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
-        let rhs = rhs_col[row];
-        let multiplicity = if node_info.inputs[1].is_initializer {
-            PackedSecureField::zero()
-        } else {
-            -PackedSecureField::one()
-        };
+        let rhs = rhs_main_col[row];
+        let id = rhs_id_col[row];
+        let multiplicity = rhs_mult_col[row];
 
-        col_rhs.write_frac(row, multiplicity, lookup_elements.combine(&[rhs]));
+        rhs_int_col.write_frac(
+            row,
+            multiplicity.into(),
+            lookup_elements.combine(&[rhs, id]),
+        );
     }
-    col_rhs.finalize_col();
+    rhs_int_col.finalize_col();
 
-    // Create trace for output
-    let out_col = &main_trace_eval[AddColumn::Out.index()].data;
-    let mut col_out = logup_gen.new_col();
+    // Create trace for OUTPUT
+    let out_main_col = &main_trace_eval[AddColumn::Out.index()].data;
+    let node_id_col = &main_trace_eval[AddColumn::NodeId.index()].data;
+    let out_mult_col = &main_trace_eval[AddColumn::OutMult.index()].data;
+    let mut out_int_col = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
-        let out = out_col[row];
-        let multiplicity = if node_info.output.is_final_output {
-            PackedSecureField::zero()
-        } else {
-            PackedSecureField::one() * BaseField::from_u32_unchecked(node_info.num_consumers as u32)
-        };
+        let out = out_main_col[row];
+        let id = node_id_col[row];
+        let multiplicity = out_mult_col[row];
 
-        col_out.write_frac(row, multiplicity, lookup_elements.combine(&[out]));
+        out_int_col.write_frac(
+            row,
+            multiplicity.into(),
+            lookup_elements.combine(&[out, id]),
+        );
     }
-    col_out.finalize_col();
+    out_int_col.finalize_col();
 
     let (trace, claimed_sum) = logup_gen.finalize_last();
 

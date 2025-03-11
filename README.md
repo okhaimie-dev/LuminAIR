@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
 
     // Execute and generate a trace of the computation graph
-    let trace = cx.gen_trace();
+    let trace = cx.gen_trace()?;
 
     // Generate proof and verify
     let proof = cx.prove(trace)?;

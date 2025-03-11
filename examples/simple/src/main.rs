@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ======= Execute graph & generate trace =======
     println!("Executing graph and generating execution trace...");
-    let trace = cx.gen_trace();
+    let trace = cx.gen_trace()?;
     println!("Execution trace generated successfully. ✅");
     println!("Final result: {:?}", e);
 

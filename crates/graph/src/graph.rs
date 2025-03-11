@@ -4,9 +4,15 @@ use crate::op::{
 };
 use luminair_air::{
     components::{
-        add::{self, table::AddColumn},
-        mul::{self, table::MulColumn},
-        ClaimType, LuminairComponents, LuminairInteractionElements, TraceEval,
+        add::{
+            self,
+            table::{AddColumn, AddTable},
+        },
+        mul::{
+            self,
+            table::{MulColumn, MulTable},
+        },
+        ClaimType, LuminairComponents, LuminairInteractionElements, TraceError, TraceEval,
     },
     pie::{ExecutionResources, InputInfo, LuminairPie, NodeInfo, OpCounter, OutputInfo, Trace},
     serde::SerializableTrace,
@@ -48,7 +54,7 @@ pub enum LuminairError {
 /// generation and verification using Stwo.
 pub trait LuminairGraph {
     /// Generates an execution trace for the graph’s computation.
-    fn gen_trace(&mut self) -> LuminairPie;
+    fn gen_trace(&mut self) -> Result<LuminairPie, TraceError>;
 
     /// Generates a proof of the graph’s execution using the provided trace.
     fn prove(
@@ -61,7 +67,7 @@ pub trait LuminairGraph {
 }
 
 impl LuminairGraph for Graph {
-    fn gen_trace(&mut self) -> LuminairPie {
+    fn gen_trace(&mut self) -> Result<LuminairPie, TraceError> {
         // Track the number of views pointing to each tensor so we know when to clear
         if self.linearized_graph.is_none() {
             self.toposort();
@@ -75,7 +81,9 @@ impl LuminairGraph for Graph {
         // Initializes operator counter
         let mut op_counter = OpCounter::default();
 
-        let mut max_log_size = 0;
+        // Initilializes table for each operator
+        let mut add_table: AddTable = AddTable::new();
+        let mut mul_table: MulTable = MulTable::new();
 
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
@@ -111,6 +119,7 @@ impl LuminairGraph for Graph {
                         is_initializer: node_is_function
                             || node_is_constant
                             || is_copy_of_initializer,
+                        id: id.index() as u32,
                     }
                 })
                 .collect::<Vec<_>>();
@@ -138,7 +147,8 @@ impl LuminairGraph for Graph {
             let node_info = NodeInfo {
                 inputs: input_info,
                 output: output_info,
-                num_consumers: *consumers.get(&(*node, 0)).unwrap_or(&0),
+                num_consumers: *consumers.get(&(*node, 0)).unwrap_or(&0) as u32,
+                id: node.index() as u32,
             };
 
             // Substitute in the dyn dims
@@ -150,39 +160,29 @@ impl LuminairGraph for Graph {
             let node_op = &mut *self.graph.node_weight_mut(*node).unwrap();
 
             let tensors =
-                if <Box<dyn Operator> as HasProcessTrace<AddColumn>>::has_process_trace(node_op) {
-                    let (trace, claim, tensors) =
-                        <Box<dyn Operator> as HasProcessTrace<AddColumn>>::call_process_trace(
-                            node_op, srcs, &node_info,
-                        )
-                        .unwrap();
-
-                    max_log_size = max_log_size.max(claim.log_size);
-
-                    traces.push(Trace {
-                        eval: SerializableTrace::from(&trace),
-                        claim: ClaimType::Add(claim),
-                        node_info,
-                    });
+                if <Box<dyn Operator> as HasProcessTrace<AddColumn, AddTable>>::has_process_trace(
+                    node_op,
+                ) {
+                    let tensors = <Box<dyn Operator> as HasProcessTrace<
+                        AddColumn,
+                        AddTable,
+                    >>::call_process_trace(
+                        node_op, srcs, &mut add_table, &node_info
+                    )
+                    .unwrap();
                     *op_counter.add.get_or_insert(0) += 1;
 
                     tensors
-                } else if <Box<dyn Operator> as HasProcessTrace<MulColumn>>::has_process_trace(
+                }  else if <Box<dyn Operator> as HasProcessTrace<MulColumn, MulTable>>::has_process_trace(
                     node_op,
                 ) {
-                    let (trace, claim, tensors) =
-                        <Box<dyn Operator> as HasProcessTrace<MulColumn>>::call_process_trace(
-                            node_op, srcs, &node_info,
-                        )
-                        .unwrap();
-
-                    max_log_size = max_log_size.max(claim.log_size);
-
-                    traces.push(Trace {
-                        eval: SerializableTrace::from(&trace),
-                        claim: ClaimType::Mul(claim),
-                        node_info,
-                    });
+                    let tensors = <Box<dyn Operator> as HasProcessTrace<
+                        MulColumn,
+                        MulTable,
+                    >>::call_process_trace(
+                        node_op, srcs, &mut mul_table, &node_info
+                    )
+                    .unwrap();
                     *op_counter.mul.get_or_insert(0) += 1;
 
                     tensors
@@ -203,34 +203,44 @@ impl LuminairGraph for Graph {
 
         self.reset();
 
-        // Sort traces to match the order of components
-        traces.sort_by_key(|trace| match trace.claim {
-            ClaimType::Add(_) => 0,
-            ClaimType::Mul(_) => 1,
-        });
+        // Convert tables to traces
+        let mut max_log_size = 0;
 
-        LuminairPie {
+        if !add_table.table.is_empty() {
+            let (trace, claim) = add_table.trace_evaluation()?;
+            max_log_size = max_log_size.max(claim.log_size);
+
+            traces.push(Trace::new(
+                SerializableTrace::from(&trace),
+                ClaimType::Add(claim),
+            ));
+        }
+        if !mul_table.table.is_empty() {
+            let (trace, claim) = mul_table.trace_evaluation()?;
+            max_log_size = max_log_size.max(claim.log_size);
+
+            traces.push(Trace::new(
+                SerializableTrace::from(&trace),
+                ClaimType::Mul(claim),
+            ));
+        }
+
+        Ok(LuminairPie {
             traces,
             execution_resources: ExecutionResources {
                 op_counter,
                 max_log_size,
             },
-        }
+        })
     }
 
     fn prove(
         &mut self,
         pie: LuminairPie,
     ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
-        // Track the number of views pointing to each tensor so we know when to clear
-        if self.linearized_graph.is_none() {
-            self.toposort();
-        }
-
         // ┌──────────────────────────┐
         // │     Protocol Setup       │
         // └──────────────────────────┘
-
         tracing::info!("Protocol Setup");
         let config = PcsConfig::default();
         let max_log_size = pie.execution_resources.max_log_size;
@@ -268,14 +278,15 @@ impl LuminairGraph for Graph {
 
         tracing::info!("Main Trace");
         let mut tree_builder = commitment_scheme.tree_builder();
-        let mut main_claim = LuminairClaim::init(is_first_log_sizes.clone());
+        let mut main_claim = LuminairClaim::new(is_first_log_sizes.clone());
 
         for trace in pie.traces.clone().into_iter() {
+            // Add the components' trace evaluation to the commit tree.
             tree_builder.extend_evals(trace.eval.to_trace());
 
             match trace.claim {
-                ClaimType::Add(claim) => main_claim.add.push(claim),
-                ClaimType::Mul(claim) => main_claim.mul.push(claim),
+                ClaimType::Add(claim) => main_claim.add = Some(claim),
+                ClaimType::Mul(claim) => main_claim.mul = Some(claim),
             }
         }
 
@@ -290,39 +301,28 @@ impl LuminairGraph for Graph {
 
         // Draw interaction elements
         let interaction_elements = LuminairInteractionElements::draw(channel);
-
         // Generate the interaction trace from the main trace, and compute the logUp sum.
         let mut tree_builder = commitment_scheme.tree_builder();
-        let mut interaction_claim = LuminairInteractionClaim::init();
+        let mut interaction_claim = LuminairInteractionClaim::default();
 
         for trace in pie.traces.into_iter() {
             let claim = trace.claim;
-            let node_info = trace.node_info;
             let trace: TraceEval = trace.eval.to_trace();
             let lookup_elements = &interaction_elements.node_lookup_elements;
 
             match claim {
                 ClaimType::Add(_) => {
-                    let (t, c) = add::table::interaction_trace_evaluation(
-                        &trace,
-                        lookup_elements,
-                        &node_info,
-                    )
-                    .unwrap();
+                    let (tr, cl) =
+                        add::table::interaction_trace_evaluation(&trace, lookup_elements).unwrap();
 
-                    tree_builder.extend_evals(t);
-                    interaction_claim.add.push(c);
+                    tree_builder.extend_evals(tr);
+                    interaction_claim.add = Some(cl);
                 }
                 ClaimType::Mul(_) => {
-                    let (t, c) = mul::table::interaction_trace_evaluation(
-                        &trace,
-                        lookup_elements,
-                        &node_info,
-                    )
-                    .unwrap();
-
-                    tree_builder.extend_evals(t);
-                    interaction_claim.mul.push(c);
+                    let (tr, cl) =
+                        mul::table::interaction_trace_evaluation(&trace, lookup_elements).unwrap();
+                    tree_builder.extend_evals(tr);
+                    interaction_claim.mul = Some(cl);
                 }
             }
         }
@@ -344,8 +344,6 @@ impl LuminairGraph for Graph {
         );
         let components = component_builder.provers();
         let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
-
-        self.reset();
 
         Ok(LuminairProof {
             claim: main_claim,
@@ -425,7 +423,6 @@ impl LuminairGraph for Graph {
             &is_first_log_sizes,
         );
         let components = component_builder.components();
-
         verify(&components, channel, commitment_scheme_verifier, proof)?;
 
         Ok(())

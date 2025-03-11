@@ -90,7 +90,7 @@ fn benchmark_add(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut graph = create_graph!(|a, b| a + b, (rows, cols), (rows, cols));
-                    let trace = graph.gen_trace();
+                    let trace = graph.gen_trace().expect("Trace generation failed");
                     (graph, trace)
                 },
                 |(mut graph, trace)| {
@@ -108,7 +108,7 @@ fn benchmark_add(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut graph = create_graph!(|a, b| a + b, (rows, cols), (rows, cols));
-                    let trace = graph.gen_trace();
+                    let trace = graph.gen_trace().expect("Trace generation failed");
                     let proof = graph.prove(trace).expect("Proof generation failed");
                     (graph, proof)
                 },
@@ -154,7 +154,7 @@ fn benchmark_mul(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut graph = create_graph!(|a, b| a * b, (rows, cols), (rows, cols));
-                    let trace = graph.gen_trace();
+                    let trace = graph.gen_trace().expect("Trace generation failed");
                     (graph, trace)
                 },
                 |(mut graph, trace)| {
@@ -172,7 +172,7 @@ fn benchmark_mul(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut graph = create_graph!(|a, b| a * b, (rows, cols), (rows, cols));
-                    let trace = graph.gen_trace();
+                    let trace = graph.gen_trace().expect("Trace generation failed");
                     let proof = graph.prove(trace).expect("Proof generation failed");
                     (graph, proof)
                 },

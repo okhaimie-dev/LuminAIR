@@ -1,5 +1,7 @@
 #![feature(trait_upcasting)]
 
+use std::vec;
+
 use ::serde::{Deserialize, Serialize};
 use components::{AddClaim, InteractionClaim, MulClaim};
 use pie::ExecutionResources;
@@ -27,37 +29,43 @@ pub struct LuminairProof<H: MerkleHasher> {
 /// Claim for system components.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairClaim {
-    pub add: Vec<AddClaim>,
-    pub mul: Vec<MulClaim>,
+    pub add: Option<AddClaim>,
+    pub mul: Option<MulClaim>,
     pub is_first_log_sizes: Vec<u32>,
 }
 
 impl LuminairClaim {
     /// Initializes a new claim with specified preprocessed trace log sizes.
-    pub fn init(is_first_log_sizes: Vec<u32>) -> Self {
+    pub fn new(is_first_log_sizes: Vec<u32>) -> Self {
         Self {
-            add: vec![],
-            mul: vec![],
+            add: None,
+            mul: None,
             is_first_log_sizes,
         }
     }
 
     /// Mixes claim data into a Fiat-Shamir channel for proof binding.
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        self.add.iter().for_each(|c| c.mix_into(channel));
-        self.mul.iter().for_each(|c| c.mix_into(channel));
+        if let Some(ref add) = self.add {
+            add.mix_into(channel);
+        }
+        if let Some(ref mul) = self.mul {
+            mul.mix_into(channel);
+        }
     }
 
     /// Computes log sizes for all trace types in the claim.
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        let mut log_sizes = TreeVec::concat_cols(
-            self.add
-                .iter()
-                .map(|c| c.log_sizes())
-                .chain(self.mul.iter().map(|c| c.log_sizes()))
-                .collect::<Vec<_>>()
-                .into_iter(),
-        );
+        let mut log_sizes = vec![];
+
+        if let Some(ref add) = self.add {
+            log_sizes.push(add.log_sizes());
+        }
+        if let Some(ref mul) = self.mul {
+            log_sizes.push(mul.log_sizes());
+        }
+
+        let mut log_sizes = TreeVec::concat_cols(log_sizes.into_iter());
         log_sizes[PREPROCESSED_TRACE_IDX] = self.is_first_log_sizes.clone();
         log_sizes
     }
@@ -66,24 +74,17 @@ impl LuminairClaim {
 /// Claim over the sum of interaction columns per system component.
 ///
 /// Used in the logUp lookup protocol with AIR.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct LuminairInteractionClaim {
-    pub add: Vec<InteractionClaim>,
-    pub mul: Vec<InteractionClaim>,
+    pub add: Option<InteractionClaim>,
+    pub mul: Option<InteractionClaim>,
 }
 
 impl LuminairInteractionClaim {
-    /// Initializes a new interaction claim.
-    pub fn init() -> Self {
-        Self {
-            add: vec![],
-            mul: vec![],
-        }
-    }
-
     /// Mixes interaction claim data into a Fiat-Shamir channel.
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        self.add.iter().for_each(|c| c.mix_into(channel));
-        self.mul.iter().for_each(|c| c.mix_into(channel));
+        if let Some(ref mul) = self.mul {
+            mul.mix_into(channel);
+        }
     }
 }

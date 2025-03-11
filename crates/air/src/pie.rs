@@ -14,7 +14,12 @@ pub struct LuminairPie {
 pub struct Trace {
     pub eval: SerializableTrace,
     pub claim: ClaimType,
-    pub node_info: NodeInfo,
+}
+
+impl Trace {
+    pub fn new(eval: SerializableTrace, claim: ClaimType) -> Self {
+        Self { eval, claim }
+    }
 }
 
 /// Holds resource usage data for the execution.
@@ -35,18 +40,20 @@ pub struct OpCounter {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InputInfo {
     pub is_initializer: bool,
+    pub id: u32,
 }
 
 /// Indicates if a node output is a final graph output or intermediate.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Default, Deserialize, PartialEq, Eq)]
 pub struct OutputInfo {
     pub is_final_output: bool,
 }
 
 /// Contains input, output, and consumer information for a node.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Default, Deserialize, PartialEq, Eq)]
 pub struct NodeInfo {
     pub inputs: Vec<InputInfo>,
     pub output: OutputInfo,
-    pub num_consumers: usize,
+    pub num_consumers: u32,
+    pub id: u32,
 }

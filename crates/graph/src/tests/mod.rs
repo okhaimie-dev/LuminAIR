@@ -58,7 +58,7 @@ macro_rules! single_binary_test {
 
                 // Compilation and execution using StwoCompiler
                 cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut c);
-                let trace = cx.gen_trace();
+                let trace = cx.gen_trace().expect("Trace generation failed");
                 let proof = cx.prove(trace).expect("Proof generation failed");
                 cx.verify(proof).expect("Proof verification failed");
                 // Retrieve output data
