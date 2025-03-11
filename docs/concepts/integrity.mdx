@@ -41,23 +41,8 @@ The underlying technology enabling this is [STARKs](https://starkware.co/stark/)
 ### Mapping Computational Graph Nodes to AIR Components
 In LuminAIR, computational graphs are transformed into AIR constraints and executed to generate an algebraic execution trace.
 
-Each node in the computational graph corresponds to a distinct AIR component, which has its own set of local constraints. 
+Each operator corresponds to a distinct AIR component, which has its own set of local constraints. 
 These constraints ensure that each operation in the graph is executed correctly.
-
-```rust
-/// Returns the `ComponentProver` of each components, used by the prover.
-pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-    self.add
-        .iter()
-        .map(|c| c as &dyn ComponentProver<SimdBackend>)
-        .chain(
-            self.mul
-                .iter()
-                .map(|c| c as &dyn ComponentProver<SimdBackend>),
-        )
-        .collect()
-}
-```
 
 ### Ensuring Data Flow Integrity Between Nodes
 
