@@ -1,21 +1,22 @@
-use crate::components::{AddClaim, NodeElements};
+use crate::components::{MulClaim, NodeElements};
 use num_traits::One;
-use numerair::eval::EvalFixedPoint;
+use numerair::{eval::EvalFixedPoint, SCALE_FACTOR};
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
 };
-/// Component for element-wise addition operations, using `SimdBackend` with fallback to `CpuBackend` for small traces.
-pub type AddComponent = FrameworkComponent<AddEval>;
 
-/// Defines the AIR for the addition component.
-pub struct AddEval {
+/// Component for element-wise multiplication operations, using `SimdBackend` with fallback to `CpuBackend` for small traces.
+pub type MulComponent = FrameworkComponent<MulEval>;
+
+/// Defines the AIR for the multiplication component.
+pub struct MulEval {
     log_size: u32,
     lookup_elements: NodeElements,
 }
 
-impl AddEval {
-    /// Creates a new `AddEval` instance from a claim and lookup elements.
-    pub fn new(claim: &AddClaim, lookup_elements: NodeElements) -> Self {
+impl MulEval {
+    /// Creates a new `MulEval` instance from a claim and lookup elements.
+    pub fn new(claim: &MulClaim, lookup_elements: NodeElements) -> Self {
         Self {
             log_size: claim.log_size,
             lookup_elements,
@@ -23,7 +24,7 @@ impl AddEval {
     }
 }
 
-impl FrameworkEval for AddEval {
+impl FrameworkEval for MulEval {
     /// Returns the logarithmic size of the main trace.
     fn log_size(&self) -> u32 {
         self.log_size
@@ -36,7 +37,7 @@ impl FrameworkEval for AddEval {
         self.log_size + 1
     }
 
-    /// Evaluates the AIR constraints for the addition operation.
+    /// Evaluates the AIR constraints for the multiplication operation.
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // IDs
         let node_id = eval.next_trace_mask(); // ID of the node in the computational graph.
@@ -55,6 +56,7 @@ impl FrameworkEval for AddEval {
         let lhs_val = eval.next_trace_mask(); // Value from first tensor at index.
         let rhs_val = eval.next_trace_mask(); // Value from second tensor at index.
         let out_val = eval.next_trace_mask(); // Value in output tensor at index.
+        let rem_val = eval.next_trace_mask(); // Rem value in result tensor at index.
 
         // Multiplicities for interaction constraints
         let lhs_mult = eval.next_trace_mask();
@@ -68,9 +70,14 @@ impl FrameworkEval for AddEval {
         // The is_last_idx flag is either 0 or 1.
         eval.add_constraint(is_last_idx.clone() * (is_last_idx.clone() - E::F::one()));
 
-        // The output value must equal the sum of the input values.
-        eval.eval_fixed_add(lhs_val.clone(), rhs_val.clone(), out_val.clone());
-
+        // Evaluates fixed point multiplication.
+        eval.eval_fixed_mul(
+            lhs_val.clone(),
+            rhs_val.clone(),
+            SCALE_FACTOR.into(),
+            out_val.clone(),
+            rem_val,
+        );
         // ┌────────────────────────────┐
         // │   Transition Constraints   │
         // └────────────────────────────┘

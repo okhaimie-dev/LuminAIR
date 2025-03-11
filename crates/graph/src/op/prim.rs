@@ -1,5 +1,8 @@
 use luminair_air::{
-    components::add::table::{AddColumn, AddTable, AddTableRow},
+    components::{
+        add::table::{AddColumn, AddTable, AddTableRow},
+        mul::table::{MulColumn, MulTable, MulTableRow},
+    },
     pie::NodeInfo,
 };
 use luminal::{
@@ -187,6 +190,93 @@ impl Operator for LuminairAdd {
     }
 }
 
+/// Implements element-wise multiplication for LuminAIR.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct LuminairMul {}
+
+impl LuminairMul {
+    /// Creates a new `LuminairMul` instance.
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl LuminairOperator<MulColumn, MulTable> for LuminairMul {
+    /// Processes two input tensors, generating a trace, claim, and output tensor.
+    fn process_trace(
+        &mut self,
+        inp: Vec<(InputTensor, ShapeTracker)>,
+        table: &mut MulTable,
+        node_info: &NodeInfo,
+    ) -> Vec<Tensor> {
+        let (lhs, rhs) = (
+            get_buffer_from_tensor(&inp[0].0),
+            get_buffer_from_tensor(&inp[1].0),
+        );
+        let lexpr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
+        let rexpr = (inp[1].1.index_expression(), inp[1].1.valid_expression());
+
+        let mut stack: Vec<i64> = vec![];
+        let output_size = inp[0].1.n_elements().to_usize().unwrap();
+        let mut out_data = vec![Fixed::zero(); output_size];
+
+        let node_id: BaseField = node_info.id.into();
+        let lhs_id: BaseField = node_info.inputs[0].id.into();
+        let rhs_id: BaseField = node_info.inputs[1].id.into();
+
+        for (idx, out) in out_data.iter_mut().enumerate() {
+            let lhs_val = get_index(lhs, &lexpr, &mut stack, idx);
+            let rhs_val = get_index(rhs, &rexpr, &mut stack, idx);
+            let (out_val, rem_val) = lhs_val * rhs_val;
+            let lhs_mult = if node_info.inputs[0].is_initializer {
+                BaseField::zero()
+            } else {
+                -BaseField::one()
+            };
+            let rhs_mult = if node_info.inputs[1].is_initializer {
+                BaseField::zero()
+            } else {
+                -BaseField::one()
+            };
+            let out_mult = if node_info.output.is_final_output {
+                BaseField::zero()
+            } else {
+                BaseField::one() * BaseField::from_u32_unchecked(node_info.num_consumers)
+            };
+
+            let is_last_idx: u32 = if idx == (output_size - 1) { 1 } else { 0 };
+
+            *out = out_val;
+            table.add_row(MulTableRow {
+                node_id,
+                lhs_id,
+                rhs_id,
+                idx: idx.into(),
+                is_last_idx: (is_last_idx).into(),
+                next_idx: (idx + 1).into(),
+                next_node_id: node_id,
+                next_lhs_id: lhs_id,
+                next_rhs_id: rhs_id,
+                lhs: lhs_val.to_m31(),
+                rhs: rhs_val.to_m31(),
+                out: out_val.to_m31(),
+                rem: rem_val.to_m31(),
+                lhs_mult,
+                rhs_mult,
+                out_mult,
+            })
+        }
+
+        vec![Tensor::new(StwoData(Arc::new(out_data)))]
+    }
+}
+
+impl Operator for LuminairMul {
+    /// This method is not used as `process_trace` handles all computation for this operator.
+    fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        unimplemented!()
+    }
+}
 // ================== COMPILER ==================
 
 /// Compiles primitive operations into provable forms for LuminAIR.
@@ -302,6 +392,8 @@ impl Compiler for PrimitiveCompiler {
                 *op_ref = Box::new(LuminairConstant::new(c.0.clone()));
             } else if is::<luminal::op::Add>(op) {
                 *op_ref = LuminairAdd::new().into_operator()
+            } else if is::<luminal::op::Mul>(op) {
+                *op_ref = LuminairMul::new().into_operator()
             } else if is::<luminal::op::Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
             }

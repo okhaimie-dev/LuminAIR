@@ -3,7 +3,7 @@
 use std::vec;
 
 use ::serde::{Deserialize, Serialize};
-use components::{AddClaim, InteractionClaim};
+use components::{AddClaim, InteractionClaim, MulClaim};
 use pie::ExecutionResources;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
 use stwo_prover::core::{
@@ -30,6 +30,7 @@ pub struct LuminairProof<H: MerkleHasher> {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairClaim {
     pub add: Option<AddClaim>,
+    pub mul: Option<MulClaim>,
     pub is_first_log_sizes: Vec<u32>,
 }
 
@@ -38,6 +39,7 @@ impl LuminairClaim {
     pub fn new(is_first_log_sizes: Vec<u32>) -> Self {
         Self {
             add: None,
+            mul: None,
             is_first_log_sizes,
         }
     }
@@ -47,16 +49,23 @@ impl LuminairClaim {
         if let Some(ref add) = self.add {
             add.mix_into(channel);
         }
+        if let Some(ref mul) = self.mul {
+            mul.mix_into(channel);
+        }
     }
 
     /// Computes log sizes for all trace types in the claim.
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        let mut log_sizes = TreeVec::new(vec![]);
+        let mut log_sizes = vec![];
 
         if let Some(ref add) = self.add {
-            log_sizes = TreeVec::concat_cols([add.log_sizes()].into_iter());
+            log_sizes.push(add.log_sizes());
+        }
+        if let Some(ref mul) = self.mul {
+            log_sizes.push(mul.log_sizes());
         }
 
+        let mut log_sizes = TreeVec::concat_cols(log_sizes.into_iter());
         log_sizes[PREPROCESSED_TRACE_IDX] = self.is_first_log_sizes.clone();
         log_sizes
     }
@@ -68,13 +77,14 @@ impl LuminairClaim {
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct LuminairInteractionClaim {
     pub add: Option<InteractionClaim>,
+    pub mul: Option<InteractionClaim>,
 }
 
 impl LuminairInteractionClaim {
     /// Mixes interaction claim data into a Fiat-Shamir channel.
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        if let Some(ref add) = self.add {
-            add.mix_into(channel);
+        if let Some(ref mul) = self.mul {
+            mul.mix_into(channel);
         }
     }
 }
