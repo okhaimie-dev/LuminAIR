@@ -40,6 +40,7 @@ pub struct OpCounter {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InputInfo {
     pub is_initializer: bool,
+    pub id: u32
 }
 
 /// Indicates if a node output is a final graph output or intermediate.
@@ -54,4 +55,5 @@ pub struct NodeInfo {
     pub inputs: Vec<InputInfo>,
     pub output: OutputInfo,
     pub num_consumers: u32,
+    pub id: u32,
 }

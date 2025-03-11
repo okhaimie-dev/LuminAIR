@@ -4,7 +4,6 @@ use numerair::eval::EvalFixedPoint;
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
 };
-
 /// Component for addition operations, using `SimdBackend` with fallback to `CpuBackend` for small traces.
 pub type AddComponent = FrameworkComponent<AddEval>;
 
@@ -88,9 +87,8 @@ impl FrameworkEval for AddEval {
         eval.add_constraint(not_last.clone() * (next_lhs_id - lhs_id));
         eval.add_constraint(not_last.clone() * (next_rhs_id - rhs_id));
 
-        // TODO: uncomment.
-        // // Index increment by 1
-        // eval.add_constraint(not_last * (next_idx - idx - E::F::one()));
+        // Index increment by 1
+        eval.add_constraint(not_last * (next_idx - idx - E::F::one()));
 
         // ┌─────────────────────────────┐
         // │   Interaction Constraints   │

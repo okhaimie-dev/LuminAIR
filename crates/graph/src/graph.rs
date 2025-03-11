@@ -116,6 +116,7 @@ impl LuminairGraph for Graph {
                         is_initializer: node_is_function
                             || node_is_constant
                             || is_copy_of_initializer,
+                        id: id.index() as u32,
                     }
                 })
                 .collect::<Vec<_>>();
@@ -144,6 +145,7 @@ impl LuminairGraph for Graph {
                 inputs: input_info,
                 output: output_info,
                 num_consumers: *consumers.get(&(*node, 0)).unwrap_or(&0) as u32,
+                id: node.index() as u32,
             };
 
             // Substitute in the dyn dims

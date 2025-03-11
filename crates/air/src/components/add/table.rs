@@ -1,3 +1,4 @@
+use num_traits::One;
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::{logup::LogupTraceGenerator, Relation},
@@ -27,6 +28,15 @@ pub struct AddTable {
 /// Represents a single row of the [`AddTable`]
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct AddTableRow {
+    pub node_id: BaseField,
+    pub lhs_id: BaseField,
+    pub rhs_id: BaseField,
+    pub idx: BaseField,
+    pub is_last_idx: BaseField,
+    pub next_node_id: BaseField,
+    pub next_lhs_id: BaseField,
+    pub next_rhs_id: BaseField,
+    pub next_idx: BaseField,
     pub lhs: BaseField,
     pub rhs: BaseField,
     pub out: BaseField,
@@ -60,15 +70,15 @@ impl AddTable {
         let trace_size = 1 << log_size;
 
         // Create columns
-        let node_id = BaseColumn::zeros(trace_size);
-        let lhs_id = BaseColumn::zeros(trace_size);
-        let rhs_id = BaseColumn::zeros(trace_size);
-        let idx = BaseColumn::zeros(trace_size);
-        let is_last_idx = BaseColumn::zeros(trace_size);
-        let next_node_id = BaseColumn::zeros(trace_size);
-        let next_lhs_id = BaseColumn::zeros(trace_size);
-        let next_rhs_id = BaseColumn::zeros(trace_size);
-        let next_idx = BaseColumn::zeros(trace_size);
+        let mut node_id = BaseColumn::zeros(trace_size);
+        let mut lhs_id = BaseColumn::zeros(trace_size);
+        let mut rhs_id = BaseColumn::zeros(trace_size);
+        let mut idx = BaseColumn::zeros(trace_size);
+        let mut is_last_idx = BaseColumn::zeros(trace_size);
+        let mut next_node_id = BaseColumn::zeros(trace_size);
+        let mut next_lhs_id = BaseColumn::zeros(trace_size);
+        let mut next_rhs_id = BaseColumn::zeros(trace_size);
+        let mut next_idx = BaseColumn::zeros(trace_size);
         let mut lhs = BaseColumn::zeros(trace_size);
         let mut rhs = BaseColumn::zeros(trace_size);
         let mut out = BaseColumn::zeros(trace_size);
@@ -78,12 +88,25 @@ impl AddTable {
 
         // Fill columns
         for (vec_row, row) in self.table.iter().enumerate() {
+            node_id.set(vec_row, row.node_id);
+            lhs_id.set(vec_row, row.lhs_id);
+            rhs_id.set(vec_row, row.rhs_id);
+            idx.set(vec_row, row.idx);
+            is_last_idx.set(vec_row, row.is_last_idx);
+            next_node_id.set(vec_row, row.next_node_id);
+            next_lhs_id.set(vec_row, row.next_lhs_id);
+            next_rhs_id.set(vec_row, row.next_rhs_id);
+            next_idx.set(vec_row, row.next_idx);
             lhs.set(vec_row, row.lhs);
             rhs.set(vec_row, row.rhs);
             out.set(vec_row, row.out);
             lhs_mult.set(vec_row, row.lhs_mult);
             rhs_mult.set(vec_row, row.rhs_mult);
             out_mult.set(vec_row, row.out_mult);
+        }
+
+        for i in self.table.len()..trace_size {
+            is_last_idx.set(i, BaseField::one());
         }
 
         // Create domain
