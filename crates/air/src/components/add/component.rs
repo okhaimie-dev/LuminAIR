@@ -81,11 +81,11 @@ impl FrameworkEval for AddEval {
         let not_last = E::F::one() - is_last_idx;
 
         // Same node ID
-        eval.add_constraint(not_last.clone() * (next_node_id - node_id));
+        eval.add_constraint(not_last.clone() * (next_node_id - node_id.clone()));
 
         // Same tensor IDs
-        eval.add_constraint(not_last.clone() * (next_lhs_id - lhs_id));
-        eval.add_constraint(not_last.clone() * (next_rhs_id - rhs_id));
+        eval.add_constraint(not_last.clone() * (next_lhs_id - lhs_id.clone()));
+        eval.add_constraint(not_last.clone() * (next_rhs_id - rhs_id.clone()));
 
         // Index increment by 1
         eval.add_constraint(not_last * (next_idx - idx - E::F::one()));
@@ -97,19 +97,19 @@ impl FrameworkEval for AddEval {
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
             lhs_mult.into(),
-            &[lhs_val],
+            &[lhs_val, lhs_id],
         ));
 
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
             rhs_mult.into(),
-            &[rhs_val],
+            &[rhs_val, rhs_id],
         ));
 
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
             out_mult.into(),
-            &[out_val],
+            &[out_val, node_id],
         ));
 
         eval.finalize_logup();

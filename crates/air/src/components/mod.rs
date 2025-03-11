@@ -113,7 +113,7 @@ impl InteractionClaim {
 
 // Defines the relation for the node lookup elements.
 // It allows to constrain relationship between nodes.
-relation!(NodeElements, 1);
+relation!(NodeElements, 2);
 
 /// All the interaction elements required by the components during the interaction phase 2.
 ///

@@ -199,37 +199,55 @@ pub fn interaction_trace_evaluation(
 
     // Create trace for LHS
     let lhs_main_col = &main_trace_eval[AddColumn::Lhs.index()].data;
+    let lhs_id_col = &main_trace_eval[AddColumn::LhsId.index()].data;
     let lhs_mult_col = &main_trace_eval[AddColumn::LhsMult.index()].data;
     let mut lhs_int_col = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
         let lhs = lhs_main_col[row];
+        let id = lhs_id_col[row];
         let multiplicity = lhs_mult_col[row];
 
-        lhs_int_col.write_frac(row, multiplicity.into(), lookup_elements.combine(&[lhs]));
+        lhs_int_col.write_frac(
+            row,
+            multiplicity.into(),
+            lookup_elements.combine(&[lhs, id]),
+        );
     }
     lhs_int_col.finalize_col();
 
     // Create trace for RHS
     let rhs_main_col = &main_trace_eval[AddColumn::Rhs.index()].data;
+    let rhs_id_col = &main_trace_eval[AddColumn::RhsId.index()].data;
     let rhs_mult_col = &main_trace_eval[AddColumn::RhsMult.index()].data;
     let mut rhs_int_col = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
         let rhs = rhs_main_col[row];
+        let id = rhs_id_col[row];
         let multiplicity = rhs_mult_col[row];
 
-        rhs_int_col.write_frac(row, multiplicity.into(), lookup_elements.combine(&[rhs]));
+        rhs_int_col.write_frac(
+            row,
+            multiplicity.into(),
+            lookup_elements.combine(&[rhs, id]),
+        );
     }
     rhs_int_col.finalize_col();
 
     // Create trace for OUTPUT
     let out_main_col = &main_trace_eval[AddColumn::Out.index()].data;
+    let node_id_col = &main_trace_eval[AddColumn::NodeId.index()].data;
     let out_mult_col = &main_trace_eval[AddColumn::OutMult.index()].data;
     let mut out_int_col = logup_gen.new_col();
     for row in 0..1 << (log_size - LOG_N_LANES) {
         let out = out_main_col[row];
+        let id = node_id_col[row];
         let multiplicity = out_mult_col[row];
 
-        out_int_col.write_frac(row, multiplicity.into(), lookup_elements.combine(&[out]));
+        out_int_col.write_frac(
+            row,
+            multiplicity.into(),
+            lookup_elements.combine(&[out, id]),
+        );
     }
     out_int_col.finalize_col();
 
