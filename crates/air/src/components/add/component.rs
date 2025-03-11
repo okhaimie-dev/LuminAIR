@@ -1,9 +1,9 @@
+use crate::components::{AddClaim, NodeElements};
+use num_traits::One;
 use numerair::eval::EvalFixedPoint;
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
 };
-
-use crate::components::{AddClaim, NodeElements};
 
 /// Component for addition operations, using `SimdBackend` with fallback to `CpuBackend` for small traces.
 pub type AddComponent = FrameworkComponent<AddEval>;
@@ -39,9 +39,25 @@ impl FrameworkEval for AddEval {
 
     /// Evaluates the AIR constraints for the addition operation.
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
-        let lhs = eval.next_trace_mask();
-        let rhs = eval.next_trace_mask();
-        let out = eval.next_trace_mask();
+        // IDs
+        let node_id = eval.next_trace_mask(); // ID of the node in the computational graph.
+        let lhs_id = eval.next_trace_mask(); // ID of first input tensor.
+        let rhs_id = eval.next_trace_mask(); // ID of second input tensor.
+        let idx = eval.next_trace_mask(); // Index in the flattened tensor.
+        let is_last_idx = eval.next_trace_mask(); // Flag if this is the last index for this operation.
+
+        // Next IDs for transition constraints
+        let next_node_id = eval.next_trace_mask();
+        let next_lhs_id = eval.next_trace_mask();
+        let next_rhs_id = eval.next_trace_mask();
+        let next_idx = eval.next_trace_mask();
+
+        // Values for consistency constraints
+        let lhs_val = eval.next_trace_mask(); // Value from first tensor at index.
+        let rhs_val = eval.next_trace_mask(); // Value from second tensor at index.
+        let out_val = eval.next_trace_mask(); // Value in output tensor at index.
+
+        // Multiplicities for interaction constraints
         let lhs_mult = eval.next_trace_mask();
         let rhs_mult = eval.next_trace_mask();
         let out_mult = eval.next_trace_mask();
@@ -50,7 +66,31 @@ impl FrameworkEval for AddEval {
         // │   Consistency Constraints   │
         // └─────────────────────────────┘
 
-        eval.eval_fixed_add(lhs.clone(), rhs.clone(), out.clone());
+        // The is_last_idx flag is either 0 or 1.
+        eval.add_constraint(is_last_idx.clone() * (is_last_idx.clone() - E::F::one()));
+
+        // The output value must equal the sum of the input values.
+        eval.eval_fixed_add(lhs_val.clone(), rhs_val.clone(), out_val.clone());
+
+        // ┌────────────────────────────┐
+        // │   Transition Constraints   │
+        // └────────────────────────────┘
+
+        // If this is not the last index for this operation, then:
+        // 1. The next row should be for the same operation on the same tensors.
+        // 2. The index should increment by 1.
+        let not_last = E::F::one() - is_last_idx;
+
+        // Same node ID
+        eval.add_constraint(not_last.clone() * (next_node_id - node_id));
+
+        // Same tensor IDs
+        eval.add_constraint(not_last.clone() * (next_lhs_id - lhs_id));
+        eval.add_constraint(not_last.clone() * (next_rhs_id - rhs_id));
+
+        // TODO: uncomment.
+        // // Index increment by 1
+        // eval.add_constraint(not_last * (next_idx - idx - E::F::one()));
 
         // ┌─────────────────────────────┐
         // │   Interaction Constraints   │
@@ -59,19 +99,19 @@ impl FrameworkEval for AddEval {
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
             lhs_mult.into(),
-            &[lhs],
+            &[lhs_val],
         ));
 
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
             rhs_mult.into(),
-            &[rhs],
+            &[rhs_val],
         ));
 
         eval.add_to_relation(RelationEntry::new(
             &self.lookup_elements,
             out_mult.into(),
-            &[out],
+            &[out_val],
         ));
 
         eval.finalize_logup();

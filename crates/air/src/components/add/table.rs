@@ -60,21 +60,30 @@ impl AddTable {
         let trace_size = 1 << log_size;
 
         // Create columns
-        let mut lhs_col = BaseColumn::zeros(trace_size);
-        let mut rhs_col = BaseColumn::zeros(trace_size);
-        let mut out_col = BaseColumn::zeros(trace_size);
-        let mut lhs_mult_col = BaseColumn::zeros(trace_size);
-        let mut rhs_mult_col = BaseColumn::zeros(trace_size);
-        let mut out_mult_col = BaseColumn::zeros(trace_size);
+        let node_id = BaseColumn::zeros(trace_size);
+        let lhs_id = BaseColumn::zeros(trace_size);
+        let rhs_id = BaseColumn::zeros(trace_size);
+        let idx = BaseColumn::zeros(trace_size);
+        let is_last_idx = BaseColumn::zeros(trace_size);
+        let next_node_id = BaseColumn::zeros(trace_size);
+        let next_lhs_id = BaseColumn::zeros(trace_size);
+        let next_rhs_id = BaseColumn::zeros(trace_size);
+        let next_idx = BaseColumn::zeros(trace_size);
+        let mut lhs = BaseColumn::zeros(trace_size);
+        let mut rhs = BaseColumn::zeros(trace_size);
+        let mut out = BaseColumn::zeros(trace_size);
+        let mut lhs_mult = BaseColumn::zeros(trace_size);
+        let mut rhs_mult = BaseColumn::zeros(trace_size);
+        let mut out_mult = BaseColumn::zeros(trace_size);
 
         // Fill columns
         for (vec_row, row) in self.table.iter().enumerate() {
-            lhs_col.set(vec_row, row.lhs);
-            rhs_col.set(vec_row, row.rhs);
-            out_col.set(vec_row, row.out);
-            lhs_mult_col.set(vec_row, row.lhs_mult);
-            rhs_mult_col.set(vec_row, row.rhs_mult);
-            out_mult_col.set(vec_row, row.out_mult);
+            lhs.set(vec_row, row.lhs);
+            rhs.set(vec_row, row.rhs);
+            out.set(vec_row, row.out);
+            lhs_mult.set(vec_row, row.lhs_mult);
+            rhs_mult.set(vec_row, row.rhs_mult);
+            out_mult.set(vec_row, row.out_mult);
         }
 
         // Create domain
@@ -82,12 +91,23 @@ impl AddTable {
 
         // Create trace
         let mut trace = Vec::with_capacity(AddColumn::count().0);
-        trace.push(CircleEvaluation::new(domain, lhs_col));
-        trace.push(CircleEvaluation::new(domain, rhs_col));
-        trace.push(CircleEvaluation::new(domain, out_col));
-        trace.push(CircleEvaluation::new(domain, lhs_mult_col));
-        trace.push(CircleEvaluation::new(domain, rhs_mult_col));
-        trace.push(CircleEvaluation::new(domain, out_mult_col));
+        trace.push(CircleEvaluation::new(domain, node_id));
+        trace.push(CircleEvaluation::new(domain, lhs_id));
+        trace.push(CircleEvaluation::new(domain, rhs_id));
+        trace.push(CircleEvaluation::new(domain, idx));
+        trace.push(CircleEvaluation::new(domain, is_last_idx));
+        trace.push(CircleEvaluation::new(domain, next_node_id));
+        trace.push(CircleEvaluation::new(domain, next_lhs_id));
+        trace.push(CircleEvaluation::new(domain, next_rhs_id));
+        trace.push(CircleEvaluation::new(domain, next_idx));
+        trace.push(CircleEvaluation::new(domain, lhs));
+        trace.push(CircleEvaluation::new(domain, rhs));
+        trace.push(CircleEvaluation::new(domain, out));
+        trace.push(CircleEvaluation::new(domain, lhs_mult));
+        trace.push(CircleEvaluation::new(domain, rhs_mult));
+        trace.push(CircleEvaluation::new(domain, out_mult));
+
+        assert_eq!(trace.len(), AddColumn::count().0);
 
         Ok((trace, AddClaim::new(log_size)))
     }
@@ -96,22 +116,20 @@ impl AddTable {
 /// Enum representing the column indices in the Add trace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AddColumn {
-    /// Index of the `lhs` register column in the Add trace.
+    NodeId,
+    LhsId,
+    RhsId,
+    Idx,
+    IsLastIdx,
+    NextNodeId,
+    NextLhsId,
+    NextRhsId,
+    NextIdx,
     Lhs,
-
-    /// Index of the `rhs` register column in the Add trace.
     Rhs,
-
-    /// Index of the `out` register column in the Add trace.
     Out,
-
-    /// Index of the `lhs` multiplicity register column in the Add trace.
     LhsMult,
-
-    /// Index of the `rhs` multiplicity register column in the Add trace.
     RhsMult,
-
-    /// Index of the `out` multiplicity register column in the Add trace.
     OutMult,
 }
 
@@ -119,19 +137,28 @@ impl AddColumn {
     /// Returns the index of the column in the Add trace.
     pub const fn index(self) -> usize {
         match self {
-            Self::Lhs => 0,
-            Self::Rhs => 1,
-            Self::Out => 2,
-            Self::LhsMult => 3,
-            Self::RhsMult => 4,
-            Self::OutMult => 5,
+            Self::NodeId => 0,
+            Self::LhsId => 1,
+            Self::RhsId => 2,
+            Self::Idx => 3,
+            Self::IsLastIdx => 4,
+            Self::NextNodeId => 5,
+            Self::NextLhsId => 6,
+            Self::NextRhsId => 7,
+            Self::NextIdx => 8,
+            Self::Lhs => 9,
+            Self::Rhs => 10,
+            Self::Out => 11,
+            Self::LhsMult => 12,
+            Self::RhsMult => 13,
+            Self::OutMult => 14,
         }
     }
 }
 impl TraceColumn for AddColumn {
     /// Returns the number of columns in the main trace and interaction trace.
     fn count() -> (usize, usize) {
-        (6, 3)
+        (15, 3)
     }
 }
 
