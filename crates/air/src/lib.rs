@@ -21,6 +21,7 @@ pub mod utils;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairProof<H: MerkleHasher> {
     pub claim: LuminairClaim,
+    pub interaction_claim: LuminairInteractionClaim,
     pub proof: StarkProof<H>,
     pub execution_resources: ExecutionResources,
 }
@@ -64,16 +65,16 @@ impl LuminairClaim {
 /// Claim over the sum of interaction columns per system component.
 ///
 /// Used in the logUp lookup protocol with AIR.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct LuminairInteractionClaim {
-    pub add: InteractionClaim,
-    pub mul: InteractionClaim,
+    pub add: Option<InteractionClaim>,
 }
 
 impl LuminairInteractionClaim {
     /// Mixes interaction claim data into a Fiat-Shamir channel.
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        self.add.mix_into(channel);
-        self.mul.mix_into(channel);
+        if let Some(ref add) = self.add {
+            add.mix_into(channel);
+        }
     }
 }

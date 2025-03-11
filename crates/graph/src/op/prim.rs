@@ -1,11 +1,15 @@
-use luminair_air::components::add::table::{AddColumn, AddTable, AddTableRow};
+use luminair_air::{
+    components::add::table::{AddColumn, AddTable, AddTableRow},
+    pie::NodeInfo,
+};
 use luminal::{
     op::{Function as LFunction, *},
     prelude::{petgraph::visit::EdgeRef, *},
 };
-use num_traits::identities::Zero;
+use num_traits::{identities::Zero, One};
 use numerair::Fixed;
 use std::sync::Arc;
+use stwo_prover::core::fields::m31::BaseField;
 
 use crate::{
     data::StwoData,
@@ -113,6 +117,7 @@ impl LuminairOperator<AddColumn, AddTable> for LuminairAdd {
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
         table: &mut AddTable,
+        node_info: &NodeInfo,
     ) -> Vec<Tensor> {
         let (lhs, rhs) = (
             get_buffer_from_tensor(&inp[0].0),
@@ -128,11 +133,30 @@ impl LuminairOperator<AddColumn, AddTable> for LuminairAdd {
             let lhs_val = get_index(lhs, &lexpr, &mut stack, i);
             let rhs_val = get_index(rhs, &rexpr, &mut stack, i);
             let out_val = lhs_val + rhs_val;
+            let lhs_mult = if node_info.inputs[0].is_initializer {
+                BaseField::zero()
+            } else {
+                -BaseField::one()
+            };
+            let rhs_mult = if node_info.inputs[1].is_initializer {
+                BaseField::zero()
+            } else {
+                -BaseField::one()
+            };
+            let out_mult = if node_info.output.is_final_output {
+                BaseField::zero()
+            } else {
+                BaseField::one() * BaseField::from_u32_unchecked(node_info.num_consumers)
+            };
+
             *out = out_val;
             table.add_row(AddTableRow {
                 lhs: lhs_val.to_m31(),
                 rhs: rhs_val.to_m31(),
                 out: out_val.to_m31(),
+                lhs_mult,
+                rhs_mult,
+                out_mult,
             })
         }
 

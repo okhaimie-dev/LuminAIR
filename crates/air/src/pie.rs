@@ -43,15 +43,15 @@ pub struct InputInfo {
 }
 
 /// Indicates if a node output is a final graph output or intermediate.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Default, Deserialize, PartialEq, Eq)]
 pub struct OutputInfo {
     pub is_final_output: bool,
 }
 
 /// Contains input, output, and consumer information for a node.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Default, Deserialize, PartialEq, Eq)]
 pub struct NodeInfo {
     pub inputs: Vec<InputInfo>,
     pub output: OutputInfo,
-    pub num_consumers: usize,
+    pub num_consumers: u32,
 }
