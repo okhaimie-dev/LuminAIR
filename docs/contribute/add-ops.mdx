@@ -1,0 +1,848 @@
+---
+title: Implementation Guide
+description: Adding New Operators to LuminAIR
+---
+
+Welcome to this comprehensive guide on implementing new operators in LuminAIR! 
+This tutorial will walk you through the entire process of adding a new computational operator, 
+using the `Add` operator as our running example. By the end, you'll understand the architecture, 
+components, and steps needed to contribute to LuminAIR by adding new operators.
+
+<Warning>We assume that you have read the LuminAIR documentation before following this tutorial.</Warning>
+
+# Introduction to LuminAIR Architecture
+
+LuminAIR is a framework that combines machine learning computations with 
+STARK proofs to ensure verifiable computation. The system is built on several key components:
+
+
+1. **Graph System:** Based on Luminal, it represents computational operations as a directed graph.
+2. **AIR Components:** Each operation type has a corresponding Arithmetic Intermediate Representation (AIR) 
+that defines mathematical constraints.
+3. **Trace Tables:** Execution traces that capture the computation steps for each operation.
+4. **Prover/Verifier:** Uses Stwo's Circle STARK system to generate and verify proofs of computation.
+
+These components work together to enable verifiable computation: 
+a prover executes the computation graph, generates traces and proofs,
+which can then be verified by a verifier without re-executing the entire computation.
+
+# Understanding Fixed-Point Arithmetic
+LuminAIR uses fixed-point arithmetic for all operations. 
+This is because STARK proofs operate in finite fields, which don't naturally 
+represent floating-point numbers. We implemented a fixed-point library called [NumerAIR](https://github.com/gizatechxyz/NumerAir) that provides the fixed-point implementation used within LuminAIR.
+
+In our system:
+- Fixed-point numbers uses by default a 12-bit scale factor (defined by `DEFAULT_SCALE` in NumerAIR). 
+- Operations need to account for this scale factor.
+- Field elements come from the `M31` field, which has a prime modulus of `2^31-1`.
+
+For example, the real number `1.5` would be represented as `1.5 * 2^12 = 6144` in our fixed-point format.
+
+# Overview of Implementing a New Operator
+
+To implement a new operator in LuminAIR, you need to create several components:
+
+1. **Table Definition:** Define the structure for storing execution traces.
+2. **AIR Component:** Define constraints that verify the operation's correctness.
+3. **Operator Implementation:** Create the logic that executes the operation and generates traces.
+4. **Interaction Trace:** Generate the traces needed for LopUp arguments.
+5. **Graph Integration:** Connect the operator to LuminAIR's graph system.
+
+Let's walk through each of these components in detail, using the `Add` operator as our example.
+
+# Implementing the Operator Table
+
+The first step is defining the structure for storing the execution trace of your operator. 
+This is done by creating a table that holds all the values needed for the constraint system.
+
+For the `Add` operator, we define `AddTable` and `AddTableRow` in `crates/air/src/components/add/table.rs`:
+
+```rust
+/// Represents the trace for the Add component
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct AddTable {
+    /// A vector of AddTableRow representing the table rows
+    pub table: Vec<AddTableRow>,
+}
+
+/// Represents a single row of the AddTable
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct AddTableRow {
+    pub node_id: BaseField,
+    pub lhs_id: BaseField,
+    pub rhs_id: BaseField,
+    pub idx: BaseField,
+    pub is_last_idx: BaseField,
+    pub next_node_id: BaseField,
+    pub next_lhs_id: BaseField,
+    pub next_rhs_id: BaseField,
+    pub next_idx: BaseField,
+    pub lhs: BaseField,
+    pub rhs: BaseField,
+    pub out: BaseField,
+    pub lhs_mult: BaseField,
+    pub rhs_mult: BaseField,
+    pub out_mult: BaseField,
+}
+```
+
+Each row in the table represents one step in the execution of the addition operation:
+- `node_id`, `lhs_id`, `rhs_id`: Identifiers for the nodes in the computation graph.
+- `idx`: The current index in the tensor.
+- `is_last_idx`: A flag (0 or 1) indicating if this is the last element.
+- `next_*` fields: Values for the next row, used for transition constraints.
+- `lhs`, `rhs`, `out`: The left operand, right operand, and result values.
+- `lhs_mult`, `rhs_mult`, `out_mult`: Multiplicity values for the lookup argument.
+
+You'll also need to implement the `trace_evaluation` method on `AddTable`, which converts the table into a format that can be used for commitment and proofs:
+
+```rust
+impl AddTable {
+    /// Transforms the [`AddTable`] into [`TraceEval`] to be commited
+    /// when generating a STARK proof.
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, AddClaim), TraceError> {
+        let n_rows = self.table.len();
+        if n_rows == 0 {
+            return Err(TraceError::EmptyTrace);
+        }
+        // Calculate log size
+        let log_size = calculate_log_size(n_rows);
+
+        // Calculate trace size
+        let trace_size = 1 << log_size;
+
+        // Create columns
+        let mut node_id = BaseColumn::zeros(trace_size);
+        let mut lhs_id = BaseColumn::zeros(trace_size);
+        let mut rhs_id = BaseColumn::zeros(trace_size);
+        let mut idx = BaseColumn::zeros(trace_size);
+        let mut is_last_idx = BaseColumn::zeros(trace_size);
+        let mut next_node_id = BaseColumn::zeros(trace_size);
+        let mut next_lhs_id = BaseColumn::zeros(trace_size);
+        let mut next_rhs_id = BaseColumn::zeros(trace_size);
+        let mut next_idx = BaseColumn::zeros(trace_size);
+        let mut lhs = BaseColumn::zeros(trace_size);
+        let mut rhs = BaseColumn::zeros(trace_size);
+        let mut out = BaseColumn::zeros(trace_size);
+        let mut lhs_mult = BaseColumn::zeros(trace_size);
+        let mut rhs_mult = BaseColumn::zeros(trace_size);
+        let mut out_mult = BaseColumn::zeros(trace_size);
+
+        // Fill columns
+        for (vec_row, row) in self.table.iter().enumerate() {
+            node_id.set(vec_row, row.node_id);
+            lhs_id.set(vec_row, row.lhs_id);
+            rhs_id.set(vec_row, row.rhs_id);
+            idx.set(vec_row, row.idx);
+            is_last_idx.set(vec_row, row.is_last_idx);
+            next_node_id.set(vec_row, row.next_node_id);
+            next_lhs_id.set(vec_row, row.next_lhs_id);
+            next_rhs_id.set(vec_row, row.next_rhs_id);
+            next_idx.set(vec_row, row.next_idx);
+            lhs.set(vec_row, row.lhs);
+            rhs.set(vec_row, row.rhs);
+            out.set(vec_row, row.out);
+            lhs_mult.set(vec_row, row.lhs_mult);
+            rhs_mult.set(vec_row, row.rhs_mult);
+            out_mult.set(vec_row, row.out_mult);
+        }
+
+        for i in self.table.len()..trace_size {
+            is_last_idx.set(i, BaseField::one());
+        }
+
+        // Create domain
+        let domain = CanonicCoset::new(log_size).circle_domain();
+
+        // Create trace
+        let mut trace = Vec::with_capacity(AddColumn::count().0);
+        trace.push(CircleEvaluation::new(domain, node_id));
+        trace.push(CircleEvaluation::new(domain, lhs_id));
+        trace.push(CircleEvaluation::new(domain, rhs_id));
+        trace.push(CircleEvaluation::new(domain, idx));
+        trace.push(CircleEvaluation::new(domain, is_last_idx));
+        trace.push(CircleEvaluation::new(domain, next_node_id));
+        trace.push(CircleEvaluation::new(domain, next_lhs_id));
+        trace.push(CircleEvaluation::new(domain, next_rhs_id));
+        trace.push(CircleEvaluation::new(domain, next_idx));
+        trace.push(CircleEvaluation::new(domain, lhs));
+        trace.push(CircleEvaluation::new(domain, rhs));
+        trace.push(CircleEvaluation::new(domain, out));
+        trace.push(CircleEvaluation::new(domain, lhs_mult));
+        trace.push(CircleEvaluation::new(domain, rhs_mult));
+        trace.push(CircleEvaluation::new(domain, out_mult));
+
+        assert_eq!(trace.len(), AddColumn::count().0);
+
+        Ok((trace, AddClaim::new(log_size)))
+    }
+}
+```
+
+# Implementing the AIR Component
+
+The AIR component defines the constraints that verify the correctness of the operation. 
+For the `Add` operator, the AIR implementation is in `crates/air/src/components/add/component.rs`:
+
+```rust 
+pub struct AddEval {
+    log_size: u32,
+    lookup_elements: NodeElements,
+}
+
+impl FrameworkEval for AddEval {
+    /// Evaluates the AIR constraints for the addition operation.
+    fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
+        // IDs
+        let node_id = eval.next_trace_mask(); // ID of the node in the computational graph.
+        let lhs_id = eval.next_trace_mask(); // ID of first input tensor.
+        let rhs_id = eval.next_trace_mask(); // ID of second input tensor.
+        let idx = eval.next_trace_mask(); // Index in the flattened tensor.
+        let is_last_idx = eval.next_trace_mask(); // Flag if this is the last index for this operation.
+
+        // Next IDs for transition constraints
+        let next_node_id = eval.next_trace_mask();
+        let next_lhs_id = eval.next_trace_mask();
+        let next_rhs_id = eval.next_trace_mask();
+        let next_idx = eval.next_trace_mask();
+
+        // Values for consistency constraints
+        let lhs_val = eval.next_trace_mask(); // Value from first tensor at index.
+        let rhs_val = eval.next_trace_mask(); // Value from second tensor at index.
+        let out_val = eval.next_trace_mask(); // Value in output tensor at index.
+
+        // Multiplicities for interaction constraints
+        let lhs_mult = eval.next_trace_mask();
+        let rhs_mult = eval.next_trace_mask();
+        let out_mult = eval.next_trace_mask();
+
+        // ┌─────────────────────────────┐
+        // │   Consistency Constraints   │
+        // └─────────────────────────────┘
+
+        // The is_last_idx flag is either 0 or 1.
+        eval.add_constraint(is_last_idx.clone() * (is_last_idx.clone() - E::F::one()));
+
+        // The output value must equal the sum of the input values.
+        eval.eval_fixed_add(lhs_val.clone(), rhs_val.clone(), out_val.clone());
+
+        // ┌────────────────────────────┐
+        // │   Transition Constraints   │
+        // └────────────────────────────┘
+
+        // If this is not the last index for this operation, then:
+        // 1. The next row should be for the same operation on the same tensors.
+        // 2. The index should increment by 1.
+        let not_last = E::F::one() - is_last_idx;
+
+        // Same node ID
+        eval.add_constraint(not_last.clone() * (next_node_id - node_id.clone()));
+
+        // Same tensor IDs
+        eval.add_constraint(not_last.clone() * (next_lhs_id - lhs_id.clone()));
+        eval.add_constraint(not_last.clone() * (next_rhs_id - rhs_id.clone()));
+
+        // Index increment by 1
+        eval.add_constraint(not_last * (next_idx - idx - E::F::one()));
+
+        // ┌─────────────────────────────┐
+        // │   Interaction Constraints   │
+        // └─────────────────────────────┘
+
+        eval.add_to_relation(RelationEntry::new(
+            &self.lookup_elements,
+            lhs_mult.into(),
+            &[lhs_val, lhs_id],
+        ));
+
+        eval.add_to_relation(RelationEntry::new(
+            &self.lookup_elements,
+            rhs_mult.into(),
+            &[rhs_val, rhs_id],
+        ));
+
+        eval.add_to_relation(RelationEntry::new(
+            &self.lookup_elements,
+            out_mult.into(),
+            &[out_val, node_id],
+        ));
+
+        eval.finalize_logup();
+
+        eval
+    }
+}
+```
+
+Here, the AIR of the `Add` component defines three types of constraints:
+
+1. **Consistency Constraints:** Ensure each row's values are valid (output equals the sum of inputs).
+2. **Transition Constraints:** Ensure the relationship between consecutive rows is valid (e.g., for tensor operations that span multiple rows).
+3. **Interaction Constraints:** We are using LogUp protocol here to constraining dataflow of the inputs/output. 
+Ensuring that the input of a node equals the output of a precedent node.
+
+For the `Add` operator, the key constraint is the `eval_fixed_add` call, which ensures that `out_val` equals `lhs_val + rhs_val`.
+
+The `eval_fixed_add` function evaluates the addition operator at the fixed-point level in the NumerAIR library. 
+If your implementation requires operating at the fixed-point level, please submit a PR to NumerAIR first.
+
+<Tip>For non-linear functions, you should use look-up arguments instead of algebraic constraints.</Tip>
+
+# Implementing the Operator Logic
+
+Now we need to implement the actual operator logic that will execute the addition and generate the trace. 
+This is done by creating a new operator type and implementing the `LuminairOperator` trait.
+
+The `Add` operator is a primitive operator, so we will add this operator in `crates/graph/src/op/prim.rs`.
+
+```rust
+/// Implements element-wise addition for LuminAIR.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct LuminairAdd {}
+
+impl LuminairOperator<AddColumn, AddTable> for LuminairAdd {
+    /// Processes two input tensors, generating a trace, claim, and output tensor.
+    fn process_trace(
+        &mut self,
+        inp: Vec<(InputTensor, ShapeTracker)>,
+        table: &mut AddTable,
+        node_info: &NodeInfo,
+    ) -> Vec<Tensor> {
+        // Get buffer from tensor.
+        let (lhs, rhs) = (
+            get_buffer_from_tensor(&inp[0].0),
+            get_buffer_from_tensor(&inp[1].0),
+        );
+        let lexpr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
+        let rexpr = (inp[1].1.index_expression(), inp[1].1.valid_expression());
+
+        let mut stack: Vec<i64> = vec![];
+        let output_size = inp[0].1.n_elements().to_usize().unwrap();
+        // The actual output data initialized.
+        let mut out_data = vec![Fixed::zero(); output_size];
+
+        let node_id: BaseField = node_info.id.into();
+        let lhs_id: BaseField = node_info.inputs[0].id.into();
+        let rhs_id: BaseField = node_info.inputs[1].id.into();
+
+        for (idx, out) in out_data.iter_mut().enumerate() {
+
+            // Retrieves a value from data based on index expressions.
+            // Evaluates index expressions to determine which element to access. 
+            // If the validity expression evaluates to non-zero, returns the element at the calculated index. 
+            // Otherwise, returns zero.
+            let lhs_val = get_index(lhs, &lexpr, &mut stack, idx);
+            let rhs_val = get_index(rhs, &rexpr, &mut stack, idx);
+
+            // The actual addition.
+            let out_val = lhs_val + rhs_val;
+
+            // Calculate multiplicity values for the constraining the dataflow.
+            let lhs_mult = if node_info.inputs[0].is_initializer {
+                BaseField::zero()
+            } else {
+                -BaseField::one()
+            };
+            let rhs_mult = if node_info.inputs[1].is_initializer {
+                BaseField::zero()
+            } else {
+                -BaseField::one()
+            };
+            let out_mult = if node_info.output.is_final_output {
+                BaseField::zero()
+            } else {
+                BaseField::one() * BaseField::from_u32_unchecked(node_info.num_consumers)
+            };
+
+            let is_last_idx: u32 = if idx == (output_size - 1) { 1 } else { 0 };
+
+            *out = out_val;
+            
+            // Add a row in the AddTable. 
+            table.add_row(AddTableRow {
+                node_id,
+                lhs_id,
+                rhs_id,
+                idx: idx.into(),
+                is_last_idx: (is_last_idx).into(),
+                next_idx: (idx + 1).into(),
+                next_node_id: node_id,
+                next_lhs_id: lhs_id,
+                next_rhs_id: rhs_id,
+                lhs: lhs_val.to_m31(),
+                rhs: rhs_val.to_m31(),
+                out: out_val.to_m31(),
+                lhs_mult,
+                rhs_mult,
+                out_mult,
+            })
+        }
+
+        vec![Tensor::new(StwoData(Arc::new(out_data)))]
+    }
+}
+```
+
+The operator logic:
+1. Extracts input tensors and shape information.
+2. Initializes the output tensor.
+3. For each element in the output:
+    - Retrieves the corresponding input elements.
+    - Performs the addition.
+    - Calculates multiplicity values for lookups.
+    - Adds a row to the table with all necessary values.
+4. Returns the computed output tensor.
+
+## How the multiplicities are calculated?
+
+While each AIR component verifies its local operation, it is also important to ensure proper data flow between 
+nodes in the computational graph. Specifically, the output of one node must match the input of another node.
+
+This consistency is enforced using the [LogUp](https://eprint.iacr.org/2022/1530?ref=blog.lambdaclass.com) lookup argument protocol, 
+which establishes a system of relations between tensor values.
+
+**Output Yields** (Positive Multiplicity)
+- When a node produces an output that will be consumed by other nodes, its multiplicity equals the number of consumers.
+- This indicates that the value is “yielded” for use elsewhere in the graph.
+
+**Input Consumes** (Negative Multiplicity)
+- When a node receives an input from another node, its multiplicity is `-1`.
+- This signifies that the value is “consumed” by the operation.
+
+**Special Cases** (Zero Multiplicity)
+- Graph Inputs (Initializers): Tensors that serve as initial inputs to the graph have zero multiplicity because they are not consumed by any prior operation.
+- Graph Outputs (Final Results): Tensors that represent final outputs of the graph also have zero multiplicity since they are not yielded to subsequent operations.
+
+## Generating the Interaction Trace
+
+The interaction trace is used for the LogUp argument, which is how different components in the system refer to each other's values. 
+
+For the `Add` operator, we are defining the interaction trace in `crates/air/src/components/add/table.rs`.
+
+```rust
+/// Generates the interaction trace for the Add component using the main trace and lookup elements.
+pub fn interaction_trace_evaluation(
+    main_trace_eval: &TraceEval,
+    lookup_elements: &NodeElements,
+) -> Result<(TraceEval, InteractionClaim), TraceError> {
+    if main_trace_eval.is_empty() {
+        return Err(TraceError::EmptyTrace);
+    }
+
+    let log_size = main_trace_eval[0].domain.log_size();
+    let mut logup_gen = LogupTraceGenerator::new(log_size);
+
+    // Create trace for LHS
+    let lhs_main_col = &main_trace_eval[AddColumn::Lhs.index()].data;
+    let lhs_id_col = &main_trace_eval[AddColumn::LhsId.index()].data;
+    let lhs_mult_col = &main_trace_eval[AddColumn::LhsMult.index()].data;
+    let mut lhs_int_col = logup_gen.new_col();
+    for row in 0..1 << (log_size - LOG_N_LANES) {
+        let lhs = lhs_main_col[row];
+        let id = lhs_id_col[row];
+        let multiplicity = lhs_mult_col[row];
+
+        lhs_int_col.write_frac(
+            row,
+            multiplicity.into(),
+            lookup_elements.combine(&[lhs, id]),
+        );
+    }
+    lhs_int_col.finalize_col();
+
+    // Create trace for RHS
+    let rhs_main_col = &main_trace_eval[AddColumn::Rhs.index()].data;
+    let rhs_id_col = &main_trace_eval[AddColumn::RhsId.index()].data;
+    let rhs_mult_col = &main_trace_eval[AddColumn::RhsMult.index()].data;
+    let mut rhs_int_col = logup_gen.new_col();
+    for row in 0..1 << (log_size - LOG_N_LANES) {
+        let rhs = rhs_main_col[row];
+        let id = rhs_id_col[row];
+        let multiplicity = rhs_mult_col[row];
+
+        rhs_int_col.write_frac(
+            row,
+            multiplicity.into(),
+            lookup_elements.combine(&[rhs, id]),
+        );
+    }
+    rhs_int_col.finalize_col();
+
+    // Create trace for OUTPUT
+    let out_main_col = &main_trace_eval[AddColumn::Out.index()].data;
+    let node_id_col = &main_trace_eval[AddColumn::NodeId.index()].data;
+    let out_mult_col = &main_trace_eval[AddColumn::OutMult.index()].data;
+    let mut out_int_col = logup_gen.new_col();
+    for row in 0..1 << (log_size - LOG_N_LANES) {
+        let out = out_main_col[row];
+        let id = node_id_col[row];
+        let multiplicity = out_mult_col[row];
+
+        out_int_col.write_frac(
+            row,
+            multiplicity.into(),
+            lookup_elements.combine(&[out, id]),
+        );
+    }
+    out_int_col.finalize_col();
+
+    let (trace, claimed_sum) = logup_gen.finalize_last();
+
+    Ok((trace, InteractionClaim { claimed_sum }))
+}
+```
+
+The interaction trace generation:
+1. Creates a new LogupTraceGenerator.
+2. For each input and output column:
+    - Creates a new column in the interaction trace.
+    - For each row, writes a fraction with the value, ID, and multiplicity.
+    - Finalizes the column.
+3. Finalizes the entire trace and returns it along with the claimed sum.
+
+The lookup argument uses the concept of multiplicity to ensure that values are correctly 
+used and produced. When a tensor element is used as input, it contributes a negative multiplicity. 
+When a tensor element is produced as output, it contributes a positive multiplicity. 
+The sum of multiplicities for each value should be zero, ensuring that each value is properly accounted for.
+
+## Integrating with the Graph System
+
+To make your operator available in the graph system, 
+you need to integrate it with the Luminal graph system. 
+As `Add` operator is a primitive operator this is done in `crates/graph/src/op/prim.rs` by implementing the operator and adding it to the `PrimitiveCompiler`:
+
+```rust
+impl Compiler for PrimitiveCompiler {
+    type Output = ();
+
+    /// Compiles a graph by replacing Luminal operators with LuminAIR equivalents.
+    fn compile<T: ToIdsMut>(&self, graph: &mut Graph, mut ids: T) -> Self::Output {
+        
+        // Replace Luminal's ops with LuminAIR ops
+        for id in graph.node_indices().collect::<Vec<_>>() {
+            let op = graph.node_weight(id).unwrap().as_any().type_id();
+            let op_ref = graph.graph.node_weight_mut(id).unwrap();
+
+            if let Some(c) = op_ref.as_any().downcast_ref::<luminal::op::Constant>() {
+                *op_ref = Box::new(LuminairConstant::new(c.0.clone()));
+            } else if is::<luminal::op::Add>(op) {
+                *op_ref = LuminairAdd::new().into_operator()
+            } else if is::<luminal::op::Mul>(op) {
+                *op_ref = LuminairMul::new().into_operator()
+            } else if is::<luminal::op::Contiguous>(op) {
+                *op_ref = Box::new(Contiguous)
+            }
+        }
+    }
+}
+```
+
+# Adding the Operator to LuminAIR Claims and Components
+
+You also need to integrate the operator into the claim system and component infrastructure so that it can be properly included in proofs and verified. 
+Let's expand on these important steps.
+
+## Defining the Operator Claim
+Every operator needs a corresponding claim type that represents the operation in the proof system. 
+
+First, in `crates/air/src/components/mod.rs`, you need to define a type alias for your operator's claim:
+
+```rust
+// For the Add operator
+pub type AddClaim = Claim<AddColumn>;
+```
+
+This uses the generic Claim struct, which is defined as:
+```rust
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Claim<T: TraceColumn> {
+    /// Logarithmic size (base 2) of the trace.
+    pub log_size: u32,
+    /// Phantom data to associate with the trace column type.
+    _marker: std::marker::PhantomData<T>,
+}
+```
+
+Then, you need to add your operator's claim type to the `ClaimType` enum, 
+which is used to represent various types of claims in the system:
+
+```rust
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum ClaimType {
+    Add(Claim<AddColumn>), // We added the `Add` operator here
+    Mul(Claim<MulColumn>),
+}
+```
+
+## Updating the LuminairClaim Struct
+
+The `LuminairClaim` struct in `crates/air/src/lib.rs` holds claims for all operators used in a computation. 
+You need to update it to include your new operator:
+
+```rust
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LuminairClaim {
+    pub add: Option<AddClaim>, // We added the `Add` operator's claim here
+    pub mul: Option<MulClaim>,
+    pub is_first_log_sizes: Vec<u32>,
+}
+```
+
+Also update the `mix_into` method to include your new claim when computing the Fiat-Shamir challenge:
+
+```rust
+impl LuminairClaim {
+    pub fn mix_into(&self, channel: &mut impl Channel) {
+        if let Some(ref add) = self.add {
+            add.mix_into(channel);
+        }
+        if let Some(ref mul) = self.mul {
+            mul.mix_into(channel);
+        }
+    }
+}
+```
+
+And update the `log_sizes` method to include your operator's log sizes:
+
+```rust
+impl LuminairClaim {
+    pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
+        let mut log_sizes = vec![];
+
+        if let Some(ref add) = self.add {
+            log_sizes.push(add.log_sizes());
+        }
+        if let Some(ref mul) = self.mul {
+            log_sizes.push(mul.log_sizes());
+        }
+    }
+}
+```
+
+## Updating the LuminairInteractionClaim
+
+Similarly, you need to update the `LuminairInteractionClaim` struct to include the claimed sum for your operator:
+
+```rust
+#[derive(Serialize, Deserialize, Default, Debug)]
+pub struct LuminairInteractionClaim {
+    pub add: Option<InteractionClaim>,
+    pub mul: Option<InteractionClaim>,
+}
+```
+
+And update its `mix_into` method:
+
+```rust
+impl LuminairInteractionClaim {
+    pub fn mix_into(&self, channel: &mut impl Channel) {
+        if let Some(ref add) = self.add {
+            add.mix_into(channel);
+        }
+        if let Some(ref mul) = self.mul {
+            mul.mix_into(channel);
+        }
+    }
+}
+```
+
+## Integrating with LuminairComponents
+
+The LuminairComponents struct in `crates/air/src/components/mod.rs` needs to be updated to include your new operator component:
+
+```rust
+pub struct LuminairComponents {
+    add: Option<AddComponent>,
+    mul: Option<MulComponent>,
+}
+```
+
+Also update the `provers` methods to include your new component:
+
+```rust
+impl LuminairComponents {
+    pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
+        let mut components: Vec<&dyn ComponentProver<SimdBackend>> = vec![];
+
+        if let Some(ref add_component) = self.add {
+            components.push(add_component);
+        }
+        if let Some(ref mul_component) = self.mul {
+            components.push(mul_component);
+        }
+
+        components
+    }
+}
+```
+
+## Updating the OpCounter
+
+The `OpCounter` struct in `crates/air/src/pie.rs` tracks operation counts, so it should be updated:
+
+```rust
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub struct OpCounter {
+    pub add: Option<usize>,
+    pub mul: Option<usize>,
+}
+```
+
+## Updating the Graph System
+
+In the `LuminairGraph` trait implementation for `Graph` in `crates/graph/src/graph.rs`, you need to modify the `gen_trace` method to handle your new operator:
+
+```rust
+fn gen_trace(&mut self) -> Result<LuminairPie, TraceError> {
+    // Existing code...
+
+    // Initialize trace collectors and tables
+    let mut add_table: AddTable = AddTable::new();
+    let mut mul_table: MulTable = MulTable::new();
+
+    // Process nodes...
+    for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
+
+        let tensors =
+            if <Box<dyn Operator> as HasProcessTrace<AddColumn, AddTable>>::has_process_trace(
+                    node_op,
+                ) {
+                    let tensors = <Box<dyn Operator> as HasProcessTrace<
+                        AddColumn,
+                        AddTable,
+                    >>::call_process_trace(
+                        node_op, srcs, &mut add_table, &node_info
+                    )
+                    .unwrap();
+                    *op_counter.add.get_or_insert(0) += 1;
+
+                    tensors
+                } else if <Box<dyn Operator> as HasProcessTrace<MulColumn, MulTable>>::has_process_trace(
+                node_op,
+            ) {
+                // Existing code for Mul...
+            } else {
+                // Handle other operators or fallback
+                node_op.process(srcs)
+            }
+
+        // Rest of the method...
+    }
+
+    // Convert tables to traces...
+    if !add_table.table.is_empty() {
+            let (trace, claim) = add_table.trace_evaluation()?;
+            max_log_size = max_log_size.max(claim.log_size);
+
+            traces.push(Trace::new(
+                SerializableTrace::from(&trace),
+                ClaimType::Add(claim),
+            ));
+    }
+    if !mul_table.table.is_empty() {
+        // Existing code for Mul...
+    }
+   
+    // Return result...
+}
+```
+
+Additionally, you need to update the prove method to generate the interaction trace for your new operator:
+
+```rust
+fn prove(
+    &mut self,
+    pie: LuminairPie,
+) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
+    // Existing code...
+
+    // ┌───────────────────────────────────────┐
+    // │    Interaction Phase 1 - Main Trace   │
+    // └───────────────────────────────────────┘
+
+    tracing::info!("Main Trace");
+    let mut tree_builder = commitment_scheme.tree_builder();
+    let mut main_claim = LuminairClaim::new(is_first_log_sizes.clone());
+
+    for trace in pie.traces.clone().into_iter() {
+        // Add the components' trace evaluation to the commit tree.
+        tree_builder.extend_evals(trace.eval.to_trace());
+
+        match trace.claim {
+            ClaimType::Add(claim) => main_claim.add = Some(claim),
+            ClaimType::Mul(claim) => main_claim.mul = Some(claim),
+        }
+    }
+
+            // Mix the claim into the Fiat-Shamir channel.
+        main_claim.mix_into(channel);
+        // Commit the main trace.
+        tree_builder.commit(channel);
+
+    // ┌───────────────────────────────────────────────┐
+    // │    Interaction Phase 2 - Interaction Trace    │
+    // └───────────────────────────────────────────────┘
+
+    // Draw interaction elements
+    let interaction_elements = LuminairInteractionElements::draw(channel);
+    // Generate the interaction trace from the main trace, and compute the logUp sum.
+    let mut tree_builder = commitment_scheme.tree_builder();
+    let mut interaction_claim = LuminairInteractionClaim::default();
+
+    for trace in pie.traces.into_iter() {
+        let claim = trace.claim;
+        let trace: TraceEval = trace.eval.to_trace();
+        let lookup_elements = &interaction_elements.node_lookup_elements;
+
+        match claim {
+            ClaimType::Add(_) => {
+                let (tr, cl) =
+                    add::table::interaction_trace_evaluation(&trace, lookup_elements).unwrap();
+
+                tree_builder.extend_evals(tr);
+                interaction_claim.add = Some(cl);
+            }
+            ClaimType::Mul(_) => {
+                let (tr, cl) =
+                    mul::table::interaction_trace_evaluation(&trace, lookup_elements).unwrap();
+                tree_builder.extend_evals(tr);
+                interaction_claim.mul = Some(cl);
+            }
+        }
+    }
+
+    // Mix the interaction claim into the Fiat-Shamir channel.
+    interaction_claim.mix_into(channel);
+    // Commit the interaction trace.
+    tree_builder.commit(channel);
+
+    // Rest of the method...
+}
+```
+
+## Checking Lookup Sum Validity
+
+In `crates/air/src/utils.rs`, update the `lookup_sum_valid` function to include your operator:
+
+```rust
+pub fn lookup_sum_valid(interaction_claim: &LuminairInteractionClaim) -> bool {
+    let mut sum = PackedSecureField::zero();
+
+    if let Some(ref int_cl) = interaction_claim.add {
+        sum += int_cl.claimed_sum.into();
+    }
+    if let Some(ref int_cl) = interaction_claim.mul {
+        sum += int_cl.claimed_sum.into();
+    }
+
+    sum.is_zero()
+}
+```
+
+# Conclusion
+Congratulations! You've now learned how to implement a new operator in LuminAIR, 
+using the `Add` operator as an example. 
+
+By following this guide, you should be able to implement new operators for LuminAIR, 
+extending its capabilities.
