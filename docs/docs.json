@@ -33,8 +33,12 @@
         ]
       },
       {
+        "group": "Contribute",
+        "pages": ["contribute/guidelines", "contribute/add-ops"]
+      },
+      {
         "group": "Learn More",
-        "pages": ["more/roadmap", "more/contribute", "more/benchmarks"]
+        "pages": ["more/roadmap", "more/benchmarks"]
       }
     ]
   },
