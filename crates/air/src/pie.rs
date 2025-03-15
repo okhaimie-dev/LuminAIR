@@ -1,11 +1,65 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{components::ClaimType, serde::SerializableTrace};
+use crate::{
+    components::{add::table::AddTable, mul::table::MulTable, AddClaim, ClaimType, MulClaim, TraceEval, TraceError},
+    serde::SerializableTrace,
+};
+
+/// Represents an operator's trace table along with its claim before conversion
+/// to a serialized trace format. Used to defer trace evaluation until proving.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum TableTrace {
+    /// Addition operator trace table and claim.
+    Add {
+        table: AddTable,
+        claim: AddClaim
+    },
+    /// Multiplication operator trace table and claim.
+    Mul {
+        table: MulTable,
+        claim: MulClaim
+    },
+}
+
+impl TableTrace {
+    /// Creates a new [`TableTrace`] from an [`AddTable`] and a log size
+    /// for use in the proof generation.
+    pub fn from_add(table: AddTable, log_size: u32) -> Self {
+        Self::Add {
+            table,
+            claim: AddClaim::new(log_size)
+        }
+    }
+    
+    /// Creates a new [`TableTrace`] from a [`MulTable`] and a log size
+    /// for use in the proof generation.
+    pub fn from_mul(table: MulTable, log_size: u32) -> Self {
+        Self::Mul {
+            table,
+            claim: MulClaim::new(log_size)
+        }
+    }
+
+    pub fn to_trace(&self) -> Result<(TraceEval, ClaimType), TraceError> {
+        match self {
+            TableTrace::Add { table, claim } => {
+                let (trace, _) = table.trace_evaluation()?;
+                Ok((trace, ClaimType::Add(claim.clone())))
+            },
+
+            TableTrace::Mul { table, claim } => {
+                let (trace, _) = table.trace_evaluation()?;
+                Ok((trace, ClaimType::Mul(claim.clone())))
+            },
+        }
+    }
+}
 
 /// Container for traces and execution resources of a computational graph.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairPie {
     pub traces: Vec<Trace>,
+    pub table_traces: Vec<TableTrace>,
     pub execution_resources: ExecutionResources,
 }
 
