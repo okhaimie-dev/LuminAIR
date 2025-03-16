@@ -1,22 +1,20 @@
-use crate::op::{
+use crate::{op::{
     prim::{CopyFromStwo, CopyToStwo, LuminairConstant},
     HasProcessTrace,
-};
+}, StwoCompiler};
 use luminair_air::{
     components::{
         add::{
             self,
             table::{AddColumn, AddTable},
-        },
-        mul::{
+        }, mul::{
             self,
             table::{MulColumn, MulTable},
-        },
-        ClaimType, LuminairComponents, LuminairInteractionElements, TraceError, TraceEval,
+        }, ClaimType, LuminairComponents, LuminairInteractionElements, TraceError, TraceEval
     },
-    pie::{ExecutionResources, InputInfo, LuminairPie, NodeInfo, OpCounter, OutputInfo, Trace},
+    pie::{ExecutionResources, InputInfo, LuminairPie, NodeInfo, OpCounter, OutputInfo, TableTrace, Trace},
     serde::SerializableTrace,
-    utils::{get_is_first_log_sizes, lookup_sum_valid},
+    utils::{calculate_log_size, get_is_first_log_sizes, lookup_sum_valid},
     LuminairClaim, LuminairInteractionClaim, LuminairProof,
 };
 use luminal::{
@@ -76,8 +74,9 @@ impl LuminairGraph for Graph {
         let mut consumers = self.consumers_map.as_ref().unwrap().clone();
         let mut dim_stack = Vec::new();
 
-        // Initialize trace collectors for different operators
-        let mut traces = Vec::new();
+        // Initialize table traces for different operators
+        let mut table_traces = Vec::new();
+
         // Initializes operator counter
         let mut op_counter = OpCounter::default();
 
@@ -207,26 +206,22 @@ impl LuminairGraph for Graph {
         let mut max_log_size = 0;
 
         if !add_table.table.is_empty() {
-            let (trace, claim) = add_table.trace_evaluation()?;
-            max_log_size = max_log_size.max(claim.log_size);
-
-            traces.push(Trace::new(
-                SerializableTrace::from(&trace),
-                ClaimType::Add(claim),
-            ));
+            let log_size = calculate_log_size(add_table.table.len());
+            max_log_size = max_log_size.max(log_size);
+            
+            table_traces.push(TableTrace::from_add(add_table, log_size));
         }
-        if !mul_table.table.is_empty() {
-            let (trace, claim) = mul_table.trace_evaluation()?;
-            max_log_size = max_log_size.max(claim.log_size);
 
-            traces.push(Trace::new(
-                SerializableTrace::from(&trace),
-                ClaimType::Mul(claim),
-            ));
+        if !mul_table.table.is_empty() {
+            let log_size = calculate_log_size(mul_table.table.len());
+            max_log_size = max_log_size.max(log_size);
+            
+            table_traces.push(TableTrace::from_mul(mul_table, log_size));
         }
 
         Ok(LuminairPie {
-            traces,
+            traces: Vec::new(),
+            table_traces,
             execution_resources: ExecutionResources {
                 op_counter,
                 max_log_size,
@@ -238,12 +233,38 @@ impl LuminairGraph for Graph {
         &mut self,
         pie: LuminairPie,
     ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
+        // Process any existing traces
+        let mut traces = pie.traces;
+
+        // Process table_traces by converting them to regular traces
+        for table_trace in pie.table_traces {
+            let (trace, claim) = match table_trace.to_trace() {
+                Ok(result) => result,
+                Err(err) => {
+                    tracing::error!("Trace conversion error: {:?}", err);
+                    return Err(ProvingError::ConstraintsNotSatisfied);
+                }
+            };
+
+            traces.push(Trace::new(
+                SerializableTrace::from(&trace),
+                claim,
+            ));
+        }
+        
+        // Create a new LuminairPie with all traces properly converted
+        let processed_pie = LuminairPie {
+            traces,
+            table_traces: Vec::new(),
+            execution_resources: pie.execution_resources,
+        };
+
         // ┌──────────────────────────┐
         // │     Protocol Setup       │
         // └──────────────────────────┘
         tracing::info!("Protocol Setup");
         let config = PcsConfig::default();
-        let max_log_size = pie.execution_resources.max_log_size;
+        let max_log_size = processed_pie.execution_resources.max_log_size;
         let is_first_log_sizes = get_is_first_log_sizes(max_log_size);
         let twiddles = SimdBackend::precompute_twiddles(
             CanonicCoset::new(max_log_size + config.fri_config.log_blowup_factor + 2)
@@ -280,7 +301,7 @@ impl LuminairGraph for Graph {
         let mut tree_builder = commitment_scheme.tree_builder();
         let mut main_claim = LuminairClaim::new(is_first_log_sizes.clone());
 
-        for trace in pie.traces.clone().into_iter() {
+        for trace in processed_pie.traces.clone().into_iter() {
             // Add the components' trace evaluation to the commit tree.
             tree_builder.extend_evals(trace.eval.to_trace());
 
@@ -305,7 +326,7 @@ impl LuminairGraph for Graph {
         let mut tree_builder = commitment_scheme.tree_builder();
         let mut interaction_claim = LuminairInteractionClaim::default();
 
-        for trace in pie.traces.into_iter() {
+        for trace in processed_pie.traces.into_iter() {
             let claim = trace.claim;
             let trace: TraceEval = trace.eval.to_trace();
             let lookup_elements = &interaction_elements.node_lookup_elements;
@@ -349,7 +370,7 @@ impl LuminairGraph for Graph {
             claim: main_claim,
             interaction_claim,
             proof,
-            execution_resources: pie.execution_resources,
+            execution_resources: processed_pie.execution_resources,
         })
     }
 
