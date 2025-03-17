@@ -449,3 +449,24 @@ impl LuminairGraph for Graph {
         Ok(())
     }
 }
+
+#[test]
+fn test_lazy_trace_evaluation() {
+    let mut cx = Graph::new();
+    let a = cx.tensor((10, 10)).set(vec![1.0; 100]);
+    let b = cx.tensor((10, 10)).set(vec![2.0; 100]);
+    let c = a * b;
+    let mut d = (c + a).retrieve();
+    
+    cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
+    
+    // Generate trace, now deferred
+    let trace = cx.gen_trace().expect("Trace generation failed");
+    
+    // The trace should have table_traces but no regular traces
+    assert!(trace.traces.is_empty(), "Regular traces should be empty");
+    assert!(!trace.table_traces.is_empty(), "Table traces should not be empty");
+    
+    let proof = cx.prove(trace).expect("Proof generation failed");
+    assert!(cx.verify(proof).is_ok(), "Proof verification should succeed");
+}
