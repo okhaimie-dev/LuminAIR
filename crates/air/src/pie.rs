@@ -1,9 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    components::{add::table::AddTable, mul::table::MulTable, AddClaim, ClaimType, MulClaim, TraceEval, TraceError},
-    serde::SerializableTrace,
-};
+use crate::components::{add::table::AddTable, mul::table::MulTable, AddClaim, ClaimType, MulClaim, TraceEval, TraceError};
 
 /// Represents an operator's trace table along with its claim before conversion
 /// to a serialized trace format. Used to defer trace evaluation until proving.
@@ -65,13 +62,12 @@ pub struct LuminairPie {
 /// Represents a single trace with its evaluation, claim, and node information.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Trace {
-    pub eval: SerializableTrace,
     pub claim: ClaimType,
 }
 
 impl Trace {
-    pub fn new(eval: SerializableTrace, claim: ClaimType) -> Self {
-        Self { eval, claim }
+    pub fn new(claim: ClaimType) -> Self {
+        Self { claim }
     }
 }
 
