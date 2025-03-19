@@ -231,11 +231,8 @@ impl LuminairGraph for Graph {
 
     fn prove(
         &mut self,
-        pie: LuminairPie,
+        mut pie: LuminairPie,
     ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
-        // Process any existing traces
-        let mut traces = pie.traces;
-
         // Process table_traces by converting them to regular traces
         for table_trace in pie.table_traces {
             let (trace, claim) = match table_trace.to_trace() {
@@ -246,25 +243,21 @@ impl LuminairGraph for Graph {
                 }
             };
 
-            traces.push(Trace::new(
+            pie.traces.push(Trace::new(
                 SerializableTrace::from(&trace),
                 claim,
             ));
         }
-        
-        // Create a new LuminairPie with all traces properly converted
-        let processed_pie = LuminairPie {
-            traces,
-            table_traces: Vec::new(),
-            execution_resources: pie.execution_resources,
-        };
 
+        // Clear the table_traces
+        pie.table_traces = Vec::new();
+        
         // ┌──────────────────────────┐
         // │     Protocol Setup       │
         // └──────────────────────────┘
         tracing::info!("Protocol Setup");
         let config = PcsConfig::default();
-        let max_log_size = processed_pie.execution_resources.max_log_size;
+        let max_log_size = pie.execution_resources.max_log_size;
         let is_first_log_sizes = get_is_first_log_sizes(max_log_size);
         let twiddles = SimdBackend::precompute_twiddles(
             CanonicCoset::new(max_log_size + config.fri_config.log_blowup_factor + 2)
@@ -301,7 +294,7 @@ impl LuminairGraph for Graph {
         let mut tree_builder = commitment_scheme.tree_builder();
         let mut main_claim = LuminairClaim::new(is_first_log_sizes.clone());
 
-        for trace in processed_pie.traces.clone().into_iter() {
+        for trace in pie.traces.clone().into_iter() {
             // Add the components' trace evaluation to the commit tree.
             tree_builder.extend_evals(trace.eval.to_trace());
 
@@ -326,7 +319,7 @@ impl LuminairGraph for Graph {
         let mut tree_builder = commitment_scheme.tree_builder();
         let mut interaction_claim = LuminairInteractionClaim::default();
 
-        for trace in processed_pie.traces.into_iter() {
+        for trace in pie.traces.into_iter() {
             let claim = trace.claim;
             let trace: TraceEval = trace.eval.to_trace();
             let lookup_elements = &interaction_elements.node_lookup_elements;
@@ -370,7 +363,7 @@ impl LuminairGraph for Graph {
             claim: main_claim,
             interaction_claim,
             proof,
-            execution_resources: processed_pie.execution_resources,
+            execution_resources: pie.execution_resources,
         })
     }
 
