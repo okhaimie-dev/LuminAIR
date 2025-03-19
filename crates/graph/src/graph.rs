@@ -432,7 +432,7 @@ impl LuminairGraph for Graph {
 }
 
 #[test]
-fn test_lazy_trace_evaluation() {
+fn test_direct_table_trace_processing() {
     use crate::StwoCompiler;
 
     let mut cx = Graph::new();
@@ -443,12 +443,17 @@ fn test_lazy_trace_evaluation() {
     
     cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
     
-    // Generate trace, now deferred
+    // Generate trace with direct table storage
     let trace = cx.gen_trace().expect("Trace generation failed");
     
-    // The trace should have table_traces but no regular traces
-    assert!(!trace.table_traces.is_empty(), "Table traces should not be empty");
+    // Verify that table traces contain both operation types
+    let has_add = trace.table_traces.iter().any(|t| matches!(t, TableTrace::Add { .. }));
+    let has_mul = trace.table_traces.iter().any(|t| matches!(t, TableTrace::Mul { .. }));
     
+    assert!(has_add, "Should contain Add table traces");
+    assert!(has_mul, "Should contain Mul table traces");
+    
+    // Verify the end-to-end proof pipeline
     let proof = cx.prove(trace).expect("Proof generation failed");
     assert!(cx.verify(proof).is_ok(), "Proof verification should succeed");
 }
