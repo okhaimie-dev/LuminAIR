@@ -10,10 +10,9 @@ use luminair_air::{
         }, mul::{
             self,
             table::{MulColumn, MulTable},
-        }, ClaimType, LuminairComponents, LuminairInteractionElements, TraceError, TraceEval
+        }, ClaimType, LuminairComponents, LuminairInteractionElements, TraceError,
     },
-    pie::{ExecutionResources, InputInfo, LuminairPie, NodeInfo, OpCounter, OutputInfo, TableTrace, Trace},
-    serde::SerializableTrace,
+    pie::{ExecutionResources, InputInfo, LuminairPie, NodeInfo, OpCounter, OutputInfo, TableTrace},
     utils::{calculate_log_size, get_is_first_log_sizes, lookup_sum_valid},
     LuminairClaim, LuminairInteractionClaim, LuminairProof,
 };
@@ -220,7 +219,6 @@ impl LuminairGraph for Graph {
         }
 
         Ok(LuminairPie {
-            traces: Vec::new(),
             table_traces,
             execution_resources: ExecutionResources {
                 op_counter,
@@ -231,27 +229,8 @@ impl LuminairGraph for Graph {
 
     fn prove(
         &mut self,
-        mut pie: LuminairPie,
+        pie: LuminairPie,
     ) -> Result<LuminairProof<Blake2sMerkleHasher>, ProvingError> {
-        // Process table_traces by converting them to regular traces
-        for table_trace in pie.table_traces {
-            let (trace, claim) = match table_trace.to_trace() {
-                Ok(result) => result,
-                Err(err) => {
-                    tracing::error!("Trace conversion error: {:?}", err);
-                    return Err(ProvingError::ConstraintsNotSatisfied);
-                }
-            };
-
-            pie.traces.push(Trace::new(
-                SerializableTrace::from(&trace),
-                claim,
-            ));
-        }
-
-        // Clear the table_traces
-        pie.table_traces = Vec::new();
-        
         // ┌──────────────────────────┐
         // │     Protocol Setup       │
         // └──────────────────────────┘
@@ -275,30 +254,42 @@ impl LuminairGraph for Graph {
         tracing::info!("Preprocessed Trace");
         // Generate all preprocessed columns
         let mut tree_builder = commitment_scheme.tree_builder();
-
+        
         tree_builder.extend_evals(
             is_first_log_sizes
-                .iter()
-                .copied()
-                .map(|log_size| IsFirst::new(log_size).gen_column_simd()),
+            .iter()
+            .copied()
+            .map(|log_size| IsFirst::new(log_size).gen_column_simd()),
         );
-
+        
         // Commit the preprocessed trace
         tree_builder.commit(channel);
-
+        
         // ┌───────────────────────────────────────┐
         // │    Interaction Phase 1 - Main Trace   │
         // └───────────────────────────────────────┘
-
+        
         tracing::info!("Main Trace");
         let mut tree_builder = commitment_scheme.tree_builder();
         let mut main_claim = LuminairClaim::new(is_first_log_sizes.clone());
+        let mut processed_traces = Vec::new();
 
-        for trace in pie.traces.clone().into_iter() {
-            // Add the components' trace evaluation to the commit tree.
-            tree_builder.extend_evals(trace.eval.to_trace());
+        for table_trace in pie.table_traces {
+            let (trace, claim_type) = match table_trace.to_trace() {
+                Ok(result) => result,
+                Err(err) => {
+                    tracing::error!("Trace evaluation failed: {:?}", err);
+                    return Err(ProvingError::ConstraintsNotSatisfied);
+                }
+            };
 
-            match trace.claim {
+            processed_traces.push((trace.clone(), claim_type.clone()));
+
+            // Add the trace to the commit tree.
+            tree_builder.extend_evals(trace.clone());
+
+            // Update the main claim based the correct claim type
+            match claim_type {
                 ClaimType::Add(claim) => main_claim.add = Some(claim),
                 ClaimType::Mul(claim) => main_claim.mul = Some(claim),
             }
@@ -319,16 +310,13 @@ impl LuminairGraph for Graph {
         let mut tree_builder = commitment_scheme.tree_builder();
         let mut interaction_claim = LuminairInteractionClaim::default();
 
-        for trace in pie.traces.into_iter() {
-            let claim = trace.claim;
-            let trace: TraceEval = trace.eval.to_trace();
-            let lookup_elements = &interaction_elements.node_lookup_elements;
+        let lookup_elements = &interaction_elements.node_lookup_elements;
 
-            match claim {
+        for (trace, claim_type) in processed_traces {
+            match claim_type {
                 ClaimType::Add(_) => {
                     let (tr, cl) =
                         add::table::interaction_trace_evaluation(&trace, lookup_elements).unwrap();
-
                     tree_builder.extend_evals(tr);
                     interaction_claim.add = Some(cl);
                 }
@@ -340,7 +328,7 @@ impl LuminairGraph for Graph {
                 }
             }
         }
-
+        
         // Mix the interaction claim into the Fiat-Shamir channel.
         interaction_claim.mix_into(channel);
         // Commit the interaction trace.
@@ -459,7 +447,6 @@ fn test_lazy_trace_evaluation() {
     let trace = cx.gen_trace().expect("Trace generation failed");
     
     // The trace should have table_traces but no regular traces
-    assert!(trace.traces.is_empty(), "Regular traces should be empty");
     assert!(!trace.table_traces.is_empty(), "Table traces should not be empty");
     
     let proof = cx.prove(trace).expect("Proof generation failed");

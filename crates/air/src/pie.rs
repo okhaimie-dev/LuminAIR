@@ -58,7 +58,6 @@ impl TableTrace {
 /// Container for traces and execution resources of a computational graph.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LuminairPie {
-    pub traces: Vec<Trace>,
     pub table_traces: Vec<TableTrace>,
     pub execution_resources: ExecutionResources,
 }
