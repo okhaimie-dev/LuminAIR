@@ -1,7 +1,7 @@
-use crate::{op::{
+use crate::op::{
     prim::{CopyFromStwo, CopyToStwo, LuminairConstant},
     HasProcessTrace,
-}, StwoCompiler};
+};
 use luminair_air::{
     components::{
         add::{
@@ -452,6 +452,8 @@ impl LuminairGraph for Graph {
 
 #[test]
 fn test_lazy_trace_evaluation() {
+    use crate::StwoCompiler;
+
     let mut cx = Graph::new();
     let a = cx.tensor((10, 10)).set(vec![1.0; 100]);
     let b = cx.tensor((10, 10)).set(vec![2.0; 100]);
