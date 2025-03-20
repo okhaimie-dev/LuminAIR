@@ -208,14 +208,14 @@ impl LuminairGraph for Graph {
             let log_size = calculate_log_size(add_table.table.len());
             max_log_size = max_log_size.max(log_size);
             
-            table_traces.push(TableTrace::from_add(add_table, log_size));
+            table_traces.push(TableTrace::from_add(add_table));
         }
 
         if !mul_table.table.is_empty() {
             let log_size = calculate_log_size(mul_table.table.len());
             max_log_size = max_log_size.max(log_size);
             
-            table_traces.push(TableTrace::from_mul(mul_table, log_size));
+            table_traces.push(TableTrace::from_mul(mul_table));
         }
 
         Ok(LuminairPie {

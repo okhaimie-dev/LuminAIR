@@ -1,52 +1,48 @@
 use serde::{Deserialize, Serialize};
 
-use crate::components::{add::table::AddTable, mul::table::MulTable, AddClaim, ClaimType, MulClaim, TraceEval, TraceError};
+use crate::components::{add::table::AddTable, mul::table::MulTable, ClaimType, TraceEval, TraceError};
 
 /// Represents an operator's trace table along with its claim before conversion
 /// to a serialized trace format. Used to defer trace evaluation until proving.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum TableTrace {
-    /// Addition operator trace table and claim.
+    /// Addition operator trace table.
     Add {
         table: AddTable,
-        claim: AddClaim
     },
-    /// Multiplication operator trace table and claim.
+    /// Multiplication operator trace table.
     Mul {
         table: MulTable,
-        claim: MulClaim
     },
 }
 
 impl TableTrace {
-    /// Creates a new [`TableTrace`] from an [`AddTable`] and a log size
+    /// Creates a new [`TableTrace`] from an [`AddTable`]
     /// for use in the proof generation.
-    pub fn from_add(table: AddTable, log_size: u32) -> Self {
+    pub fn from_add(table: AddTable) -> Self {
         Self::Add {
             table,
-            claim: AddClaim::new(log_size)
         }
     }
     
-    /// Creates a new [`TableTrace`] from a [`MulTable`] and a log size
+    /// Creates a new [`TableTrace`] from a [`MulTable`]
     /// for use in the proof generation.
-    pub fn from_mul(table: MulTable, log_size: u32) -> Self {
+    pub fn from_mul(table: MulTable) -> Self {
         Self::Mul {
             table,
-            claim: MulClaim::new(log_size)
         }
     }
 
     pub fn to_trace(&self) -> Result<(TraceEval, ClaimType), TraceError> {
         match self {
-            TableTrace::Add { table, claim } => {
-                let (trace, _) = table.trace_evaluation()?;
-                Ok((trace, ClaimType::Add(claim.clone())))
+            TableTrace::Add { table } => {
+                let (trace, claim) = table.trace_evaluation()?;
+                Ok((trace, ClaimType::Add(claim)))
             },
 
-            TableTrace::Mul { table, claim } => {
-                let (trace, _) = table.trace_evaluation()?;
-                Ok((trace, ClaimType::Mul(claim.clone())))
+            TableTrace::Mul { table } => {
+                let (trace, claim) = table.trace_evaluation()?;
+                Ok((trace, ClaimType::Mul(claim)))
             },
         }
     }
