@@ -471,6 +471,7 @@ fn test_direct_table_trace_processing() {
     let b = cx.tensor((10, 10)).set(vec![2.0; 100]);
     let c = a * b;
     let mut d = (c + a).retrieve();
+    let _e = a.sum_reduce(0).retrieve();
     
     cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
     
