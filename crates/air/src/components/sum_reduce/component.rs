@@ -1,5 +1,5 @@
 use crate::components::{SumReduceClaim, NodeElements};
-use num_traits::{One, Zero};
+use num_traits::One;
 // use numerair::eval::EvalFixedPoint;
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
