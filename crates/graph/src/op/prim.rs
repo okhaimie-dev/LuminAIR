@@ -504,17 +504,11 @@ impl Compiler for PrimitiveCompiler {
             } else if is::<luminal::op::Mul>(op) {
                 *op_ref = LuminairMul::new().into_operator()
             } else if is::<luminal::op::SumReduce>(op) {
-                // TODO
-                // How to instatntiate without hardcoding
-
-                let new_op = op_ref.deref();
-
-                let dim_index = if let Some(sum_reduce) = new_op.as_any().downcast_ref::<SumReduce>() {
+                let dim_index = if let Some(sum_reduce) = op_ref.deref().as_any().downcast_ref::<SumReduce>() {
                     sum_reduce.0 // Access the usize field (the 0 in SumReduce(0))
                 } else {
                     0
                 };
-
                 *op_ref = LuminairSumReduce::new(dim_index).into_operator() 
             }  else if is::<luminal::op::Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
