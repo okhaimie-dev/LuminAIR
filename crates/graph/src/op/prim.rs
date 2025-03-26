@@ -311,8 +311,8 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
         let mut stack: Vec<i64> = vec![];
 
         let node_id: BaseField = node_info.id.into();
-        let lhs_id: BaseField = node_info.inputs[0].id.into();
-        let rhs_id: BaseField = BaseField::zero();
+        let input_id: BaseField = node_info.inputs[0].id.into();
+        // let rhs_id: BaseField = BaseField::zero();
 
         for i in 0..front_size {
 
@@ -321,8 +321,8 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
                 let mut acc = Fixed::zero(); // Initialize accumulator for each (i, j)
                 for k in 0..dim_size {
                     let orig_index = i * dim_size * back_size + k * back_size + j;
-                    let lhs_val = get_index(input, &expr, &mut stack, orig_index);
-                    let next_acc = acc + lhs_val; // Compute next accumulator
+                    let input_val = get_index(input, &expr, &mut stack, orig_index);
+                    let next_acc = acc + input_val; // Compute next accumulator
 
                     // Set out_data only in the last reduction step
                     let (out_val, is_last_step )= if k == dim_size - 1 {
@@ -332,12 +332,12 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
                         (Fixed::zero(), BaseField::zero()) // Placeholder for incomplete reductions
                     };
 
-                    let lhs_mult = if node_info.inputs[0].is_initializer {
+                    let input_mult = if node_info.inputs[0].is_initializer {
                         BaseField::zero()
                     } else {
                         -BaseField::one()
                     };
-                    let rhs_mult = BaseField::zero();
+                    // let rhs_mult = BaseField::zero();
                     let out_mult = if node_info.output.is_final_output {
                         BaseField::zero()
                     } else {
@@ -351,22 +351,22 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
                     // Add row to the trace table with acc and next_acc
                     table.add_row(SumReduceTableRow {
                         node_id,
-                        lhs_id,
-                        rhs_id,
+                        input_id,
+                        // rhs_id,
                         idx: idx.into(),
                         is_last_idx: (is_last_idx).into(),
-                        next_idx: (idx + 1).into(),
                         next_node_id: node_id,
-                        next_lhs_id: lhs_id,
-                        next_rhs_id: rhs_id,
-                        lhs: lhs_val.to_m31(),
-                        rhs: BaseField::zero(),
+                        next_input_id: input_id,
+                        next_idx: (idx + 1).into(),
+                        // next_rhs_id: rhs_id,
+                        input: input_val.to_m31(),
+                        // rhs: BaseField::zero(),
                         out: out_val.to_m31(),
                         acc: acc.to_m31(),
                         next_acc: next_acc.to_m31(),
                         is_last_step: is_last_step,
-                        lhs_mult,
-                        rhs_mult,
+                        input_mult,
+                        // rhs_mult,
                         out_mult,
                     });
                     acc = next_acc;
