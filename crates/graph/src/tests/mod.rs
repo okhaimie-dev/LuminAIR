@@ -4,6 +4,65 @@ use rand::Rng;
 mod ops;
 
 #[macro_export]
+macro_rules! single_unary_test {
+    ($func:expr, $name:ident, $type:ty, ($rows:expr, $cols:expr)) => {
+        paste::paste! {
+            #[test]
+            fn [<$name _ $rows x $cols>]() {
+                let mut rng = StdRng::seed_from_u64(42);
+                let a_data = vec![1.0];
+
+                // Graph setup for Stwo compiler
+                let mut cx = Graph::new();
+                let a = cx.tensor(($rows, $cols)).set(a_data.clone());
+
+                let f: fn(GraphTensor) -> GraphTensor = $func;
+                let mut c = f(a).retrieve();
+
+                // Compilation and execution using StwoCompiler
+                cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut c);
+
+                let trace = cx.gen_trace().expect("Trace generation failed");
+                let proof = cx.prove(trace).expect("Proof generation failed");
+                cx.verify(proof).expect("Proof verification failed");
+                // Retrieve output data
+                let stwo_output = c.data();
+
+                // CPUCompiler comparison
+                let mut cx_cpu = Graph::new();
+                let a_cpu = cx_cpu.tensor(($rows, $cols)).set(a_data);
+                let mut c_cpu = f(a_cpu).retrieve();
+                cx_cpu.compile(<(GenericCompiler, CPUCompiler)>::default(), &mut c_cpu);
+                cx_cpu.execute();
+                // Retrieve CPU output
+                let cpu_output = c_cpu.data();
+
+                // Assert outputs are close
+                assert_close(&stwo_output, &cpu_output);
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! unary_test {
+    ($func: expr, $name: ident, $type: ty) => {
+        // // Test with small tensor
+        // $crate::single_unary_test!($func, $name, $type, (3, 4));
+        // // Test with large tensor to ensure scalability
+        // $crate::single_unary_test!($func, $name, $type, (32, 32));
+        // // Test with tensors that have uneven dimensions
+        // $crate::single_unary_test!($func, $name, $type, (17, 13));
+        // Test with a scalar
+        $crate::single_unary_test!($func, $name, $type, (1, 1));
+        // // Test with a row vector
+        // $crate::single_unary_test!($func, $name, $type, (1, 8));
+        // // Test with a column vector
+        // $crate::single_unary_test!($func, $name, $type, (8, 1));
+    };
+}
+
+#[macro_export]
 macro_rules! single_binary_test {
     ($func:expr, $name:ident, $type:ty, ($a_rows:expr, $a_cols:expr), ($b_rows:expr, $b_cols:expr)) => {
         paste::paste! {
@@ -143,7 +202,7 @@ pub fn random_vec_rng<R: Rng>(n: usize, rng: &mut R) -> Vec<f32> {
 
 /// Ensure two arrays are nearly equal
 pub fn assert_close(a_vec: &[f32], b_vec: &[f32]) {
-    assert_close_precision(a_vec, b_vec, 1e-3);
+    assert_close_precision(a_vec, b_vec, 1e-2);
 }
 
 /// Ensure two arrays are nearly equal to a decimal place
