@@ -37,6 +37,7 @@ pub struct RecipTableRow {
     pub input: BaseField,
     pub out: BaseField,
     pub rem: BaseField,
+    pub scale: BaseField,
     pub input_mult: BaseField,
     pub out_mult: BaseField,
 }
@@ -76,6 +77,7 @@ impl RecipTable {
         let mut input = BaseColumn::zeros(trace_size);
         let mut out = BaseColumn::zeros(trace_size);
         let mut rem = BaseColumn::zeros(trace_size);
+        let mut scale = BaseColumn::zeros(trace_size);
         let mut input_mult = BaseColumn::zeros(trace_size);
         let mut out_mult = BaseColumn::zeros(trace_size);
 
@@ -93,6 +95,7 @@ impl RecipTable {
             input.set(vec_row, row.input);
             out.set(vec_row, row.out);
             rem.set(vec_row, row.rem);
+            scale.set(vec_row, row.scale);
             input_mult.set(vec_row, row.input_mult);
             out_mult.set(vec_row, row.out_mult);
         }
@@ -116,8 +119,11 @@ impl RecipTable {
         trace.push(CircleEvaluation::new(domain, input));
         trace.push(CircleEvaluation::new(domain, out));
         trace.push(CircleEvaluation::new(domain, rem));
+        trace.push(CircleEvaluation::new(domain, scale));
         trace.push(CircleEvaluation::new(domain, input_mult));
         trace.push(CircleEvaluation::new(domain, out_mult));
+
+        println!("Trace: {:?}", trace);
 
         assert_eq!(trace.len(), RecipColumn::count().0);
 
@@ -138,6 +144,7 @@ pub enum RecipColumn {
     Input,
     Out,
     Rem,
+    Scale,
     InputMult,
     OutMult,
 }
@@ -156,15 +163,16 @@ impl RecipColumn {
             Self::Input => 7,
             Self::Out => 8,
             Self::Rem => 9,
-            Self::InputMult => 10,
-            Self::OutMult => 11,
+            Self::Scale => 10,
+            Self::InputMult => 11,
+            Self::OutMult => 12,
         }
     }
 }
 impl TraceColumn for RecipColumn {
     /// Returns the number of columns in the main trace and interaction trace.
     fn count() -> (usize, usize) {
-        (12, 2)
+        (13, 2)
     }
 }
 

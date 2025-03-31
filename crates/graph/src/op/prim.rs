@@ -11,7 +11,7 @@ use luminal::{
     prelude::{petgraph::visit::EdgeRef, *},
 };
 use num_traits::{identities::Zero, One};
-use numerair::Fixed;
+use numerair::{Fixed, SCALE_FACTOR};
 use std::sync::Arc;
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -165,6 +165,7 @@ impl LuminairOperator<RecipColumn, RecipTable> for LuminairRecip {
                 input: input_val.to_m31(),
                 out: out_val.to_m31(),
                 rem: rem_val.to_m31(),
+                scale: SCALE_FACTOR,
                 input_mult,
                 out_mult,
             })

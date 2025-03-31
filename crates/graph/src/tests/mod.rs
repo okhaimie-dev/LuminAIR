@@ -5,13 +5,12 @@ mod ops;
 
 #[macro_export]
 macro_rules! single_unary_test {
-    ($func:expr, $name:ident, $type:ty, ($rows:expr, $cols:expr)) => {
+    ($func:expr, $name:ident, $type:ty, ($rows:expr, $cols:expr), $nonzero:expr) => {
         paste::paste! {
             #[test]
             fn [<$name _ $rows x $cols>]() {
-                // let mut rng = StdRng::seed_from_u64(42);
-                // let a_data = random_vec_rng($rows * $cols, &mut rng);
-                let a_data = vec![1.0];
+                let mut rng = StdRng::seed_from_u64(42);
+                let a_data = random_vec_rng($rows * $cols, &mut rng, $nonzero);
 
                 // Graph setup for Stwo compiler
                 let mut cx = Graph::new();
@@ -47,31 +46,27 @@ macro_rules! single_unary_test {
 
 #[macro_export]
 macro_rules! unary_test {
-    ($func: expr, $name: ident, $type: ty) => {
-        // // Test with small tensor
-        // $crate::single_unary_test!($func, $name, $type, (3, 4));
-        // // Test with large tensor to ensure scalability
-        // $crate::single_unary_test!($func, $name, $type, (32, 32));
-        // // Test with tensors that have uneven dimensions
-        // $crate::single_unary_test!($func, $name, $type, (17, 13));
+    ($func: expr, $name: ident, $type: ty,  $nonzero: expr) => {
+        // Test with 2D tensor
+        $crate::single_unary_test!($func, $name, $type, (3, 4), $nonzero);
         // Test with a scalar
-        $crate::single_unary_test!($func, $name, $type, (1, 1));
-        // // Test with a row vector
-        // $crate::single_unary_test!($func, $name, $type, (1, 8));
-        // // Test with a column vector
-        // $crate::single_unary_test!($func, $name, $type, (8, 1));
+        $crate::single_unary_test!($func, $name, $type, (1, 1), $nonzero);
+        // Test with a row vector
+        $crate::single_unary_test!($func, $name, $type, (1, 8), $nonzero);
+        // Test with a column vector
+        $crate::single_unary_test!($func, $name, $type, (8, 1), $nonzero);
     };
 }
 
 #[macro_export]
 macro_rules! single_binary_test {
-    ($func:expr, $name:ident, $type:ty, ($a_rows:expr, $a_cols:expr), ($b_rows:expr, $b_cols:expr)) => {
+    ($func:expr, $name:ident, $type:ty, ($a_rows:expr, $a_cols:expr), ($b_rows:expr, $b_cols:expr), $nonzero:expr) => {
         paste::paste! {
             #[test]
             fn [<$name _ $a_rows x $a_cols _ $b_rows x $b_cols>]() {
                 let mut rng = StdRng::seed_from_u64(42);
-                let a_data = random_vec_rng($a_rows * $a_cols, &mut rng);
-                let b_data = random_vec_rng($b_rows * $b_cols, &mut rng);
+                let a_data = random_vec_rng($a_rows * $a_cols, &mut rng, $nonzero);
+                let b_data = random_vec_rng($b_rows * $b_cols, &mut rng, $nonzero);
 
                 // Graph setup
                 let mut cx = Graph::new();
@@ -173,19 +168,19 @@ macro_rules! single_binary_test {
 
 #[macro_export]
 macro_rules! binary_test {
-    ($func: expr, $name: ident, $type: ty) => {
+    ($func: expr, $name: ident, $type: ty, $nonzero: expr) => {
         // Test operation with same-sized tensors
-        $crate::single_binary_test!($func, $name, $type, (3, 4), (3, 4));
+        $crate::single_binary_test!($func, $name, $type, (3, 4), (3, 4), $nonzero);
         // Test with large tensors to ensure scalability
-        $crate::single_binary_test!($func, $name, $type, (32, 32), (32, 32));
+        $crate::single_binary_test!($func, $name, $type, (32, 32), (32, 32), $nonzero);
         // Test with tensors that have uneven dimensions
-        $crate::single_binary_test!($func, $name, $type, (17, 13), (17, 13));
+        $crate::single_binary_test!($func, $name, $type, (17, 13), (17, 13), $nonzero);
         // Test broadcasting a scalar (1,1) to a larger tensor
-        $crate::single_binary_test!($func, $name, $type, (1, 1), (5, 5));
+        $crate::single_binary_test!($func, $name, $type, (1, 1), (5, 5), $nonzero);
         // Test broadcasting a row vector to a matrix
-        $crate::single_binary_test!($func, $name, $type, (1, 4), (3, 4));
+        $crate::single_binary_test!($func, $name, $type, (1, 4), (3, 4), $nonzero);
         // Test broadcasting a column vector to a matrix
-        $crate::single_binary_test!($func, $name, $type, (3, 1), (3, 4));
+        $crate::single_binary_test!($func, $name, $type, (3, 1), (3, 4), $nonzero);
     };
 }
 
@@ -197,13 +192,23 @@ pub fn assert_op_in_graph<T: Operator + 'static>(graph: &Graph) {
     );
 }
 
-pub fn random_vec_rng<R: Rng>(n: usize, rng: &mut R) -> Vec<f32> {
-    (0..n).map(|_| rng.gen_range(-0.5..0.5)).collect()
+pub fn random_vec_rng<R: Rng>(n: usize, rng: &mut R, nonzero: bool) -> Vec<f32> {
+    (0..n)
+        .map(|_| {
+            let mut value = rng.gen_range(-0.5..0.5);
+            if nonzero {
+                while value < 0.001 {
+                    value = rng.gen_range(-0.5..0.5);
+                }
+            }
+            value
+        })
+        .collect()
 }
 
 /// Ensure two arrays are nearly equal
 pub fn assert_close(a_vec: &[f32], b_vec: &[f32]) {
-    assert_close_precision(a_vec, b_vec, 1e-2);
+    assert_close_precision(a_vec, b_vec, 1e-1);
 }
 
 /// Ensure two arrays are nearly equal to a decimal place

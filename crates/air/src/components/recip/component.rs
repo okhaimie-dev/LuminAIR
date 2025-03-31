@@ -1,6 +1,6 @@
 use crate::components::{NodeElements, RecipClaim};
 use num_traits::One;
-use numerair::{eval::EvalFixedPoint, SCALE_FACTOR};
+use numerair::eval::EvalFixedPoint;
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
 };
@@ -54,6 +54,7 @@ impl FrameworkEval for RecipEval {
         let input_val = eval.next_trace_mask(); // Value from the tensor at index.
         let out_val = eval.next_trace_mask(); // Value in output tensor at index.
         let rem_val = eval.next_trace_mask(); // Rem value in result tensor at index.
+        let scale = eval.next_trace_mask(); // Scale
 
         // Multiplicities for interaction constraints
         let input_mult = eval.next_trace_mask();
@@ -67,12 +68,7 @@ impl FrameworkEval for RecipEval {
         eval.add_constraint(is_last_idx.clone() * (is_last_idx.clone() - E::F::one()));
 
         // Evaluates fixed point recip.
-        eval.eval_fixed_recip(
-            input_val.clone(),
-            SCALE_FACTOR.into(),
-            out_val.clone(),
-            rem_val,
-        ); 
+        eval.eval_fixed_recip(input_val.clone(), scale, out_val.clone(), rem_val);
         // THIS CONSTRAINT MAKES IT FAIL WITH `ConstraintsNotSatisfied`.
 
         // ┌────────────────────────────┐

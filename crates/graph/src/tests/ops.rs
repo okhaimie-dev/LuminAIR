@@ -7,8 +7,8 @@ use luminal_cpu::CPUCompiler;
 use rand::{rngs::StdRng, SeedableRng};
 
 // =============== UNARY ===============
-unary_test!(|a| a.recip(), test_recip, f32);
+unary_test!(|a| a.recip(), test_recip, f32, true);
 
 // =============== BINARY ===============
-binary_test!(|a, b| a + b, test_add, f32);
-binary_test!(|a, b| a * b, test_mul, f32);
+binary_test!(|a, b| a + b, test_add, f32, false);
+binary_test!(|a, b| a * b, test_mul, f32, false);
