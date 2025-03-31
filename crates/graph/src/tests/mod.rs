@@ -208,7 +208,7 @@ pub fn random_vec_rng<R: Rng>(n: usize, rng: &mut R, nonzero: bool) -> Vec<f32> 
 
 /// Ensure two arrays are nearly equal
 pub fn assert_close(a_vec: &[f32], b_vec: &[f32]) {
-    assert_close_precision(a_vec, b_vec, 1e-1);
+    assert_close_precision(a_vec, b_vec, 1e-3);
 }
 
 /// Ensure two arrays are nearly equal to a decimal place

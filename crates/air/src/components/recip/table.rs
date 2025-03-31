@@ -81,8 +81,6 @@ impl RecipTable {
         let mut input_mult = BaseColumn::zeros(trace_size);
         let mut out_mult = BaseColumn::zeros(trace_size);
 
-        println!("Table: {:?}", self.table);
-
         // Fill columns
         for (vec_row, row) in self.table.iter().enumerate() {
             node_id.set(vec_row, row.node_id);
@@ -122,8 +120,6 @@ impl RecipTable {
         trace.push(CircleEvaluation::new(domain, scale));
         trace.push(CircleEvaluation::new(domain, input_mult));
         trace.push(CircleEvaluation::new(domain, out_mult));
-
-        println!("Trace: {:?}", trace);
 
         assert_eq!(trace.len(), RecipColumn::count().0);
 

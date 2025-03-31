@@ -124,7 +124,6 @@ impl LuminairOperator<RecipColumn, RecipTable> for LuminairRecip {
         node_info: &NodeInfo,
     ) -> Vec<Tensor> {
         let input = get_buffer_from_tensor(&inp[0].0);
-        println!("Input: {:?}", input);
         let expr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
 
         let mut stack: Vec<i64> = vec![];
@@ -137,8 +136,6 @@ impl LuminairOperator<RecipColumn, RecipTable> for LuminairRecip {
         for (idx, out) in out_data.iter_mut().enumerate() {
             let input_val = get_index(input, &expr, &mut stack, idx);
             let (out_val, rem_val) = input_val.recip();
-            println!("Out: {:?}", out_val);
-            println!("Rem: {:?}", rem_val);
 
             let input_mult = if node_info.inputs[0].is_initializer {
                 BaseField::zero()

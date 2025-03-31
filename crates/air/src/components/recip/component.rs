@@ -69,7 +69,6 @@ impl FrameworkEval for RecipEval {
 
         // Evaluates fixed point recip.
         eval.eval_fixed_recip(input_val.clone(), scale, out_val.clone(), rem_val);
-        // THIS CONSTRAINT MAKES IT FAIL WITH `ConstraintsNotSatisfied`.
 
         // ┌────────────────────────────┐
         // │   Transition Constraints   │
