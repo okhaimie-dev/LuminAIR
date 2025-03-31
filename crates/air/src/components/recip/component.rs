@@ -72,7 +72,8 @@ impl FrameworkEval for RecipEval {
             SCALE_FACTOR.into(),
             out_val.clone(),
             rem_val,
-        );
+        ); 
+        // THIS CONSTRAINT MAKES IT FAIL WITH `ConstraintsNotSatisfied`.
 
         // ┌────────────────────────────┐
         // │   Transition Constraints   │

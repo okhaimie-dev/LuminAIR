@@ -9,7 +9,8 @@ macro_rules! single_unary_test {
         paste::paste! {
             #[test]
             fn [<$name _ $rows x $cols>]() {
-                let mut rng = StdRng::seed_from_u64(42);
+                // let mut rng = StdRng::seed_from_u64(42);
+                // let a_data = random_vec_rng($rows * $cols, &mut rng);
                 let a_data = vec![1.0];
 
                 // Graph setup for Stwo compiler

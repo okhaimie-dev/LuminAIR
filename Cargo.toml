@@ -12,8 +12,7 @@ license = "MIT"
 stwo-prover = { git = "https://github.com/starkware-libs/stwo.git", rev = "8902113" }
 luminal = { git = "https://github.com/raphaelDkhn/luminal.git", rev = "80ae0fd" }
 
-# numerair = { git = "https://github.com/gizatechxyz/NumerAir.git", rev = "ee7fd64" }
-numerair = {path = "/Users/raphaeldoukhan/Desktop/Giza/Frameworks/numerair"}
+numerair = { git = "https://github.com/gizatechxyz/NumerAir.git", rev = "21a0a68" }
 
 rayon = "1.10.0"
 tracing = "0.1"
