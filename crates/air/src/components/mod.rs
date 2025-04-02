@@ -9,6 +9,7 @@ use mul::{
 use sum_reduce::{
     component::{SumReduceComponent, SumReduceEval},
     table::SumReduceColumn,
+};
 use recip::{
     component::{RecipComponent, RecipEval},
     table::RecipColumn,

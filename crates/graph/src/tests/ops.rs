@@ -20,8 +20,8 @@ fn sum_reduce_wrapper_axes_1(a: GraphTensor, _b: GraphTensor) -> GraphTensor {
 }
 
 // Use binary_test with the wrapper function
-binary_test!(sum_reduce_wrapper_axes_0, test_sum_reduce_0, f32, false));
-binary_test!(sum_reduce_wrapper_axes_1, test_sum_reduce_1, f32, false));
+binary_test!(sum_reduce_wrapper_axes_0, test_sum_reduce_0, f32, false);
+binary_test!(sum_reduce_wrapper_axes_1, test_sum_reduce_1, f32, false);
 
 
 #[test]
