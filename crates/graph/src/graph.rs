@@ -7,15 +7,23 @@ use luminair_air::{
         add::{
             self,
             table::{AddColumn, AddTable},
-        }, mul::{
+        },
+        mul::{
             self,
             table::{MulColumn, MulTable},
-        }, sum_reduce::{
+        }, 
+        sum_reduce::{
             self,
             table::{SumReduceColumn, SumReduceTable},
-        }, ClaimType, LuminairComponents, LuminairInteractionElements, TraceError,
+        }, 
+        recip::{self, 
+            table::{RecipColumn, RecipTable},
+        },
+        ClaimType, LuminairComponents, LuminairInteractionElements, TraceError,
     },
-    pie::{ExecutionResources, InputInfo, LuminairPie, NodeInfo, OpCounter, OutputInfo, TableTrace},
+    pie::{
+        ExecutionResources, InputInfo, LuminairPie, NodeInfo, OpCounter, OutputInfo, TableTrace,
+    },
     utils::{calculate_log_size, get_is_first_log_sizes, lookup_sum_valid},
     LuminairClaim, LuminairInteractionClaim, LuminairProof,
 };
@@ -86,6 +94,7 @@ impl LuminairGraph for Graph {
         let mut add_table: AddTable = AddTable::new();
         let mut mul_table: MulTable = MulTable::new();
         let mut sum_reduce_table: SumReduceTable = SumReduceTable::new();
+        let mut recip_table = RecipTable::new();
 
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
@@ -201,7 +210,21 @@ impl LuminairGraph for Graph {
                     *op_counter.sum_reduce.get_or_insert(0) += 1;
 
                     tensors
-                } else {
+                } else if <Box<dyn Operator> as HasProcessTrace<RecipColumn, RecipTable>>::has_process_trace(
+                    node_op,
+                ) {
+                    let tensors = <Box<dyn Operator> as HasProcessTrace<
+                    RecipColumn,
+                    RecipTable,
+                    >>::call_process_trace(
+                        node_op, srcs, &mut recip_table, &node_info
+                    )
+                    .unwrap();
+                    *op_counter.recip.get_or_insert(0) += 1;
+
+                    tensors
+                }
+                else {
                     // Handle other operators or fallback
                     node_op.process(srcs)
                 };
@@ -224,15 +247,20 @@ impl LuminairGraph for Graph {
         if !add_table.table.is_empty() {
             let log_size = calculate_log_size(add_table.table.len());
             max_log_size = max_log_size.max(log_size);
-            
+
             table_traces.push(TableTrace::from_add(add_table));
         }
-
         if !mul_table.table.is_empty() {
             let log_size = calculate_log_size(mul_table.table.len());
             max_log_size = max_log_size.max(log_size);
-            
+
             table_traces.push(TableTrace::from_mul(mul_table));
+        }
+        if !recip_table.table.is_empty() {
+            let log_size = calculate_log_size(recip_table.table.len());
+            max_log_size = max_log_size.max(log_size);
+
+            table_traces.push(TableTrace::from_recip(recip_table));
         }
 
         if !sum_reduce_table.table.is_empty() {
@@ -259,7 +287,7 @@ impl LuminairGraph for Graph {
         // │     Protocol Setup       │
         // └──────────────────────────┘
         tracing::info!("Protocol Setup");
-        let config = PcsConfig::default();
+        let config: PcsConfig = PcsConfig::default();
         let max_log_size = pie.execution_resources.max_log_size;
         let is_first_log_sizes = get_is_first_log_sizes(max_log_size);
         let twiddles = SimdBackend::precompute_twiddles(
@@ -278,21 +306,21 @@ impl LuminairGraph for Graph {
         tracing::info!("Preprocessed Trace");
         // Generate all preprocessed columns
         let mut tree_builder = commitment_scheme.tree_builder();
-        
+
         tree_builder.extend_evals(
             is_first_log_sizes
-            .iter()
-            .copied()
-            .map(|log_size| IsFirst::new(log_size).gen_column_simd()),
+                .iter()
+                .copied()
+                .map(|log_size| IsFirst::new(log_size).gen_column_simd()),
         );
-        
+
         // Commit the preprocessed trace
         tree_builder.commit(channel);
-        
+
         // ┌───────────────────────────────────────┐
         // │    Interaction Phase 1 - Main Trace   │
         // └───────────────────────────────────────┘
-        
+
         tracing::info!("Main Trace");
         let mut tree_builder = commitment_scheme.tree_builder();
         let mut main_claim = LuminairClaim::new(is_first_log_sizes.clone());
@@ -317,6 +345,7 @@ impl LuminairGraph for Graph {
                 ClaimType::Add(claim) => main_claim.add = Some(claim),
                 ClaimType::Mul(claim) => main_claim.mul = Some(claim),
                 ClaimType::SumReduce(claim) => main_claim.sum_reduce = Some(claim),
+                ClaimType::Recip(claim) => main_claim.recip = Some(claim),
             }
         }
 
@@ -357,9 +386,15 @@ impl LuminairGraph for Graph {
                     tree_builder.extend_evals(tr);
                     interaction_claim.sum_reduce = Some(cl);
                 }
+                ClaimType::Recip(_) => {
+                    let (tr, cl) =
+                        recip::table::interaction_trace_evaluation(&trace, lookup_elements).unwrap();
+                    tree_builder.extend_evals(tr);
+                    interaction_claim.recip = Some(cl);
+                }
             }
         }
-        
+
         // Mix the interaction claim into the Fiat-Shamir channel.
         interaction_claim.mix_into(channel);
         // Commit the interaction trace.
@@ -472,12 +507,12 @@ fn test_direct_table_trace_processing() {
     let c = a * b;
     let mut d = (c + a).retrieve();
     let _e = a.sum_reduce(0).retrieve();
-    
-    cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
-    
+
+  cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
+
     // Generate trace with direct table storage
     let trace = cx.gen_trace().expect("Trace generation failed");
-    
+
     // Verify that table traces contain both operation types
     let has_add = trace.table_traces.iter().any(|t| matches!(t, TableTrace::Add { .. }));
     let has_mul = trace.table_traces.iter().any(|t| matches!(t, TableTrace::Mul { .. }));
@@ -489,5 +524,8 @@ fn test_direct_table_trace_processing() {
     
     // Verify the end-to-end proof pipeline
     let proof = cx.prove(trace).expect("Proof generation failed");
-    assert!(cx.verify(proof).is_ok(), "Proof verification should succeed");
+    assert!(
+        cx.verify(proof).is_ok(),
+        "Proof verification should succeed"
+    );
 }

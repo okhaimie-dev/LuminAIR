@@ -3,6 +3,7 @@ use luminair_air::{
         add::table::{AddColumn, AddTable, AddTableRow},
         mul::table::{MulColumn, MulTable, MulTableRow},
         sum_reduce::table::{SumReduceColumn, SumReduceTable, SumReduceTableRow},
+        recip::table::{RecipColumn, RecipTable, RecipTableRow},
     },
     pie::NodeInfo,
 };
@@ -11,7 +12,7 @@ use luminal::{
     prelude::{petgraph::visit::EdgeRef, *},
 };
 use num_traits::{identities::Zero, One};
-use numerair::Fixed;
+use numerair::{Fixed, SCALE_FACTOR};
 use std::{ops::Deref, sync::Arc};
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -99,6 +100,83 @@ impl Operator for LuminairConstant {
         let mut data = Vec::with_capacity(1);
         data.push(Fixed::from_f64(value as f64));
         vec![Tensor::new(StwoData(Arc::new(data)))]
+    }
+}
+
+// ================== UNARY ==================
+
+/// Implements element-wise addition for LuminAIR.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct LuminairRecip {}
+
+impl LuminairRecip {
+    /// Creates a new `LuminairRecip` instance.
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl LuminairOperator<RecipColumn, RecipTable> for LuminairRecip {
+    /// Processes input tensor, generating a trace, claim, and output tensor.
+    fn process_trace(
+        &mut self,
+        inp: Vec<(InputTensor, ShapeTracker)>,
+        table: &mut RecipTable,
+        node_info: &NodeInfo,
+    ) -> Vec<Tensor> {
+        let input = get_buffer_from_tensor(&inp[0].0);
+        let expr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
+
+        let mut stack: Vec<i64> = vec![];
+        let output_size = inp[0].1.n_elements().to_usize().unwrap();
+        let mut out_data = vec![Fixed::zero(); output_size];
+
+        let node_id: BaseField = node_info.id.into();
+        let input_id: BaseField = node_info.inputs[0].id.into();
+
+        for (idx, out) in out_data.iter_mut().enumerate() {
+            let input_val = get_index(input, &expr, &mut stack, idx);
+            let (out_val, rem_val) = input_val.recip();
+
+            let input_mult = if node_info.inputs[0].is_initializer {
+                BaseField::zero()
+            } else {
+                -BaseField::one()
+            };
+            let out_mult = if node_info.output.is_final_output {
+                BaseField::zero()
+            } else {
+                BaseField::one() * BaseField::from_u32_unchecked(node_info.num_consumers)
+            };
+
+            let is_last_idx: u32 = if idx == (output_size - 1) { 1 } else { 0 };
+
+            *out = out_val;
+            table.add_row(RecipTableRow {
+                node_id,
+                input_id,
+                idx: idx.into(),
+                is_last_idx: (is_last_idx).into(),
+                next_idx: (idx + 1).into(),
+                next_node_id: node_id,
+                next_input_id: input_id,
+                input: input_val.to_m31(),
+                out: out_val.to_m31(),
+                rem: rem_val.to_m31(),
+                scale: SCALE_FACTOR,
+                input_mult,
+                out_mult,
+            })
+        }
+
+        vec![Tensor::new(StwoData(Arc::new(out_data)))]
+    }
+}
+
+impl Operator for LuminairRecip {
+    /// This method is not used as `process_trace` handles all computation for this operator.
+    fn process(&mut self, _inp: Vec<(InputTensor, ShapeTracker)>) -> Vec<Tensor> {
+        unimplemented!()
     }
 }
 
@@ -510,7 +588,9 @@ impl Compiler for PrimitiveCompiler {
                     0
                 };
                 *op_ref = LuminairSumReduce::new(dim_index).into_operator() 
-            }  else if is::<luminal::op::Contiguous>(op) {
+            } else if is::<luminal::op::Recip>(op) {
+                *op_ref = LuminairRecip::new().into_operator()
+            } else if is::<luminal::op::Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
             }
         }

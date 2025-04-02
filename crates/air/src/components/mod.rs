@@ -9,6 +9,9 @@ use mul::{
 use sum_reduce::{
     component::{SumReduceComponent, SumReduceEval},
     table::SumReduceColumn,
+use recip::{
+    component::{RecipComponent, RecipEval},
+    table::RecipColumn,
 };
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
@@ -31,6 +34,7 @@ use crate::{LuminairClaim, LuminairInteractionClaim};
 pub mod add;
 pub mod mul;
 pub mod sum_reduce;
+pub mod recip;
 
 /// Errors related to trace operations.
 #[derive(Debug, Error, Eq, PartialEq)]
@@ -49,6 +53,8 @@ pub type AddClaim = Claim<AddColumn>;
 pub type MulClaim = Claim<MulColumn>;
 /// Claim for the SumReduce trace.
 pub type SumReduceClaim = Claim<SumReduceColumn>;
+/// Claim for the Recip trace.
+pub type RecipClaim = Claim<RecipColumn>;
 
 /// Represents columns of a trace.
 pub trait TraceColumn {
@@ -104,6 +110,7 @@ pub enum ClaimType {
     Add(Claim<AddColumn>),
     Mul(Claim<MulColumn>),
     SumReduce(Claim<SumReduceColumn>),
+    Recip(Claim<RecipColumn>),
 }
 
 /// The claim of the interaction phase 2 (with the logUp protocol).
@@ -159,6 +166,7 @@ pub struct LuminairComponents {
     add: Option<AddComponent>,
     mul: Option<MulComponent>,
     sum_reduce: Option<SumReduceComponent>,
+    recip: Option<RecipComponent>,
 }
 
 impl LuminairComponents {
@@ -211,12 +219,25 @@ impl LuminairComponents {
                     interaction_elements.node_lookup_elements.clone(),
                 ),
                 interaction_claim.sum_reduce.as_ref().unwrap().claimed_sum,
+              ))
+        } else {
+            None
+        };
+      
+        let recip = if let Some(ref recip_claim) = claim.recip {
+            Some(RecipComponent::new(
+                tree_span_provider,
+                RecipEval::new(
+                    &recip_claim,
+                    interaction_elements.node_lookup_elements.clone(),
+                ),
+                interaction_claim.recip.as_ref().unwrap().claimed_sum,
             ))
         } else {
             None
         };
 
-        Self { add, mul, sum_reduce }
+        Self { add, mul, sum_reduce, recip }
     }
 
     /// Returns the `ComponentProver` of each components, used by the prover.
@@ -231,6 +252,9 @@ impl LuminairComponents {
         }
         if let Some(ref sum_reduce_component) = self.sum_reduce {
             components.push(sum_reduce_component);
+        }
+        if let Some(ref recip_component) = self.recip {
+            components.push(recip_component);
         }
         components
     }
