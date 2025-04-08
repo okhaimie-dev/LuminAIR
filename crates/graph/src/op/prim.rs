@@ -390,7 +390,6 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
 
         let node_id: BaseField = node_info.id.into();
         let input_id: BaseField = node_info.inputs[0].id.into();
-        // let rhs_id: BaseField = BaseField::zero();
 
         for i in 0..front_size {
 
@@ -415,7 +414,6 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
                     } else {
                         -BaseField::one()
                     };
-                    // let rhs_mult = BaseField::zero();
                     let out_mult = if node_info.output.is_final_output {
                         BaseField::zero()
                     } else {
@@ -429,21 +427,17 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
                     table.add_row(SumReduceTableRow {
                         node_id,
                         input_id,
-                        // rhs_id,
                         idx: idx.into(),
                         is_last_idx: (is_last_idx).into(),
                         next_node_id: node_id,
                         next_input_id: input_id,
                         next_idx: (idx + 1).into(),
-                        // next_rhs_id: rhs_id,
                         input: input_val.to_m31(),
-                        // rhs: BaseField::zero(),
                         out: out_val.to_m31(),
                         acc: acc.to_m31(),
                         next_acc: next_acc.to_m31(),
                         is_last_step: is_last_step,
                         input_mult,
-                        // rhs_mult,
                         out_mult,
                     });
                     acc = next_acc;

@@ -54,7 +54,7 @@ impl SumReduceTable {
         self.table.push(row);
     }
 
-    /// Transforms the [`SumReduceTable`] into [`TraceEval`] to be commited
+    /// Transforms the [`SumReduceTable`] into [`TraceEval`] to be committed
     /// when generating a STARK proof.
     pub fn trace_evaluation(&self) -> Result<(TraceEval, SumReduceClaim), TraceError> {
         let n_rows = self.table.len();
