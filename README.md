@@ -100,6 +100,7 @@ Check performance benchmarks for LuminAIR operators [here](https://luminair.giza
       <td align="center" valign="top" width="14.28%"><a href="https://audithub.app"><img src="https://avatars.githubusercontent.com/u/71888134?v=4?s=100" width="100px;" alt="malatrax"/><br /><sub><b>malatrax</b></sub></a><br /><a href="https://github.com/gizatechxyz/LuminAIR/commits?author=zmalatrax" title="Documentation">📖</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/blewater"><img src="https://avatars.githubusercontent.com/u/2580304?v=4?s=100" width="100px;" alt="Mario Karagiorgas"/><br /><sub><b>Mario Karagiorgas</b></sub></a><br /><a href="https://github.com/gizatechxyz/LuminAIR/commits?author=blewater" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Tbelleng"><img src="https://avatars.githubusercontent.com/u/117627242?v=4?s=100" width="100px;" alt="Tbelleng"/><br /><sub><b>Tbelleng</b></sub></a><br /><a href="https://github.com/gizatechxyz/LuminAIR/commits?author=Tbelleng" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/sukrucildirr"><img src="https://avatars.githubusercontent.com/u/32969880?v=4?s=100" width="100px;" alt="sukrucildirr"/><br /><sub><b>sukrucildirr</b></sub></a><br /><a href="https://github.com/gizatechxyz/LuminAIR/commits?author=sukrucildirr" title="Documentation">📖</a></td>
     </tr>
   </tbody>
 </table>
@@ -119,4 +120,4 @@ A special thanks to the developers and maintainers of the foundational projects 
 
 ## License
 
-LuminAIR is is open-source software released under the [MIT](https://opensource.org/license/mit) License.
+LuminAIR is open-source software released under the [MIT](https://opensource.org/license/mit) License.

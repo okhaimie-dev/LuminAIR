@@ -93,8 +93,8 @@ impl LuminairGraph for Graph {
         // Initilializes table for each operator
         let mut add_table: AddTable = AddTable::new();
         let mut mul_table: MulTable = MulTable::new();
-        let mut sum_reduce_table: SumReduceTable = SumReduceTable::new();
         let mut recip_table = RecipTable::new();
+        let mut sum_reduce_table: SumReduceTable = SumReduceTable::new();
 
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {

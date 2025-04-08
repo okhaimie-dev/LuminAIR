@@ -100,8 +100,8 @@ pub struct LuminairInteractionClaim {
 impl LuminairInteractionClaim {
     /// Mixes interaction claim data into a Fiat-Shamir channel.
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        if let Some(ref recip) = self.recip {
-            recip.mix_into(channel);
+        if let Some(ref add) = self.add {
+            add.mix_into(channel);
         }
         if let Some(ref mul) = self.mul {
             mul.mix_into(channel);
