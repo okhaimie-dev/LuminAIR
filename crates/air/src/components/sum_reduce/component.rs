@@ -1,11 +1,10 @@
 use crate::components::{NodeElements, SumReduceClaim};
 use num_traits::One;
-use numerair::eval::EvalFixedPoint;
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
 };
 
-/// Component for SumReducerocal operations, using `SimdBackend` with fallback to `CpuBackend` for small traces.
+/// Component for SumReduce operations, using `SimdBackend` with fallback to `CpuBackend` for small traces.
 pub type SumReduceComponent = FrameworkComponent<SumReduceEval>;
 
 /// Defines the AIR for the SumReduce component.
@@ -53,9 +52,9 @@ impl FrameworkEval for SumReduceEval {
         // Values for consistency constraints
         let input_val = eval.next_trace_mask(); // Value from the tensor at index.
         let out_val = eval.next_trace_mask(); // Value in output tensor at index.
-        let acc_val = eval.next_trace_mask(); // Rem value in result tensor at index.
-        let next_acc_val = eval.next_trace_mask(); // Scale
-        let is_last_step = eval.next_trace_mask(); // Scale
+        let acc_val = eval.next_trace_mask(); // Accumulative value in result tensor at index.
+        let next_acc_val = eval.next_trace_mask(); // Next accumulative value.
+        let is_last_step = eval.next_trace_mask(); // Flag if this is the last step.
 
         // Multiplicities for interaction constraints
         let input_mult = eval.next_trace_mask();
@@ -65,8 +64,9 @@ impl FrameworkEval for SumReduceEval {
         // │   Consistency Constraints   │
         // └─────────────────────────────┘
 
-        // The is_last_idx flag is either 0 or 1.
+        // The is_last_idx and is_last_step flags are either 0 or 1.
         eval.add_constraint(is_last_idx.clone() * (is_last_idx.clone() - E::F::one()));
+        eval.add_constraint(is_last_step.clone() * (is_last_step.clone() - E::F::one()));
 
         // The output value must equal the sum of the input values.
         eval.add_constraint(next_acc_val.clone() - (acc_val.clone() + input_val.clone()));

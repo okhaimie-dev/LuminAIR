@@ -2,8 +2,8 @@ use luminair_air::{
     components::{
         add::table::{AddColumn, AddTable, AddTableRow},
         mul::table::{MulColumn, MulTable, MulTableRow},
-        sum_reduce::table::{SumReduceColumn, SumReduceTable, SumReduceTableRow},
         recip::table::{RecipColumn, RecipTable, RecipTableRow},
+        sum_reduce::table::{SumReduceColumn, SumReduceTable, SumReduceTableRow},
     },
     pie::NodeInfo,
 };
@@ -357,8 +357,9 @@ impl Operator for LuminairMul {
     }
 }
 
+// ================== REDUCE ==================
 
-/// Implements element-wise Sum Reduce for LuminAIR.
+/// Implements SumReduce for LuminAIR.
 #[derive(Debug, Clone, Default, PartialEq)]
 struct LuminairSumReduce(pub usize);
 
@@ -370,7 +371,7 @@ impl LuminairSumReduce {
 }
 
 impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
-    /// Processes two input tensors, generating a trace, claim, and output tensor.
+    /// Processes input tensor, generating a trace, claim, and output tensor.
     fn process_trace(
         &mut self,
         inp: Vec<(InputTensor, ShapeTracker)>,
@@ -384,7 +385,7 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
 
         let output_size = front_size * back_size;
         let mut out_data = vec![Fixed::zero(); output_size];
-        let input= get_buffer_from_tensor(&inp[0].0);
+        let input = get_buffer_from_tensor(&inp[0].0);
         let expr = (inp[0].1.index_expression(), inp[0].1.valid_expression());
         let mut stack: Vec<i64> = vec![];
 
@@ -392,9 +393,7 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
         let input_id: BaseField = node_info.inputs[0].id.into();
 
         for i in 0..front_size {
-
             for j in 0..back_size {
-
                 let mut acc = Fixed::zero(); // Initialize accumulator for each (i, j)
                 for k in 0..dim_size {
                     let orig_index = i * dim_size * back_size + k * back_size + j;
@@ -402,7 +401,7 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
                     let next_acc = acc + input_val; // Compute next accumulator
 
                     // Set out_data only in the last reduction step
-                    let (out_val, is_last_step )= if k == dim_size - 1 {
+                    let (out_val, is_last_step) = if k == dim_size - 1 {
                         out_data[i * back_size + j] = next_acc;
                         (next_acc, BaseField::one())
                     } else {
@@ -419,8 +418,7 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
                     } else {
                         BaseField::one() * BaseField::from_u32_unchecked(node_info.num_consumers)
                     };
-                    let idx = i * back_size + j; // Correct index for out_data
-                    // let is_last_idx: u32 = if (front_size * back_size) == output_size - 1 { 1 } else { 0 };
+                    let idx = i * back_size + j; // Index for out_data
 
                     let is_last_idx: u32 = if idx == (output_size - 1) { 1 } else { 0 };
                     // Add row to the trace table with acc and next_acc
@@ -436,13 +434,12 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
                         out: out_val.to_m31(),
                         acc: acc.to_m31(),
                         next_acc: next_acc.to_m31(),
-                        is_last_step: is_last_step,
+                        is_last_step,
                         input_mult,
                         out_mult,
                     });
                     acc = next_acc;
                 }
-
             }
         }
         vec![Tensor::new(StwoData(Arc::new(out_data)))]
@@ -564,7 +561,6 @@ impl Compiler for PrimitiveCompiler {
 
         // Replace Luminal's ops with LuminAIR ops
         for id in graph.node_indices().collect::<Vec<_>>() {
-
             let op = graph.node_weight(id).unwrap().as_any().type_id();
             let op_ref = graph.graph.node_weight_mut(id).unwrap();
 
@@ -575,12 +571,13 @@ impl Compiler for PrimitiveCompiler {
             } else if is::<luminal::op::Mul>(op) {
                 *op_ref = LuminairMul::new().into_operator()
             } else if is::<luminal::op::SumReduce>(op) {
-                let dim_index = if let Some(sum_reduce) = op_ref.deref().as_any().downcast_ref::<SumReduce>() {
-                    sum_reduce.0 // Access the usize field (the 0 in SumReduce(0))
-                } else {
-                    0
-                };
-                *op_ref = LuminairSumReduce::new(dim_index).into_operator() 
+                let dim_index =
+                    if let Some(sum_reduce) = op_ref.deref().as_any().downcast_ref::<SumReduce>() {
+                        sum_reduce.0 // Access the usize field (the 0 in SumReduce(0))
+                    } else {
+                        0
+                    };
+                *op_ref = LuminairSumReduce::new(dim_index).into_operator()
             } else if is::<luminal::op::Recip>(op) {
                 *op_ref = LuminairRecip::new().into_operator()
             } else if is::<luminal::op::Contiguous>(op) {
