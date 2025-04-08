@@ -1,3 +1,7 @@
+use crate::{
+    components::{InteractionClaim, NodeElements, SumReduceClaim, TraceColumn, TraceError, TraceEval},
+    utils::calculate_log_size,
+};
 use num_traits::One;
 use serde::{Deserialize, Serialize};
 use stwo_prover::{
@@ -12,12 +16,7 @@ use stwo_prover::{
     },
 };
 
-use crate::{
-    components::{SumReduceClaim, InteractionClaim, NodeElements, TraceColumn, TraceError, TraceEval},
-    utils::calculate_log_size,
-};
-
-/// Represents the trace for the Sum Reduce component, containing the required registers for its
+/// Represents the trace for the SumReduce component, containing the required registers for its
 /// constraints.
 #[derive(Debug, Default, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SumReduceTable {
@@ -30,21 +29,17 @@ pub struct SumReduceTable {
 pub struct SumReduceTableRow {
     pub node_id: BaseField,
     pub input_id: BaseField,
-    // pub rhs_id: BaseField,
     pub idx: BaseField,
     pub is_last_idx: BaseField,
     pub next_node_id: BaseField,
     pub next_input_id: BaseField,
-    // pub next_rhs_id: BaseField,
     pub next_idx: BaseField,
     pub input: BaseField,
-    // pub rhs: BaseField,
     pub out: BaseField,
     pub acc: BaseField,
     pub next_acc: BaseField,
     pub is_last_step: BaseField,
     pub input_mult: BaseField,
-    // pub rhs_mult: BaseField,
     pub out_mult: BaseField,
 }
 
@@ -75,42 +70,34 @@ impl SumReduceTable {
         // Create columns
         let mut node_id = BaseColumn::zeros(trace_size);
         let mut input_id = BaseColumn::zeros(trace_size);
-        // let mut rhs_id = BaseColumn::zeros(trace_size);
         let mut idx = BaseColumn::zeros(trace_size);
         let mut is_last_idx = BaseColumn::zeros(trace_size);
         let mut next_node_id = BaseColumn::zeros(trace_size);
         let mut next_input_id = BaseColumn::zeros(trace_size);
-        // let mut next_rhs_id = BaseColumn::zeros(trace_size);
         let mut next_idx = BaseColumn::zeros(trace_size);
         let mut input = BaseColumn::zeros(trace_size);
-        // let mut rhs = BaseColumn::zeros(trace_size);
         let mut out = BaseColumn::zeros(trace_size);
         let mut acc = BaseColumn::zeros(trace_size);
         let mut next_acc = BaseColumn::zeros(trace_size);
         let mut is_last_step = BaseColumn::zeros(trace_size);
         let mut input_mult = BaseColumn::zeros(trace_size);
-        // let mut rhs_mult = BaseColumn::zeros(trace_size);
         let mut out_mult = BaseColumn::zeros(trace_size);
 
         // Fill columns
         for (vec_row, row) in self.table.iter().enumerate() {
             node_id.set(vec_row, row.node_id);
             input_id.set(vec_row, row.input_id);
-            // rhs_id.set(vec_row, row.rhs_id);
             idx.set(vec_row, row.idx);
             is_last_idx.set(vec_row, row.is_last_idx);
             next_node_id.set(vec_row, row.next_node_id);
             next_input_id.set(vec_row, row.next_input_id);
-            // next_rhs_id.set(vec_row, row.next_rhs_id);
             next_idx.set(vec_row, row.next_idx);
             input.set(vec_row, row.input);
-            // rhs.set(vec_row, row.rhs);
             out.set(vec_row, row.out);
             acc.set(vec_row, row.acc);
             next_acc.set(vec_row, row.next_acc);
             is_last_step.set(vec_row, row.is_last_step);
             input_mult.set(vec_row, row.input_mult);
-            // rhs_mult.set(vec_row, row.rhs_mult);
             out_mult.set(vec_row, row.out_mult);
         }
 
@@ -125,21 +112,17 @@ impl SumReduceTable {
         let mut trace = Vec::with_capacity(SumReduceColumn::count().0);
         trace.push(CircleEvaluation::new(domain, node_id));
         trace.push(CircleEvaluation::new(domain, input_id));
-        // trace.push(CircleEvaluation::new(domain, rhs_id));
         trace.push(CircleEvaluation::new(domain, idx));
         trace.push(CircleEvaluation::new(domain, is_last_idx));
         trace.push(CircleEvaluation::new(domain, next_node_id));
         trace.push(CircleEvaluation::new(domain, next_input_id));
-        // trace.push(CircleEvaluation::new(domain, next_rhs_id));
         trace.push(CircleEvaluation::new(domain, next_idx));
         trace.push(CircleEvaluation::new(domain, input));
-        // trace.push(CircleEvaluation::new(domain, rhs));
         trace.push(CircleEvaluation::new(domain, out));
         trace.push(CircleEvaluation::new(domain, acc));
         trace.push(CircleEvaluation::new(domain, next_acc));
         trace.push(CircleEvaluation::new(domain, is_last_step));
         trace.push(CircleEvaluation::new(domain, input_mult));
-        // trace.push(CircleEvaluation::new(domain, rhs_mult));
         trace.push(CircleEvaluation::new(domain, out_mult));
 
         assert_eq!(trace.len(), SumReduceColumn::count().0);
@@ -153,21 +136,17 @@ impl SumReduceTable {
 pub enum SumReduceColumn {
     NodeId,
     InputId,
-    // RhsId,
     Idx,
     IsLastIdx,
     NextNodeId,
     NextInputId,
-    // NextRhsId,
     NextIdx,
     Input,
-    // Rhs,
     Out,
     Acc,
     NextAcc,
     IsLastStep,
     InputMult,
-    // RhsMult,
     OutMult,
 }
 
@@ -177,21 +156,17 @@ impl SumReduceColumn {
         match self {
             Self::NodeId => 0,
             Self::InputId => 1,
-            // Self::RhsId => 2,
             Self::Idx => 2,
             Self::IsLastIdx => 3,
             Self::NextNodeId => 4,
             Self::NextInputId => 5,
-            // Self::NextRhsId => 7,
             Self::NextIdx => 6,
             Self::Input => 7,
-            // Self::Rhs => 10,
             Self::Out => 8,
             Self::Acc => 9,
             Self::NextAcc => 10,
             Self::IsLastStep => 11,
             Self::InputMult => 12,
-            // Self::RhsMult => 16,
             Self::OutMult => 13,
         }
     }
@@ -199,7 +174,7 @@ impl SumReduceColumn {
 impl TraceColumn for SumReduceColumn {
     /// Returns the number of columns in the main trace and interaction trace.
     fn count() -> (usize, usize) {
-        (14, 3)
+        (14, 2)
     }
 }
 
@@ -215,7 +190,7 @@ pub fn interaction_trace_evaluation(
     let log_size = main_trace_eval[0].domain.log_size();
     let mut logup_gen = LogupTraceGenerator::new(log_size);
 
-    // Create trace for input
+    // Create trace for Input
     let input_main_col = &main_trace_eval[SumReduceColumn::Input.index()].data;
     let input_id_col = &main_trace_eval[SumReduceColumn::InputId.index()].data;
     let input_mult_col = &main_trace_eval[SumReduceColumn::InputMult.index()].data;
@@ -232,24 +207,6 @@ pub fn interaction_trace_evaluation(
         );
     }
     input_int_col.finalize_col();
-
-    // // Create trace for RHS
-    // let rhs_main_col = &main_trace_eval[SumReduceColumn::Rhs.index()].data;
-    // let rhs_id_col = &main_trace_eval[SumReduceColumn::RhsId.index()].data;
-    // let rhs_mult_col = &main_trace_eval[SumReduceColumn::RhsMult.index()].data;
-    // let mut rhs_int_col = logup_gen.new_col();
-    // for row in 0..1 << (log_size - LOG_N_LANES) {
-    //     let rhs = rhs_main_col[row];
-    //     let id = rhs_id_col[row];
-    //     let multiplicity = rhs_mult_col[row];
-
-    //     rhs_int_col.write_frac(
-    //         row,
-    //         multiplicity.into(),
-    //         lookup_elements.combine(&[rhs, id]),
-    //     );
-    // }
-    // rhs_int_col.finalize_col();
 
     // Create trace for OUTPUT
     let out_main_col = &main_trace_eval[SumReduceColumn::Out.index()].data;

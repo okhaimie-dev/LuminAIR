@@ -425,7 +425,6 @@ impl LuminairOperator<SumReduceColumn, SumReduceTable> for LuminairSumReduce {
                     // let is_last_idx: u32 = if (front_size * back_size) == output_size - 1 { 1 } else { 0 };
 
                     let is_last_idx: u32 = if idx == (output_size - 1) { 1 } else { 0 };
-    
                     // Add row to the trace table with acc and next_acc
                     table.add_row(SumReduceTableRow {
                         node_id,
