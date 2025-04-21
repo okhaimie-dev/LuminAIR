@@ -97,3 +97,36 @@ fn test_max_reduce() {
     assert_close(&c.data(), &c_cpu.data());
     assert_close(&d.data(), &d_cpu.data());
 }
+
+#[test]
+fn test_log2_op() {
+    // Graph setup
+    let mut cx = Graph::new();
+    let mut rng = StdRng::seed_from_u64(1);
+    let data = random_vec_rng(1 * 4 * 100, &mut rng, true);
+    let a = cx.tensor((1, 4, 100));
+    a.set(data.clone());
+    let mut b = a.log2().retrieve();
+
+    // Compilation and execution using StwoCompiler
+    cx.compile(
+        <(GenericCompiler, StwoCompiler)>::default(),
+        &mut b,
+    );
+    let trace = cx.gen_trace().expect("Trace generation failed");
+    let proof = cx.prove(trace).expect("Proof generation failed");
+    cx.verify(proof).expect("Proof verification failed");
+
+    // CPUCompiler comparison
+    let mut cx_cpu = Graph::new();
+    let a_cpu = cx_cpu.tensor((1, 4, 100)).set(data.clone());
+    let mut b_cpu = a_cpu.log2().retrieve();
+    cx_cpu.compile(
+        <(GenericCompiler, CPUCompiler)>::default(),
+        &mut b_cpu,
+    );
+    cx_cpu.execute();
+
+    // Assert outputs are close
+    assert_close(&b.data(), &b_cpu.data());
+}
