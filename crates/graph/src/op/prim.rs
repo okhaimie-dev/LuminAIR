@@ -598,7 +598,11 @@ impl LuminairOperator<Log2Column, Log2Table> for LuminairLog2 {
 
         for (idx, out) in out_data.iter_mut().enumerate() {
             let input_val = get_index(input, &expr, &mut stack, idx);
-            let (out_val, rem_val) = input_val.log2();
+            // Calculate log2 by converting to f64, taking log2, and converting back
+            let input_f64 = input_val.to_f64();
+            let out_val = Fixed::from_f64(input_f64.log2());
+            let pow2_val = 2f64.powf(out_val.to_f64());
+            let rem_val = input_val - Fixed::from_f64(pow2_val);
 
             let input_mult = if node_info.inputs[0].is_initializer {
                 BaseField::zero()
@@ -624,7 +628,7 @@ impl LuminairOperator<Log2Column, Log2Table> for LuminairLog2 {
                 next_input_id: input_id,
                 input_val: input_val.to_m31(),
                 output_val: out_val.to_m31(),
-                pow2_result: (2u32.pow(out_val.to_u32().unwrap())).into(), // Calculate 2^out_val
+                pow2_result: Fixed::from_f64(pow2_val).to_m31(), // Store 2^out_val as BaseField
                 input_mult,
                 output_mult: out_mult,
             })
