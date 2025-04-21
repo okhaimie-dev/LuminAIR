@@ -4,7 +4,7 @@ use std::vec;
 
 use ::serde::{Deserialize, Serialize};
 use components::{
-    AddClaim, InteractionClaim, MaxReduceClaim, MulClaim, RecipClaim, SumReduceClaim, Log2Claim
+    AddClaim, InteractionClaim, Log2Claim, MaxReduceClaim, MulClaim, RecipClaim, SumReduceClaim
 };
 use pie::ExecutionResources;
 use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
@@ -70,6 +70,9 @@ impl LuminairClaim {
         if let Some(ref max_reduce) = self.max_reduce {
             max_reduce.mix_into(channel);
         }
+        if let Some(ref log2) = self.log2 {
+            log2.mix_into(channel);
+        }
     }
 
     /// Computes log sizes for all trace types in the claim.
@@ -90,6 +93,9 @@ impl LuminairClaim {
         }
         if let Some(ref max_reduce) = self.max_reduce {
             log_sizes.push(max_reduce.log_sizes());
+        }
+        if let Some(ref log2) = self.log2 {
+            log_sizes.push(log2.log_sizes());
         }
 
         let mut log_sizes = TreeVec::concat_cols(log_sizes.into_iter());

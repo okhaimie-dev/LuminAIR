@@ -602,7 +602,6 @@ impl LuminairOperator<Log2Column, Log2Table> for LuminairLog2 {
             let input_f64 = input_val.to_f64();
             let out_val = Fixed::from_f64(input_f64.log2());
             let pow2_val = 2f64.powf(out_val.to_f64());
-            let rem_val = input_val - Fixed::from_f64(pow2_val);
 
             let input_mult = if node_info.inputs[0].is_initializer {
                 BaseField::zero()
@@ -644,7 +643,6 @@ impl Operator for LuminairLog2 {
         unimplemented!()
     }
 }
-
 
 // ================== COMPILER ==================
 
@@ -781,7 +779,11 @@ impl Compiler for PrimitiveCompiler {
                 *op_ref = LuminairMaxReduce::new(dim_index).into_operator()
             } else if is::<luminal::op::Recip>(op) {
                 *op_ref = LuminairRecip::new().into_operator()
-            } else if is::<luminal::op::Contiguous>(op) {
+            }
+            else if is::<luminal::op::Log2>(op) {
+                *op_ref = LuminairLog2::new().into_operator()
+            }
+            else if is::<luminal::op::Contiguous>(op) {
                 *op_ref = Box::new(Contiguous)
             }
         }

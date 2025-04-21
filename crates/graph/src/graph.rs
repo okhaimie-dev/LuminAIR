@@ -24,6 +24,7 @@ use luminair_air::{
             self,
             table::{SumReduceColumn, SumReduceTable},
         },
+        log2::table::{Log2Column, Log2Table},
         ClaimType, LuminairComponents, LuminairInteractionElements, TraceError,
     },
     pie::{
@@ -101,6 +102,7 @@ impl LuminairGraph for Graph {
         let mut recip_table = RecipTable::new();
         let mut sum_reduce_table = SumReduceTable::new();
         let mut max_reduce_table = MaxReduceTable::new();
+        let mut log2_table = Log2Table::new();
 
         for (node, src_ids) in self.linearized_graph.as_ref().unwrap() {
             if self.tensors.contains_key(&(*node, 0)) {
@@ -242,6 +244,19 @@ impl LuminairGraph for Graph {
                     *op_counter.max_reduce.get_or_insert(0) += 1;
 
                     tensors
+                } else if <Box<dyn Operator> as HasProcessTrace<Log2Column, Log2Table>>::has_process_trace(
+                    node_op,
+                ) {
+                    let tensors = <Box<dyn Operator> as HasProcessTrace<
+                        Log2Column,
+                        Log2Table,
+                    >>::call_process_trace(
+                        node_op, srcs, &mut log2_table, &node_info
+                    )
+                    .unwrap();
+                    *op_counter.log2.get_or_insert(0) += 1;
+
+                    tensors
                 }
                 else {
                     // Handle other operators or fallback
@@ -292,6 +307,12 @@ impl LuminairGraph for Graph {
             max_log_size = max_log_size.max(log_size);
 
             table_traces.push(TableTrace::from_max_reduce(max_reduce_table));
+        }
+        if !log2_table.table.is_empty() {
+            let log_size = calculate_log_size(log2_table.table.len());
+            max_log_size = max_log_size.max(log_size);
+
+            table_traces.push(TableTrace::from_log2(log2_table));
         }
 
         Ok(LuminairPie {
@@ -548,6 +569,7 @@ fn test_direct_table_trace_processing() {
     let mut d = (c + a).retrieve();
     let _e = a.sum_reduce(0).retrieve();
     let _f = a.max_reduce(0).retrieve();
+    let _g = a.log2();
 
     cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
 
@@ -571,11 +593,16 @@ fn test_direct_table_trace_processing() {
         .table_traces
         .iter()
         .any(|t| matches!(t, TableTrace::MaxReduce { .. }));
+    let has_log2 = trace
+        .table_traces
+        .iter()
+        .any(|t| matches!(t, TableTrace::Log2 { .. }));
 
     assert!(has_add, "Should contain Add table traces");
     assert!(has_mul, "Should contain Mul table traces");
     assert!(has_sum_reduce, "Should contain SumReduce table traces");
     assert!(has_max_reduce, "Should contain MaxReduce table traces");
+    assert!(has_log2, "Should contain Log2 table traces");
 
     // Verify the end-to-end proof pipeline
     let proof = cx.prove(trace).expect("Proof generation failed");
