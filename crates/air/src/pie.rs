@@ -2,8 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::components::{
     add::table::AddTable, max_reduce::table::MaxReduceTable, mul::table::MulTable,
-    recip::table::RecipTable, sum_reduce::table::SumReduceTable, ClaimType, TraceError, TraceEval,
-    log2::table::Log2Table
+    recip::table::RecipTable, sum_reduce::table::SumReduceTable, log2::table::Log2Table, ClaimType, TraceError, TraceEval,
 };
 
 /// Represents an operator's trace table along with its claim before conversion

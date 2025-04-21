@@ -24,7 +24,10 @@ use luminair_air::{
             self,
             table::{SumReduceColumn, SumReduceTable},
         },
-        log2::table::{Log2Column, Log2Table},
+        log2::{
+            self,
+            table::{Log2Column, Log2Table}
+        },
         ClaimType, LuminairComponents, LuminairInteractionElements, TraceError,
     },
     pie::{
@@ -449,7 +452,7 @@ impl LuminairGraph for Graph {
                     interaction_claim.max_reduce = Some(cl);
                 }
                 ClaimType::Log2(_) => {
-                    let (tr, cl) = recip::table::interaction_trace_evaluation(&trace, lookup_elements).unwrap();
+                    let (tr, cl) = log2::table::interaction_trace_evaluation(&trace, lookup_elements).unwrap();
                     tree_builder.extend_evals(tr);
                     interaction_claim.log2 = Some(cl);
                 }
