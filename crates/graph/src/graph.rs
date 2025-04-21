@@ -371,6 +371,7 @@ impl LuminairGraph for Graph {
                 ClaimType::SumReduce(claim) => main_claim.sum_reduce = Some(claim),
                 ClaimType::Recip(claim) => main_claim.recip = Some(claim),
                 ClaimType::MaxReduce(claim) => main_claim.max_reduce = Some(claim),
+                ClaimType::Log2(claim) => main_claim.log2 = Some(claim)
             }
         }
 
@@ -425,6 +426,11 @@ impl LuminairGraph for Graph {
                             .unwrap();
                     tree_builder.extend_evals(tr);
                     interaction_claim.max_reduce = Some(cl);
+                }
+                ClaimType::Log2(_) => {
+                    let (tr, cl) = recip::table::interaction_trace_evaluation(&trace, lookup_elements).unwrap();
+                    tree_builder.extend_evals(tr);
+                    interaction_claim.log2 = Some(cl);
                 }
             }
         }

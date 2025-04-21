@@ -1,6 +1,5 @@
 use crate::components::{Log2Claim, NodeElements};
 use num_traits::One;
-use numerair::eval::EvalFixedPoint;
 use stwo_prover::constraint_framework::{
     EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
 };
