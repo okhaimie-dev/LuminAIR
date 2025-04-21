@@ -572,6 +572,7 @@ fn test_direct_table_trace_processing() {
     let mut d = (c + a).retrieve();
     let _e = a.sum_reduce(0).retrieve();
     let _f = a.max_reduce(0).retrieve();
+    let _g = a.log2().retrieve();
 
     cx.compile(<(GenericCompiler, StwoCompiler)>::default(), &mut d);
 
